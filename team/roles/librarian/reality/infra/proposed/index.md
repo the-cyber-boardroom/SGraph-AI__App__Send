@@ -1,6 +1,6 @@
 # Infrastructure — Proposed Items Index
 
-**Domain:** infra/proposed/ | **Last updated:** 2026-07-14 | **Maintained by:** Librarian (daily run)
+**Domain:** infra/proposed/ | **Last updated:** 2026-08-11 | **Maintained by:** Librarian (daily run)
 
 All items below are PROPOSED. None have been code-verified. Do not describe any of these as existing features.
 
@@ -132,4 +132,27 @@ Large proposed sections are in dedicated topic files to keep this index navigabl
 
 | # | Feature | One-Line Description | Source |
 |---|---------|---------------------|--------|
-| P-398 | SG/Vault AWS Marketplace standalone deployment | Separate admin FastAPI and website for deployment management; setup mode on boot (boots unconfigured, no user data required at launch — marketplace policy); storage-mode property (memory / disk EBS / S3) with least-privilege IAM role per mode attached to EC2 instance (no credentials in AMI); two-layer authorization model (FastAPI access control + usage API keys, both user-configurable); send-to-someone workflow = open FastAPI access + key required to invoke; AMI + CloudFormation one-click deploy; marketplace-branded vault page; pricing: free / BYOL / metered; open items before launch: TLS without Caddy (sidecar proxy recommended), admin auth bootstrap (first-boot random token), EBS volume lifecycle (DeletionPolicy: Snapshot) | 06/21 aws-marketplace-deployment/dev-brief |
+| P-398 | SG/Vault AWS Marketplace standalone deployment | Separate admin FastAPI and website for deployment management; setup mode on boot (boots unconfigured, no user data required at launch — marketplace policy); storage-mode property (memory / disk EBS / S3) with least-privilege IAM role per mode attached to EC2 instance (no credentials in AMI); two-layer authorization model (FastAPI access control + usage API keys, both user-configurable); send-to-someone workflow = open FastAPI access + key required to invoke; AMI + CloudFormation one-click deploy; marketplace-branded vault page; pricing: free / BYOL / metered; open items before launch: TLS without Caddy (sidecar proxy recommended), admin auth bootstrap (first-boot random token), EBS volume lifecycle (DeletionPolicy: Snapshot) | 06/21 aws-marketplace-deployment/dev-brief
+
+---
+
+## Multi-Target Deployment Plan — Phases A–D (08/11 architect spec + technical brief — v0.33.54)
+
+Planned in `team/roles/architect/reviews/08/11/v0.33.54__architect-spec__multi-target-deployment.md` and `team/comms/briefs/08/11/v0.33.54__technical-brief__deployment-phases-a-d.md`. Resolves P-398's three open items (ADR-5/6/7).
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-399 | Lambda Web Adapter in `sg-send-vault` image | One image runs on Lambda (container fn), Cloud Run, Heroku, Docker/EC2; `$PORT` contract; non-root + HEALTHCHECK + OCI-label hardening; ECR publish | 08/11 technical brief, Phase A |
+| P-400 | CloudFormation Lambda target (`deploy/aws/lambda.cfn.yml`) | Container-image Lambda + Function URL, params for memory/timeout/token/DNS (optional CloudFront + Route53; cert must be us-east-1); stack-created S3 buckets by existing naming convention | 08/11 technical brief, Phase B |
+| P-401 | CloudFormation EC2 appliance target (`deploy/aws/ec2.cfn.yml`) | Single instance, docker compose (app + caddy auto-TLS sidecar), EBS data volume with DeletionPolicy: Snapshot, first-boot token in SSM, storage-mode param swaps least-privilege IAM policy, params for instance type/DNS/CIDR | 08/11 technical brief, Phase B |
+| P-402 | Dedicated deploy-targets CI pipeline | New `deploy-targets.yml` workflow (separate from ci-pipeline family): image build/push (Docker Hub + ECR), cfn-lint, per-target deploy + shared pytest smoke suite, GitHub OIDC (no long-lived AWS keys), EC2 auto-teardown | 08/11 technical brief, Phase C |
+| P-403 | GCP Cloud Run + Heroku deployments | Same image; Cloud Run via Workload Identity Federation, Heroku via container registry; both S3 storage mode (Heroku fs is ephemeral); `Storage_FS__GCS` backend registered as follow-on | 08/11 technical brief, Phases D1–D2 |
+| P-404 | ~~Netlify static vault UI hosting~~ SUPERSEDED by P-412 | Netlify (and all static hosts) moved to the dedicated static-vault-hosting brief — static hosting is its own deployment kind, not an API target | 08/11 static-vault-hosting brief |
+| P-405 | Terraform modules (AWS + non-AWS) | `deploy/terraform/modules/{aws-lambda,aws-ec2,aws-ecs-fargate,gcp-cloud-run,heroku}`; AWS modules mirror the authoritative CFN templates (smoke suite = drift alarm), non-AWS modules ARE the implementation Phase D CI calls; Registry publication is a follow-on | 08/11 technical brief, Phase B2 / ADR-10 |
+| P-406 | One-click deploy web pages (`/deploy/*`) | Website section with per-target one-click installs: CFN Launch Stack deep-links (public versioned template bucket, params prefilled), GCP Cloud Run Button, Heroku Button (`app.json`+`heroku.yml`), docker one-liner; no credential collection — buttons deep-link into the provider's own console | 08/11 technical brief, Phase E / ADR-11 |
+| P-407 | ECS/Fargate CFN target with full cluster lifecycle | `deploy/aws/ecs-fargate.cfn.yml`: one stack owns cluster + task def + service + ALB + DNS; stack delete removes everything (orphans = pipeline failure); the long-running multi-replica pattern | 08/11 technical brief, Phase B.3b / ADR-13 |
+| P-408 | AMI baking pipeline — AMI as master server-side artifact | EC2 Image Builder pipeline (CFN-defined): AL2023 + docker + pre-pulled image + compose + systemd; versioned per-region AMIs + latest SSM parameter; `ec2.cfn.yml` boots from it (user-data fallback kept); same AMI is the Marketplace artifact (P-398) | 08/11 technical brief, Phase B3 / ADR-15 |
+| P-409 | Full-cycle validation pipeline (`deploy-full-cycle.yml`) | ONE workflow: deploy ALL targets in sequence → smoke ALL → destroy ALL in reverse → orphan sweep (tag-based) → report; dispatch + nightly; proves create AND destroy end-to-end | 08/11 technical brief, Phase C1 / ADR-16 |
+| P-410 | Publish/dogfood pipeline (`deploy-publish.yml`) + CFN/TF productization | Publishes the live API to the several wanted locations, driven exclusively by CFN/Terraform at pinned versions from `deploy/publish-targets.yml`; direction: pytest-as-deployer (osbot dev-era tool) retired after bedding-in → one deployment mode across the board | 08/11 technical brief, Phase C2 / ADR-16 |
+| P-411 | Single-key licensing mode + friendly login page + memory mode everywhere | `AccessToken` param = the licensing key on every target, gating ALL routes incl. reads; friendly login page in the image replaces the bare set-cookie-form (caddy just proxies); `StorageMode=memory` first-class on every target (agentic/ephemeral); self-contained image invariant enforced by `--network=none` smoke | 08/11 technical brief, A.4/A.5 + shared param semantics / ADR-8, ADR-12, ADR-14 |
+| P-412 | Static vault hosting — read-only projections to any static host | Dedicated brief: publish UI tree + ciphertext mirror + read-only token to GitHub Pages / S3+CF / Netlify / GCS / Cloudflare Pages / Heroku-static; two access models (public projection, locked projection); adopts `sgit publish-static` (doc 375) as the exporter; source-of-truth vault stays on a live server | 08/11 static-vault-hosting brief | |
