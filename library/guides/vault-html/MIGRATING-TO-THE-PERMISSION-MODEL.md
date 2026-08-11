@@ -78,6 +78,11 @@ Verb → permission key:
 surfaces a consent prompt for a declared, consent-gated verb (create) at runtime — it cannot grant a
 verb the manifest didn't list (that returns `EPERM`).
 
+> **Extracting a folder into its own vault and embedding it back?** The full `vault.create` /
+> `vault.createKey` / `vault.seedFrom` / `vault.mount` grant set, with worked examples, is in
+> [`EXTRACT-AND-EMBED-A-SUB-VAULT.md`](EXTRACT-AND-EMBED-A-SUB-VAULT.md) — including an honest
+> maturity note on `vault.mount`'s credential-resolution path before you rely on it for writes.
+
 ---
 
 ## The floor — what no app can ever do (and never could be granted)

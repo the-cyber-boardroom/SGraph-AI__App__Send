@@ -612,6 +612,11 @@ A vault can link to **other vaults** (the "vault-in-vault" feature). Linked vaul
 the file tree as folders and are **read-only**. To your app, an inner-vault file is **just another
 path** — read it through the same `sg.vfs.*` API:
 
+> **Want to go the other direction — split a folder OUT of the current vault into its own vault,
+> then bring it back?** See **[EXTRACT-AND-EMBED-A-SUB-VAULT.md](EXTRACT-AND-EMBED-A-SUB-VAULT.md)**
+> — covers `sg.vault.create({seedFrom, link})` plus all three ways to re-surface the result (a
+> read-only link like the one below, `sg.vault.embed`, or the `sg.vault.mount` ViV relay).
+
 ```js
 // 'subvaults/' is where links commonly live; the mount path is the link-file name without
 // the .link.json suffix. Inner-vault files appear under that path.
@@ -638,6 +643,10 @@ without the user ever seeing the raw vault UI.
 Sometimes you don't want to *read* another vault's files — you want to **show the whole
 other vault** (its app, its files) inside a panel in your app. A doctor console opening
 each patient's vault is the canonical case. Use **`sg.vault.embed`**:
+
+> Creating the child vault to embed by extracting it from a folder in the current vault?
+> **[EXTRACT-AND-EMBED-A-SUB-VAULT.md](EXTRACT-AND-EMBED-A-SUB-VAULT.md)** walks the full
+> `seedFrom` → `embed` flow end to end, including where the raw key in the call below comes from.
 
 ```js
 const pane = document.querySelector('#patient-pane');
