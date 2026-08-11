@@ -1,6 +1,6 @@
 # Infrastructure — Proposed Items Index
 
-**Domain:** infra/proposed/ | **Last updated:** 2026-07-14 | **Maintained by:** Librarian (daily run)
+**Domain:** infra/proposed/ | **Last updated:** 2026-08-11 | **Maintained by:** Librarian (daily run)
 
 All items below are PROPOSED. None have been code-verified. Do not describe any of these as existing features.
 
@@ -132,4 +132,19 @@ Large proposed sections are in dedicated topic files to keep this index navigabl
 
 | # | Feature | One-Line Description | Source |
 |---|---------|---------------------|--------|
-| P-398 | SG/Vault AWS Marketplace standalone deployment | Separate admin FastAPI and website for deployment management; setup mode on boot (boots unconfigured, no user data required at launch — marketplace policy); storage-mode property (memory / disk EBS / S3) with least-privilege IAM role per mode attached to EC2 instance (no credentials in AMI); two-layer authorization model (FastAPI access control + usage API keys, both user-configurable); send-to-someone workflow = open FastAPI access + key required to invoke; AMI + CloudFormation one-click deploy; marketplace-branded vault page; pricing: free / BYOL / metered; open items before launch: TLS without Caddy (sidecar proxy recommended), admin auth bootstrap (first-boot random token), EBS volume lifecycle (DeletionPolicy: Snapshot) | 06/21 aws-marketplace-deployment/dev-brief |
+| P-398 | SG/Vault AWS Marketplace standalone deployment | Separate admin FastAPI and website for deployment management; setup mode on boot (boots unconfigured, no user data required at launch — marketplace policy); storage-mode property (memory / disk EBS / S3) with least-privilege IAM role per mode attached to EC2 instance (no credentials in AMI); two-layer authorization model (FastAPI access control + usage API keys, both user-configurable); send-to-someone workflow = open FastAPI access + key required to invoke; AMI + CloudFormation one-click deploy; marketplace-branded vault page; pricing: free / BYOL / metered; open items before launch: TLS without Caddy (sidecar proxy recommended), admin auth bootstrap (first-boot random token), EBS volume lifecycle (DeletionPolicy: Snapshot) | 06/21 aws-marketplace-deployment/dev-brief
+
+---
+
+## Multi-Target Deployment Plan — Phases A–D (08/11 architect spec + technical brief — v0.33.54)
+
+Planned in `team/roles/architect/reviews/08/11/v0.33.54__architect-spec__multi-target-deployment.md` and `team/comms/briefs/08/11/v0.33.54__technical-brief__deployment-phases-a-d.md`. Resolves P-398's three open items (ADR-5/6/7).
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-399 | Lambda Web Adapter in `sg-send-vault` image | One image runs on Lambda (container fn), Cloud Run, Heroku, Docker/EC2; `$PORT` contract; non-root + HEALTHCHECK + OCI-label hardening; ECR publish | 08/11 technical brief, Phase A |
+| P-400 | CloudFormation Lambda target (`deploy/aws/lambda.cfn.yml`) | Container-image Lambda + Function URL, params for memory/timeout/token/DNS (optional CloudFront + Route53; cert must be us-east-1); stack-created S3 buckets by existing naming convention | 08/11 technical brief, Phase B |
+| P-401 | CloudFormation EC2 appliance target (`deploy/aws/ec2.cfn.yml`) | Single instance, docker compose (app + caddy auto-TLS sidecar), EBS data volume with DeletionPolicy: Snapshot, first-boot token in SSM, storage-mode param swaps least-privilege IAM policy, params for instance type/DNS/CIDR | 08/11 technical brief, Phase B |
+| P-402 | Dedicated deploy-targets CI pipeline | New `deploy-targets.yml` workflow (separate from ci-pipeline family): image build/push (Docker Hub + ECR), cfn-lint, per-target deploy + shared pytest smoke suite, GitHub OIDC (no long-lived AWS keys), EC2 auto-teardown | 08/11 technical brief, Phase C |
+| P-403 | GCP Cloud Run + Heroku deployments | Same image; Cloud Run via Workload Identity Federation, Heroku via container registry; both S3 storage mode (Heroku fs is ephemeral); `Storage_FS__GCS` backend registered as follow-on | 08/11 technical brief, Phases D1–D2 |
+| P-404 | Netlify static vault UI hosting | NOT an API target (no container runtime): (1) read-only static vault host via existing `SGSend.staticMode`, (2) UI-on-Netlify with `SG_ENDPOINT` at a Lambda/Cloud Run API | 08/11 technical brief, Phase D3 |
