@@ -1,6 +1,6 @@
 # Reality — Master Index
 
-**Version:** v0.33.53 | **Last updated:** 2026-08-09 | **Maintained by:** Librarian (daily run)
+**Version:** v0.33.54 | **Last updated:** 2026-08-11 | **Maintained by:** Librarian (daily run)
 **Structure:** Domain tree — each domain has its own directory with `index.md` and `proposed/`
 
 This file is the entry point. Read it to find the right domain, then go to that domain's
@@ -31,7 +31,7 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 
 ---
 
-## Quick Stats (as of 2026-08-09)
+## Quick Stats (as of 2026-08-11)
 
 | Metric | Count |
 |--------|-------|
@@ -44,8 +44,8 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | Browser UIs | **7** (share v0.4, open v0.4, admin, workspace, vault browser, vault app /en-gb/app; user v0.3.x legacy) |
 | Active tools (tools.sgraph.ai) | 4 |
 | sgit CLI commands | 20+ |
-| Open PROPOSED items (across all domains) | ~1040+ (+13 net-new from 31 July: P-ACT-001–013 in alchemist/; previously ~1027+; processed 2026-08-03) |
-| Total documents catalogued | 910 (+26 from 31 July: 25 substantive briefs + 1 day-index; processed 08/03) |
+| Open PROPOSED items (across all domains) | ~1051+ (+11 net-new from 02-06 Aug: P-ACT-014–024 across vault/, ai-agents/, cli/; previously ~1040+; processed 2026-08-11) |
+| Total documents catalogued | 936 (+26 from 02-06 Aug: 10 from 02 Aug v0.33.55 + 16 from 06 Aug v0.33.56; processed 08/11) |
 | **Key decision** | **Risk Mandate.ai** adopted as product name (resolves OQ-company-name-1, 2026-06-25) |
 | **Key decision** | **Grounded alarm** adopted as the Risk Mandate communication strategy term (replaces FUD framing, 2026-07-05) |
 | **Key decision** | **The grant is the mandate** — authorization is the union of what the agent can already do; "never-in-line" (2026-07-23) |
@@ -55,7 +55,7 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | **Key decision** | **"We sell the mandate to operate"** — product reframe from dashboard/register to mandate delivered vault-to-vault (2026-07-17) |
 | **Latest build spec** | Airgapped RiskMandate demo/MVP (read-only vault + local storage + persona library + risk flow upward + actionable items) — 17 July 2026 |
 | **Next build priority** | Browser-local query engine (vault-as-source-of-truth, sync by commit-id, IndexedDB) — blocks the airgapped MVP |
-| **Key decision** | **Voice note transcription tool** — first SGraph product going to market; 90-day partnership term from 1 Aug 2026; OpenRouter carries both inference and billing; three privacy modes (routed/restricted/browser-local); all PROPOSED (2026-07-27) |
+| **Key decision** | **Voice note transcription tool** — first SGraph product going to market; 90-day partnership term from 1 Aug 2026; ~~OpenRouter carries both inference and billing; the markup is the issued key's credit limit~~ **INVALIDATED 2026-08-06**: OpenRouter's terms prohibit resale; the funded-key mechanism is not buildable; see payments-platform PROPOSED for replacement architecture; three privacy modes (routed/restricted/browser-local); all PROPOSED (2026-07-27) |
 | **Key decision** | **Accepted ≠ Acceptable** — two orthogonal primitives: Accepted = a named individual's act at a specific altitude and time; Acceptable = a business-owned threshold set by policy; Article 9 EU AI Act mandates risk management without defining acceptable (2026-07-28) |
 | **Key decision** | **Three-predicate model** — Confirmed (technical fact), Validated (compliance interpretation by GRC), Accepted (appetite judgement by business owner at altitude); the chain from a technical fact to a board decision (2026-07-28) |
 | **Key decision** | **Regulation graph = vault + website** — EU AI Act encoded via AKN4EU XML, graph starts empty and accretes as customer answers Confirm/Validate/Accept provisions; partial connection sufficient for value (2026-07-28) |
@@ -66,6 +66,18 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | **Key decision** | **Amendment is the subscription** — Standards-as-a-Service: open artefact, recurring revenue from re-derivation as instrument amends; cost scales with change not size (2026-07-31) |
 | **Key decision** | **Accountability manufactures demand for evidence** — three primitives (risk-as-fact, named person, visible upward) produce self-correction; three failure conditions: guessable reviewer, prior commitment, undiscriminated information (2026-07-31) |
 | **Key legal fact** | **EU AI Act transparency obligations (Article 50) are now live** — in force from 2 August 2026; Annex III standalone high-risk obligations deferred to 2 December 2027; Regulation 2026/1744 in force 27 July 2026 |
+| **Key decision** | **Registers are one chain** — the executive's risk exists because of the operator's, which exists because of a fact; side-by-side display is a model problem showing through the interface; draw as a chain (2026-08-02) |
+| **Key decision** | **A risk is something that can be accepted** — if it cannot carry a named acceptor and an interval, it is a question, not a risk; quality gate for all generated risk register rows (2026-08-02) |
+| **Key decision** | **Three moves, none denial** — acceptance flow: accept, escalate, or challenge the fact; single-button denial produces reactance; removing perceived choice produces counter-argument (2026-08-02) |
+| **Key decision** | **Vaults as substrate** — agents with distinct responsibility, capability and focus collaborate asynchronously through encrypted vault folders; no direct addressing; blackboard architecture with authorisation, audit and confidentiality answered by the medium (2026-08-02) |
+| **Key decision** | **Never render the whole graph** — render the result of a query; a diagram of everything is rarely useful; one node with neighbours is always readable (2026-08-02) |
+| **Key decision** | **Voice Debrief** is the product name (plural deliberate); WhatsApp variant is the current build; supersedes "voice transcription tool" naming (2026-08-06) |
+| **Key decision** | **Disagreement-as-output** — where two transcription models disagree is worth more than their average; disagreement spans must be marked, not smoothed; applies to transcription, concept graphs, and ontology matching (2026-08-06) |
+| **Key decision** | **Plugins are capability grants** — organising by authority creates security boundaries; organising by code creates modules; ambient authority is the root cause of prompt injection; the reference is the permission (2026-08-06) |
+| **Key decision** | **Write-as-attestation** — an external step advances the vault kernel state machine only by depositing its output in the vault; the write is the attestation rather than a claim about one (2026-08-06) |
+| **Key decision** | **Budget is a containment control** — a per-step spending ceiling declared before execution makes maximum workflow cost knowable before it runs; generalises to any bounded resource (money, time, calls, bytes) (2026-08-06) |
+| **Key fact** | **OpenRouter resale prohibited** — OpenRouter's terms prohibit reselling or distributing the service and prohibit access for the purpose of reselling API access; enforcement already visible; this invalidates the 2026-07-27 funded-key commercialisation mechanism (2026-08-06) |
+| **Key fact** | **Hyperscaler shipped per-agent budget ceilings** (May 2026) — validates the outbound maturity model claim that budget ceilings are cheapest containment controls; removes metering as a differentiator; the ledger, provenance record and register link remain as differentiators (2026-08-06) |
 
 ---
 
