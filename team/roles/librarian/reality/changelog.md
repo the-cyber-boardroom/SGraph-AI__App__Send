@@ -7,6 +7,27 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-08-11
+
+New briefs: 26 documents across 2 Aug (v0.33.55, 10 docs) and 6 Aug (v0.33.56, 16 docs). All committed to repo on 2026-08-09. Code commits: 5 since 08/08 (briefs added, 3 architect reviews merged, CI version bump v0.33.53 → v0.33.54).
+
+Key correction: OpenRouter resale prohibition invalidates 2026-07-27 "funded-key" commercialisation mechanism; annotated in index.md.
+
+Files changed:
+- `reality/index.md` — Version v0.33.53 → v0.33.54; Last updated → 2026-08-11; Quick Stats date → 2026-08-11; cumulative docs 910 → 936; PROPOSED count ~1040+ → ~1051+; 2 standing key decisions corrected/annotated; 12 new key decisions/facts added from 08/02-08/06 briefs
+- `reality/vault/proposed/index.md` — Last updated; P-ACT-014, P-ACT-015, P-ACT-018, P-ACT-024 added (vault kernel state machine, plugins-as-grants, git+sgit coexistence, write-only monitoring vault)
+- `reality/ai-agents/proposed/workflows.md` — Last updated; P-ACT-016, P-ACT-019, P-ACT-020, P-ACT-021, P-ACT-022 added (engine-outside-vault, Voice Debrief workflow declaration, parallel transcription, SKOS ontology, graph canvas REPL)
+- `reality/ai-agents/proposed/agent-communication.md` — Last updated; P-ACT-023 added (vault-as-substrate blackboard architecture)
+- `reality/cli/proposed/index.md` — Last updated; P-ACT-017, P-ACT-018 added (per-path index, vault ignore file)
+- `reality/identity/proposed/payments-platform.md` — Already created by prior session (Architect review, 2026-08-06); not touched this session
+- `reality/changelog.md` — 2026-08-11 entry added (this entry)
+
+Session: 26 new briefs | New EXISTS items: 0 | New PROPOSED items: 11 (P-ACT-014–024) | Cumulative docs: 936 | Correction: 1 standing key decision invalidated/annotated
+Master index (08/11): `team/roles/librarian/reviews/08/11/v0.33.54__master-index__briefs-02-to-06-aug-2026.md`
+Debrief (08/11): `team/humans/dinis_cruz/debriefs/08/11/v0.33.54__debrief__briefs-processing-02-to-06-aug-2026.md`
+
+---
+
 ## 2026-08-08
 
 No new briefs. No new dev commits since 2026-08-07. Quiet check: dates brought current.

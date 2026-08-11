@@ -253,6 +253,7 @@ None currently active.
 | 2026-08-05 | No new briefs; vision/screenshot + auto-pull-off commits; test count updated to ~2950+ | 3 new EXISTS items (screenshots, sg.llm.imagePart(), auto-pull-off). developer already patched ui/index.md (7 lines). Updated: index.md v0.33.53, qa/index.md ViV suite ~780+→~930+, changelog. +150 assertions (+sg_vision 62, +no_auto_reload 27, vault_llm_chat 93→122, app_shell_llm_bridge 79→96, sg_llm_config 38→53). Master index + debrief produced |
 | 2026-08-06 | No new briefs; addendum to 08/05 session with deeper commit-level detail | 7 EXISTS items detailed (image paste, SGVision, sg.llm.imagePart, ledger fix, auto-sync data-loss fix, claude-sonnet-5 default, picker notice); index.md last-updated + Black Hat note updated; changelog 08/06 + 08/05 merged; master index + debrief produced |
 | 2026-08-08 | No new briefs; no new commits; date/last-updated brought current; B-012 added | index.md + qa/index.md updated to 2026-08-08; master index + debrief produced |
+| 2026-08-11 | 26 new briefs (02 Aug + 06 Aug); 5 new code commits; 1 standing decision corrected; 11 new PROPOSED items | Master index, Dev review, AppSec review, 6 reality files updated, changelog, debrief produced; OpenRouter resale prohibition annotated in index.md |
 | 2026-08-07 | No new briefs; date/last-updated brought current to today | qa/index.md + index.md "Last updated" updated to 2026-08-07; master index + debrief produced |
 
 ---

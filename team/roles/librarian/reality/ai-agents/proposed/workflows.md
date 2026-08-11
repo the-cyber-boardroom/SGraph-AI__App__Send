@@ -1,6 +1,6 @@
 # AI Agents — Proposed: Automated Workflows and Agentic Patterns
 
-**Domain:** ai-agents/proposed/workflows | **Last updated:** 2026-06-28 | **Maintained by:** Librarian (B-003)
+**Domain:** ai-agents/proposed/workflows | **Last updated:** 2026-08-11 | **Maintained by:** Librarian (B-003)
 **Parent index:** [`index.md`](index.md)
 
 All items below are PROPOSED. None have been code-verified. Do not describe any of these as existing features.
@@ -63,3 +63,26 @@ This is a service concept, not a build. No code deliverable until the workflow m
 | # | Feature | One-Line Description | Source |
 |---|---------|---------------------|--------|
 | P-247 | Agentic compromise incident-response service | "Who you gonna call" service for users whose privileged AI agents are compromised; rootkit-style threat model (access, resources, credentials, persistence); when-not-if posture; rebuild-reset-monitor remediation; aligned with security companies; SGraph offering vs separate venture open; next step is workflow map | 06/15 strategy-brief (agentic-compromise-incident-response) |
+
+---
+
+## Voice Debrief Workflow State Machine (06 Aug 2026, v0.33.56)
+
+All items below are PROPOSED — does not exist yet.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-ACT-016 | Statechart execution engine (outside vault) | Statechart engine outside the vault kernel; kernel is the referee (holds transition graph, tracks state, permits/refuses), engine is the interpreter; recommended formalism: XState or equivalent; do not invent the formalism | doc 929 (v0.33.56) |
+| P-ACT-019 | Voice Debrief workflow declaration (state machine JSON) | Workflow declared as a JSON file; each step carries: id, requires, produces, model (pinned), budget, next-transitions, on_failure; `on_failure` is the Librarian's addition — declared workflows must declare failure paths | doc 933 (v0.33.56) |
+| P-ACT-020 | Voice Debrief parallel transcription with disagreement output | Run two transcription models; disagreement spans marked explicitly rather than smoothed; text-only consolidation of disagreements degrades quality (published: ~doubles error rate on proper nouns); the disagreement IS the product output | docs 933-934 (v0.33.56) |
+| P-ACT-021 | SKOS-based concept extraction and ontology matching | SKOS (Simple Knowledge Organization System) as concept model for vault content; extraction is commodity; mapping concepts against the customer's own ontology/vocabulary is the differentiator; unmapped concepts are the primary finding | docs 935-936 (v0.33.56) |
+
+---
+
+## Vault-As-Substrate Agent Collaboration (02 Aug 2026, v0.33.55)
+
+All items below are PROPOSED — does not exist yet.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-ACT-022 | Graph canvas REPL | Agent-facing canvas that renders Mermaid output of a query result; rule: never render the whole graph; render one node with neighbours; the canvas "un-blinds" the agent by showing structured query results | doc 916 (v0.33.55) |

@@ -1,6 +1,6 @@
 # AI Agents — Proposed: Agent Communication, MCP, and Security Tools
 
-**Domain:** ai-agents/proposed/agent-communication | **Last updated:** 2026-06-28 | **Maintained by:** Librarian (B-003)
+**Domain:** ai-agents/proposed/agent-communication | **Last updated:** 2026-08-11 | **Maintained by:** Librarian (B-003)
 **Parent index:** [`index.md`](index.md)
 
 All items below are PROPOSED. None have been code-verified. Do not describe any of these as existing features.
@@ -74,3 +74,13 @@ All items below are PROPOSED — does not exist yet.
 | P-312 | Three-Agent Comms Demo Vault | Browser harness proving vault-to-vault messaging: 3 agents each with iframe inboxes; internal JS API (ping, send, receive, markReceived); step-by-step validation harness; manual round-trip proof first, then agentic via OpenRouter; key design principle: agents only share what they explicitly message (no full vault access); scale path 3 → 5 → 100s → 1000s; accountant experiment as first real use case. Depends on vault inbox (NOW EXISTS). | 06/03 dev-brief |
 | P-315 | Skills Library as Platform Feature | A vault holding skills from multiple sources (Tessl, Anthropic, Pi, platform own). Library management: provenance tracking, sync from source, applicability scoring, evidence (screenshots, test results). Sharp insight: how-to-deploy-and-run knowledge fills a real gap (Claude couldn't run an Anthropic legal skill from a URL alone — deployment context was missing). Differentiator: talk-to-skill (on-demand vault instance), per-skill budgets, per-skill billing. Foundation for skills marketplace (P-297). | 06/03 strategy-brief |
 | P-316 | SG/Vault as Platform of Primitives — Positioning | SG/Vault is a hyperscaler for shared state, not a category product. Dissolves the protocol/harness/workflow question by sitting beneath all three (noun, not verbs). Three-layer model: bottom (vault primitives), middle (heterogeneous agents/workflows/manual), top (bespoke UX). Two views: invisible-vault (users never see it) and builder-platform (developers see the structure). Restrict-to-unleash flywheel (tight primitive scope → safe, wide autonomy for builders). Superpower: builders are users of the same platform (tight feedback loop, features driven by real use). | 06/03 strategy-brief |
+
+---
+
+## Vault-As-Substrate / Blackboard Architecture (02 Aug 2026, v0.33.55)
+
+All items below are PROPOSED — does not exist yet. Vault primitives (append, two-key, ephemeral compute) are EXISTS.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-ACT-023 | Vault-as-substrate asynchronous agent collaboration | Agents with distinct responsibility, capability and focus collaborate via encrypted vault folders; no direct addressing — agents write where they may, read when they choose; blackboard architecture; authorisation, audit and confidentiality answered by the medium rather than the application; significantly outperforms controller-assigned arrangements (13-57% relative improvement per literature) | doc 915 (v0.33.55) |

@@ -1,6 +1,6 @@
 # cli/proposed — Index
 
-**Domain:** `cli/` | **Last updated:** 2026-05-03
+**Domain:** `cli/` | **Last updated:** 2026-08-11
 **Source:** Archived monolith `../v0.16.26__what-exists-today.md` — Section 17 (lines 1556–1596), Section 6 (lines 817–903)
 
 ---
@@ -101,3 +101,23 @@ Enables performance visibility without premature optimisation: "Upload objects (
 | 30 | Transaction log storage location — alongside vault data or separate? | Architect recommends: alongside vault data for MVP. |
 
 *Full source: `briefs/04/29/v0.22.19__villager-brief__sgit-code-refactoring-four-layers.md`*
+
+---
+
+## Per-Path Indexes for sgit (06 Aug 2026, v0.33.56)
+
+PROPOSED — does not exist yet.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-ACT-017 | sgit per-path index (denormalised value cache) | The sgit identifier schema already contains an index type described as a denormalised cache; a per-path index makes one-request lookups possible; for small records the index should hold the value (not just a pointer); the batch endpoint collapses breadth but not depth — per-path index is the correct answer to depth; derivation path is included in the index key | doc 932 (v0.33.56) |
+
+---
+
+## Vault Ignore File (06 Aug 2026, v0.33.56)
+
+PROPOSED — does not exist yet. **Security-critical prerequisite** for the git+sgit coexistence pattern.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-ACT-018 | Vault ignore file | Configuration file specifying which vault paths are excluded from operations (analogous to .gitignore); required to make git+sgit coexistence safe; without it, vault key material may enter the git working tree and git history, permanently violating zero-knowledge; AppSec co-owns this deliverable | doc 931 (v0.33.56) — see also vault/proposed/index.md |
