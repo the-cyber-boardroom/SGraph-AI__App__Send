@@ -6,6 +6,12 @@ formats. The companion user guide (`library/guides/content/v0.27.62__guide__vaul
 covers the end-user experience; [`AUTHORING.md`](./AUTHORING.md) covers reading these from an app's
 `sg.vfs` / `sg.history`.
 
+> **Starting from an existing folder you want to split into its own vault (not a vault you already
+> have a key for)?** [`EXTRACT-AND-EMBED-A-SUB-VAULT.md`](EXTRACT-AND-EMBED-A-SUB-VAULT.md) covers
+> `sg.vault.create({seedFrom, link})` — it creates the child vault, copies the folder into it, *and*
+> writes the link file + `ro-links.json` record described below, all in one call — plus the two
+> other ways to re-surface the result (`sg.vault.embed`, `sg.vault.mount`).
+
 > **It really is "just create some files."** A sub-vault or an embed is a small JSON pointer file in
 > the vault tree, plus (optionally) one record file under `.vault/owner/`. No special API — write the
 > files, `sgit commit`, `sgit push`.
