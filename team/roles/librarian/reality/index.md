@@ -1,6 +1,6 @@
 # Reality — Master Index
 
-**Version:** v0.33.54 | **Last updated:** 2026-08-11 | **Maintained by:** Librarian (daily run)
+**Version:** v0.33.55 | **Last updated:** 2026-08-12 | **Maintained by:** Librarian (daily run)
 **Structure:** Domain tree — each domain has its own directory with `index.md` and `proposed/`
 
 This file is the entry point. Read it to find the right domain, then go to that domain's
@@ -22,7 +22,7 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | **Website** | [`website/`](website/index.md) | sgraph.ai website (21 pages, web components) | 21 pages, 11 components, CI pipeline |
 | **Browser UIs** | [`ui/`](ui/index.md) | Share (v0.4), Open (v0.4), Admin, Workspace, Vault; v0.3.x user legacy | 5 active + 1 legacy; ~35 web components |
 | **Tools** | [`tools/`](tools/index.md) | tools.sgraph.ai browser tools | 4 tools live |
-| **Infrastructure** | [`infra/`](infra/index.md) | Deployment, CI/CD, Lambda, Docker | 7 targets, 2 Lambda functions |
+| **Infrastructure** | [`infra/`](infra/index.md) | Deployment, CI/CD, Lambda, Docker | 4 working targets + 8 PROPOSED (multi-target plan) |
 | **Security** | [`security/`](security/index.md) | Security properties, violations, AppSec | 11 verified properties |
 | **Identity** | [`identity/`](identity/index.md) | Credentials, OAuth, billing | Token auth only (rest PROPOSED) |
 | **AI Agents** | [`ai-agents/`](ai-agents/index.md) | Agentic workflows, LLM components, MCP | MCP + Claude vault access verified |
@@ -31,7 +31,7 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 
 ---
 
-## Quick Stats (as of 2026-08-11)
+## Quick Stats (as of 2026-08-12)
 
 | Metric | Count |
 |--------|-------|
@@ -39,7 +39,7 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | Admin Lambda API endpoints | 51 unique (61 route paths) |
 | Total API endpoints | **83+** |
 | Unit tests passing | **~2950+** (977 Python + ~157 vault-UI JS + ~930+ ViV loader suite (373+ base + ~557 from LLM/voice/releases/send-browse-split/image/sync sessions 08/02–08/04: sg_releases 47, pinned_data_source 27, vault_releases_editor 44, sg_llm_config 53, sg_llm 40, sg_llm_vault 17, sg_voice 86, base64_chunk_guard 88, send_browse_split 97, vault_llm_log 35, vault_llm_chat 122, vault_shell_llm_panels 28, app_page_llm_panels 46, vault_llm_requests 29, vault_browse_edit__add_to_chat 13, app_shell_llm_bridge 96, sg_vision 62, no_auto_reload 27) + ~78 app-shell JS + 37 embed-protocol + ~334 inbox/write-batch/owner-secrets suite; browser integration: 8 tests; +10 app-shell-nav-helpers) |
-| Deployment targets | **7** (Lambda, Docker, Fargate, GCP, EC2, AMI, CLI) |
+| Deployment targets | **4 working** (Lambda, Docker Hub, local container, CLI) + **8 PROPOSED** (P-405–P-412: Fargate, AMI, Terraform, one-click deploy, full-cycle CI, publish pipeline, memory-mode licensing, static vault hosting) — DevOps review 2026-08-11 |
 | Website pages | 21 |
 | Browser UIs | **7** (share v0.4, open v0.4, admin, workspace, vault browser, vault app /en-gb/app; user v0.3.x legacy) |
 | Active tools (tools.sgraph.ai) | 4 |
