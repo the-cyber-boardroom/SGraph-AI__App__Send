@@ -124,7 +124,11 @@ the "current head" — a stale ref shows an old snapshot.
 ## Worked example — GitHub Pages
 
 1. **Author the vault** normally (live), put your app HTML in it as `index.html`, push.
-2. **Export the `bare/` tree** to a Pages repo at `api/vault/read/<vaultId>/bare/...`.
+2. **Export the `bare/` tree** to a Pages repo at `api/vault/read/<vaultId>/bare/...`. If the repo
+   *is* your sgit vault's own git remote (working tree + `bare/` both committed, per
+   [`PUBLISHING-SGIT-VAULT-TO-GITHUB.md`](PUBLISHING-SGIT-VAULT-TO-GITHUB.md)), `bare/` is already
+   there — this step is just getting it under the right path prefix for Pages to serve, and making
+   sure `.sg_vault/local/` (the plaintext key/token tier) was never committed in the first place.
 3. **Add a host page** `index.html` at the repo root that loads the host + transport from
    `dev.vault.sgraph.ai`, sets `SG_STATIC`/`SG_ENDPOINT`, and opens the vault read-only with
    the key (in the URL hash, as usual — the key is the read capability; it's not a secret on
