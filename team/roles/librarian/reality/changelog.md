@@ -7,6 +7,25 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-08-12
+
+No new human briefs. Team activity since 08/11: multi-target deployment plan (Architect spec + two technical briefs), DevOps review (code-verifies 4 of 7 claimed targets working), and vault extract-and-embed guide. CI version bump v0.33.54 → v0.33.55.
+
+Key correction: "7 deployment targets" claim corrected to "4 working + 8 PROPOSED" per DevOps review (2026-08-11). P-405–P-412 already registered in infra/proposed/index.md by the architect session; confirmed by Librarian this session.
+
+Files changed:
+- `reality/index.md` — Version v0.33.54 → v0.33.55; Last updated → 2026-08-12; Quick Stats date → 2026-08-12; "7 targets" corrected to "4 working + 8 PROPOSED"
+- `reality/qa/index.md` — Last updated → 2026-08-12
+- `reality/ui/index.md` — Last updated → 2026-08-12 (B1 vault-llm-chat tools already documented; date not updated by prior session)
+- `reality/changelog.md` — 2026-08-12 entry added (this entry)
+- `team/roles/librarian/DAILY_RUN.md` — session added to COMPLETED
+
+Session: 0 new briefs | New EXISTS items: 0 | New PROPOSED items: 8 (P-405–P-412, confirmed by Librarian) | Cumulative docs: 936 (unchanged)
+Master index (08/12): `team/roles/librarian/reviews/08/12/v0.33.55__master-index__daily-check-12-aug-2026.md`
+Debrief (08/12): `team/humans/dinis_cruz/debriefs/08/12/v0.33.55__debrief__daily-check-12-aug-2026.md`
+
+---
+
 ## 2026-08-11
 
 New briefs: 26 documents across 2 Aug (v0.33.55, 10 docs) and 6 Aug (v0.33.56, 16 docs). All committed to repo on 2026-08-09. Code commits: 5 since 08/08 (briefs added, 3 architect reviews merged, CI version bump v0.33.53 → v0.33.54).
