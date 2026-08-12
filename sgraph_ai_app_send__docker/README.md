@@ -124,9 +124,9 @@ docker run --rm -p 8080:8080 \
   diniscruz/sg-send-vault:latest
 ```
 
-Clients must then send the header `x-sgraph-access-token: my-secret-token` on every API call. The static UI is also gated — except `GET /auth/set-cookie-form`, which is a small page that sets the token as a cookie so the browser can use the UI.
+Clients must then send the header `x-sgraph-access-token: my-secret-token` on every API call. The static UI is also gated — except `GET /auth/set-cookie-form`, which serves the **SG/Send login page**: enter the access key once, it is stored as a browser cookie, verified against the API, and you are redirected into the vault UI. Wrong keys stay on the page with a clear error.
 
-To set the cookie from the form: open <http://localhost:8080/auth/set-cookie-form>, paste the token, submit. The vault UI then loads normally.
+Browser flow: open <http://localhost:8080/auth/set-cookie-form> (any gated page will 401 until then), paste the key, Unlock.
 
 For sgit clients:
 
@@ -183,7 +183,7 @@ With TLS on it binds `:443` using a mounted cert/key pair.
 | `FAST_API__TLS__ENABLED` | `false` | Master switch. `true` / `1` / `yes` turns TLS on. |
 | `FAST_API__TLS__CERT_FILE` | `/certs/cert.pem` | Path to the cert file (mount it in). |
 | `FAST_API__TLS__KEY_FILE` | `/certs/key.pem` | Path to the key file (mount it in). |
-| `FAST_API__TLS__PORT` | `443` | Bind port when TLS is on. |
+| `FAST_API__TLS__PORT` | `8443` | Bind port when TLS is on (non-root container cannot bind :443 — map it on the host: `-p 443:8443`). |
 
 The container does **not** generate certs — mount them in (a `cert-init` sidecar
 owns acquisition). If TLS is enabled but the cert/key files are missing, the
@@ -195,7 +195,7 @@ vaults open from any host — not just `localhost`. See
 [Troubleshooting](#vault-wont-open-from-a-lan-ip-or-other-hostname).
 
 ```bash
-docker run --rm -p 443:443 \
+docker run --rm -p 443:8443 \
   -e FAST_API__TLS__ENABLED=true \
   -v "$(pwd)/certs:/certs:ro" \
   -v "$(pwd)/_sg-send_data:/data" \
