@@ -145,6 +145,31 @@ Code: `sgraph_ai_app_send/lambda__user/storage/Storage_FS__S3.py` (commit `b61a1
 - **Two-track model:** Docker uses wildcard deps in `pyproject.toml` (auto-latest on build). Lambda uses hardcoded `==` pins in `user__config.py` / `admin__config.py` with content-addressable S3 cache (`sha256(sorted(pins))[:12]`). Pin bump = cache bust = fresh pip resolution.
 - **Verification endpoint:** `GET /api/info/versions` returns installed versions of all tracked dependencies at runtime
 
+### Multi-Target Deployment — Phase A/B/C1 code (added 2026-08-11, BETA until live-account validation)
+
+Implements P-399/P-400/P-401/P-407/P-409 (spec: `architect/reviews/08/11/v0.33.54__architect-spec__multi-target-deployment.md`):
+
+- **Universal container image (Phase A)** — Lambda Web Adapter baked into the Dockerfile
+  (`/opt/extensions/lambda-adapter`, inert outside Lambda); `serve.py` honours `$PORT`;
+  non-root user (uid 10001, TLS port now 8443); HEALTHCHECK + OCI labels; **friendly SG/Send
+  login page** at `/auth/set-cookie-form` (`Routes__Auth__Login.py`, replaces osbot's cookie
+  editor; osbot-compatible POST retained). **Validated on a real local build:** health/UI/login,
+  `$PORT`, `--network=none`+memory-mode self-contained invariant, single-key gate incl. reads.
+- **CloudFormation templates (Phase B)** — `deploy/aws/{lambda,ec2,ecs-fargate,ami-pipeline}.cfn.yml`
+  + README. cfn-lint clean. Access token = startup parameter, never stored (no SSM — ADR-6 as
+  amended); `StorageMode` incl. `memory` everywhere; EC2 data volume snapshot-on-delete;
+  Fargate stack owns its own VPC (total teardown).
+- **Full-cycle pipeline (C1)** — `.github/workflows/deploy-full-cycle.yml`: build → invariant
+  check → ECR push → deploy lambda/fargate/ec2 → shared smoke suite
+  (`tests/deploy/targets/test_smoke__deployed_target.py`, validated against a live local
+  container: 8/8) → destroy all → orphan sweep. **OIDC only** (`AWS_DEPLOY_ROLE_ARN` secret;
+  skips deploy jobs gracefully when unset — role bootstrap is the remaining setup step).
+- **Heroku button contract** — root `app.json` + `heroku.yml` (container stack).
+
+Still PROPOSED from that plan: Terraform modules (P-405), publish/dogfood pipeline (P-410, C2),
+GCP/Heroku CI deploys (P-403), deploy web pages (P-406), AMI bake execution + region mapping
+(P-408 — the pipeline template exists, no AMI has been baked).
+
 ## PROPOSED (Not Yet Implemented)
 
 - ~~CloudFront behavior bypass for `obj-cas-imm-*` immutable objects~~ — **MOVED TO EXISTS** (deployed 2026-06-03)

@@ -1,0 +1,216 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  SG/Send zero-knowledge vault server as a Lambda container-image function with a public
+  Function URL. Optional CloudFront + Route53 custom domain. Storage: S3 (default) or
+  memory (ephemeral). The access token is provided at launch and never stored (ADR-6).
+
+Parameters:
+
+  ImageUri:
+    Type: String
+    Description: >-
+      ECR image URI for sg-send-vault (must be in this account/region), e.g.
+      123456789012.dkr.ecr.eu-west-2.amazonaws.com/sg-send-vault:v0.33.54
+
+  Stage:
+    Type: String
+    Default: dev
+    AllowedPattern: '^[a-z0-9-]{1,16}$'
+    Description: Deployment stage suffix (dev / qa / prod / ...)
+
+  MemorySize:
+    Type: Number
+    Default: 1024
+    MinValue: 128
+    MaxValue: 10240
+    Description: Lambda memory (MB)
+
+  Timeout:
+    Type: Number
+    Default: 30
+    MinValue: 3
+    MaxValue: 900
+    Description: Lambda timeout (seconds)
+
+  StorageMode:
+    Type: String
+    Default: s3
+    AllowedValues: [s3, memory]
+    Description: >-
+      s3 = durable (stack creates the bucket unless ExistingTransfersBucket is set).
+      memory = ephemeral per-container scratch, zero storage resources, zero storage IAM.
+
+  ExistingTransfersBucket:
+    Type: String
+    Default: ''
+    Description: >-
+      Optional: name of an existing S3 bucket to use (s3 mode). Empty = the stack creates
+      one named {account}--sgraph-send-transfers--{region} (the SG/Send convention).
+
+  AccessToken:
+    Type: String
+    Default: ''
+    NoEcho: true
+    Description: >-
+      The deployment's access key (licensing key). Gates ALL routes including reads.
+      Provided at launch, never stored by the stack (manage it in GitHub Actions Secrets,
+      an SG/Vault, or your password manager). Empty = explicitly open instance.
+
+  DomainName:
+    Type: String
+    Default: ''
+    Description: 'Optional custom domain (requires HostedZoneId + CertificateArn), e.g. send.example.com'
+
+  HostedZoneId:
+    Type: String
+    Default: ''
+    Description: 'Route53 hosted zone id for DomainName (custom domain only)'
+
+  CertificateArn:
+    Type: String
+    Default: ''
+    Description: >-
+      ACM certificate ARN for DomainName. MUST be in us-east-1 (CloudFront constraint),
+      created before deploying this stack.
+
+Conditions:
+  IsS3Mode:        !Equals [!Ref StorageMode, s3]
+  CreateBucket:    !And [!Condition IsS3Mode, !Equals [!Ref ExistingTransfersBucket, '']]
+  HasAccessToken:  !Not [!Equals [!Ref AccessToken, '']]
+  HasCustomDomain: !And
+    - !Not [!Equals [!Ref DomainName, '']]
+    - !Not [!Equals [!Ref HostedZoneId, '']]
+    - !Not [!Equals [!Ref CertificateArn, '']]
+
+Resources:
+
+  TransfersBucket:
+    Type: AWS::S3::Bucket
+    Condition: CreateBucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub '${AWS::AccountId}--sgraph-send-transfers--${AWS::Region}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - !If
+          - IsS3Mode
+          - PolicyName: sg-send-storage
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action: [s3:GetObject, s3:PutObject, s3:DeleteObject, s3:ListBucket, s3:CreateBucket, s3:GetBucketLocation]
+                  Resource:
+                    - !Sub
+                      - 'arn:aws:s3:::${BucketName}'
+                      - BucketName: !If [CreateBucket, !Sub '${AWS::AccountId}--sgraph-send-transfers--${AWS::Region}', !Ref ExistingTransfersBucket]
+                    - !Sub
+                      - 'arn:aws:s3:::${BucketName}/*'
+                      - BucketName: !If [CreateBucket, !Sub '${AWS::AccountId}--sgraph-send-transfers--${AWS::Region}', !Ref ExistingTransfersBucket]
+          - !Ref AWS::NoValue
+
+  SgSendFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'sg-send-vault--${Stage}'
+      PackageType: Image
+      Code: { ImageUri: !Ref ImageUri }
+      MemorySize: !Ref MemorySize
+      Timeout: !Ref Timeout
+      Architectures: [x86_64]
+      Role: !GetAtt ExecutionRole.Arn
+      Environment:
+        Variables:
+          SEND__STORAGE_MODE: !Ref StorageMode
+          SEND__S3_BUCKET: !If
+            - IsS3Mode
+            - !If [CreateBucket, !Sub '${AWS::AccountId}--sgraph-send-transfers--${AWS::Region}', !Ref ExistingTransfersBucket]
+            - !Ref AWS::NoValue
+          SGRAPH_SEND__ACCESS_TOKEN: !If [HasAccessToken, !Ref AccessToken, !Ref AWS::NoValue]
+          SEND__ENABLE_AUTH:         !If [HasAccessToken, 'true', !Ref AWS::NoValue]
+
+  FunctionUrl:
+    Type: AWS::Lambda::Url
+    Properties:
+      TargetFunctionArn: !GetAtt SgSendFunction.Arn
+      AuthType: NONE
+      InvokeMode: BUFFERED
+
+  FunctionUrlPublicAccess:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt SgSendFunction.Arn
+      Action: lambda:InvokeFunctionUrl
+      Principal: '*'
+      FunctionUrlAuthType: NONE
+
+  Distribution:
+    Type: AWS::CloudFront::Distribution
+    Condition: HasCustomDomain
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: !Sub 'SG/Send ${Stage} — Function URL origin'
+        Aliases: [!Ref DomainName]
+        ViewerCertificate:
+          AcmCertificateArn: !Ref CertificateArn
+          SslSupportMethod: sni-only
+          MinimumProtocolVersion: TLSv1.2_2021
+        Origins:
+          - Id: function-url
+            DomainName: !Select [2, !Split ['/', !GetAtt FunctionUrl.FunctionUrl]]
+            CustomOriginConfig:
+              OriginProtocolPolicy: https-only
+              OriginSSLProtocols: [TLSv1.2]
+        DefaultCacheBehavior:
+          TargetOriginId: function-url
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD, OPTIONS, PUT, POST, PATCH, DELETE]
+          CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad          # CachingDisabled (managed)
+          OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac  # AllViewerExceptHostHeader (managed)
+
+  DnsRecord:
+    Type: AWS::Route53::RecordSet
+    Condition: HasCustomDomain
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref DomainName
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt Distribution.DomainName
+        HostedZoneId: Z2FDTNDATAQYW2                                   # CloudFront's fixed hosted zone id
+
+Outputs:
+  FunctionUrl:
+    Description: Direct Lambda Function URL (always available)
+    Value: !GetAtt FunctionUrl.FunctionUrl
+  PublicUrl:
+    Description: The URL to use (custom domain when configured, else the Function URL)
+    Value: !If [HasCustomDomain, !Sub 'https://${DomainName}/', !GetAtt FunctionUrl.FunctionUrl]
+  StorageBucket:
+    Description: S3 bucket holding the encrypted data (s3 mode; empty for memory mode)
+    Value: !If
+      - IsS3Mode
+      - !If [CreateBucket, !Sub '${AWS::AccountId}--sgraph-send-transfers--${AWS::Region}', !Ref ExistingTransfersBucket]
+      - '(memory mode — no bucket)'

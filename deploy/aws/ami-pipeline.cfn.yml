@@ -1,0 +1,160 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  EC2 Image Builder pipeline that bakes the SG/Send appliance AMI (ADR-15): AL2023 + docker
+  + the sg-send-vault container image pre-pulled + caddy pre-pulled. The baked AMI is the
+  master server-side artifact - consumed by ec2.cfn.yml (SgSendAmiId) and, later, the AWS
+  Marketplace listing (P-398). No credentials of any kind are baked (ADR-6).
+
+Parameters:
+
+  ImageRef:
+    Type: String
+    Default: 'diniscruz/sg-send-vault:latest'
+    Description: Container image to pre-pull into the AMI (pin a version tag for releases)
+
+  ImageVersion:
+    Type: String
+    Default: '1.0.0'
+    AllowedPattern: '^\d+\.\d+\.\d+$'
+    Description: Semantic version for the Image Builder recipe (bump per bake)
+
+  ParentImageArn:
+    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Default: '/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64'
+    Description: Base AMI (AWS public AL2023 parameter; arm64 default)
+
+  InstanceType:
+    Type: String
+    Default: t4g.medium
+    Description: Build instance type (arm64 default to match the base AMI)
+
+Resources:
+
+  BuildComponent:
+    Type: AWS::ImageBuilder::Component
+    Properties:
+      Name: sg-send-appliance-setup
+      Platform: Linux
+      Version: !Ref ImageVersion
+      Description: Install docker, pre-pull the sg-send-vault + caddy images, install the launcher
+      Data: !Sub |
+        name: sg-send-appliance-setup
+        description: SG/Send appliance - docker + pre-pulled images + launcher script
+        schemaVersion: 1.0
+        phases:
+          - name: build
+            steps:
+              - name: InstallDocker
+                action: ExecuteBash
+                inputs:
+                  commands:
+                    - dnf install -y docker
+                    - systemctl enable docker
+                    - systemctl start docker
+              - name: PrePullImages
+                action: ExecuteBash
+                inputs:
+                  commands:
+                    - docker pull ${ImageRef}
+                    - docker pull caddy:2
+              - name: InstallLauncher
+                action: ExecuteBash
+                inputs:
+                  commands:
+                    - mkdir -p /etc/sg-send
+                    - |
+                      cat > /usr/local/bin/sg-send-up.sh <<'LAUNCH'
+                      #!/bin/bash
+                      # Started by the sg-send systemd unit that ec2.cfn.yml's user-data writes
+                      # at first boot (config + token arrive at launch - nothing baked here).
+                      set -e
+                      docker network inspect sgsend >/dev/null 2>&1 || docker network create sgsend
+                      docker rm -f sg-send-app sg-send-caddy 2>/dev/null || true
+                      APP_ARGS=(-d --name sg-send-app --network sgsend --restart unless-stopped)
+                      APP_ARGS+=(-e SEND__STORAGE_MODE="$SG_STORAGE_MODE")
+                      if [ "$SG_STORAGE_MODE" = "disk" ]; then APP_ARGS+=(-v /var/lib/sg-send:/data); fi
+                      if [ -n "$SGRAPH_SEND__ACCESS_TOKEN" ]; then APP_ARGS+=(-e SGRAPH_SEND__ACCESS_TOKEN="$SGRAPH_SEND__ACCESS_TOKEN"); fi
+                      docker run "${!APP_ARGS[@]}" --network-alias app "$SG_IMAGE"
+                      docker run -d --name sg-send-caddy --network sgsend --restart unless-stopped \
+                        -p 80:80 -p 443:443 \
+                        -v /etc/sg-send/Caddyfile:/etc/caddy/Caddyfile:ro \
+                        -v caddy_data:/data \
+                        caddy:2
+                      LAUNCH
+                    - chmod +x /usr/local/bin/sg-send-up.sh
+          - name: validate
+            steps:
+              - name: ImagesPresent
+                action: ExecuteBash
+                inputs:
+                  commands:
+                    - docker image inspect ${ImageRef} >/dev/null
+                    - docker image inspect caddy:2 >/dev/null
+                    - test -x /usr/local/bin/sg-send-up.sh
+
+  Recipe:
+    Type: AWS::ImageBuilder::ImageRecipe
+    Properties:
+      Name: sg-send-appliance
+      Version: !Ref ImageVersion
+      ParentImage: !Ref ParentImageArn
+      Components:
+        - ComponentArn: !GetAtt BuildComponent.Arn
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs: { VolumeSize: 16, VolumeType: gp3, DeleteOnTermination: true }
+
+  BuilderRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ec2.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/EC2InstanceProfileForImageBuilder
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+
+  BuilderInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref BuilderRole]
+
+  InfrastructureConfiguration:
+    Type: AWS::ImageBuilder::InfrastructureConfiguration
+    Properties:
+      Name: sg-send-appliance-infra
+      InstanceProfileName: !Ref BuilderInstanceProfile
+      InstanceTypes: [!Ref InstanceType]
+      TerminateInstanceOnFailure: true
+
+  DistributionConfiguration:
+    Type: AWS::ImageBuilder::DistributionConfiguration
+    Properties:
+      Name: sg-send-appliance-dist
+      Distributions:
+        - Region: !Ref AWS::Region
+          AmiDistributionConfiguration:
+            Name: 'sg-send-vault-{{ imagebuilder:buildDate }}'
+            AmiTags:
+              Project: sg-send
+              SourceImage: !Ref ImageRef
+
+  Pipeline:
+    Type: AWS::ImageBuilder::ImagePipeline
+    Properties:
+      Name: sg-send-appliance-pipeline
+      ImageRecipeArn: !GetAtt Recipe.Arn
+      InfrastructureConfigurationArn: !GetAtt InfrastructureConfiguration.Arn
+      DistributionConfigurationArn: !GetAtt DistributionConfiguration.Arn
+      Status: ENABLED
+      ImageTestsConfiguration: { ImageTestsEnabled: true, TimeoutMinutes: 60 }
+
+Outputs:
+  PipelineArn:
+    Description: Trigger a bake with `aws imagebuilder start-image-pipeline-execution --image-pipeline-arn <arn>`
+    Value: !GetAtt Pipeline.Arn
+  NextStep:
+    Value: 'After a bake completes, pass the produced AMI id to ec2.cfn.yml as SgSendAmiId (the deploy pipeline maintains the per-region mapping).'
