@@ -1,0 +1,108 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  One-time bootstrap for the deploy pipelines (ADR-16): GitHub OIDC identity provider +
+  the role that deploy-full-cycle.yml assumes. Deploy this ONCE per account (manually or
+  via any admin credentials), then set the RoleArn output as the AWS_DEPLOY_ROLE_ARN
+  GitHub Actions secret. After this, no long-lived AWS keys are needed by the new pipelines.
+
+Parameters:
+
+  GitHubOrg:
+    Type: String
+    Default: the-cyber-boardroom
+    Description: GitHub organisation allowed to assume the role
+
+  GitHubRepo:
+    Type: String
+    Default: SGraph-AI__App__Send
+    Description: Repository allowed to assume the role
+
+  CreateOidcProvider:
+    Type: String
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+    Description: >-
+      Set false if the account already has the token.actions.githubusercontent.com OIDC
+      provider (only one per account is allowed).
+
+Conditions:
+  MakeProvider: !Equals [!Ref CreateOidcProvider, 'true']
+
+Resources:
+
+  GitHubOidcProvider:
+    Type: AWS::IAM::OIDCProvider
+    Condition: MakeProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList: [sts.amazonaws.com]
+      ThumbprintList: [6938fd4d98bab03faadb97b34396831e3780aea1]   # GitHub's root CA thumbprint (AWS now validates via trust chain; value kept for compat)
+
+  DeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: sg-send-github-deploy
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !If
+                - MakeProvider
+                - !Ref GitHubOidcProvider
+                - !Sub 'arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com'
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+              StringLike:
+                token.actions.githubusercontent.com:sub: !Sub 'repo:${GitHubOrg}/${GitHubRepo}:*'
+      Policies:
+        - PolicyName: sg-send-deploy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # CloudFormation lifecycle for the sg-send stacks
+              - Effect: Allow
+                Action: [cloudformation:*]
+                Resource:
+                  - !Sub 'arn:aws:cloudformation:*:${AWS::AccountId}:stack/sgsend-*/*'
+                  - !Sub 'arn:aws:cloudformation:*:${AWS::AccountId}:stack/sg-send-*/*'
+              # Resources the stacks create/destroy. Scoped by service; the stacks
+              # themselves are the fine-grained boundary (full-cycle tears down all).
+              - Effect: Allow
+                Action:
+                  - lambda:*
+                  - ecs:*
+                  - elasticloadbalancing:*
+                  - ec2:*
+                  - ecr:*
+                  - logs:*
+                  - route53:ChangeResourceRecordSets
+                  - route53:GetChange
+                  - route53:ListResourceRecordSets
+                  - cloudfront:*
+                  - imagebuilder:*
+                  - s3:*
+                Resource: '*'
+              - Effect: Allow
+                Action: [iam:CreateRole, iam:DeleteRole, iam:GetRole, iam:PassRole,
+                         iam:PutRolePolicy, iam:DeleteRolePolicy, iam:GetRolePolicy,
+                         iam:AttachRolePolicy, iam:DetachRolePolicy, iam:TagRole,
+                         iam:CreateInstanceProfile, iam:DeleteInstanceProfile,
+                         iam:AddRoleToInstanceProfile, iam:RemoveRoleFromInstanceProfile,
+                         iam:GetInstanceProfile]
+                Resource:
+                  - !Sub 'arn:aws:iam::${AWS::AccountId}:role/sgsend-*'
+                  - !Sub 'arn:aws:iam::${AWS::AccountId}:role/sg-send-*'
+                  - !Sub 'arn:aws:iam::${AWS::AccountId}:instance-profile/sgsend-*'
+                  - !Sub 'arn:aws:iam::${AWS::AccountId}:instance-profile/sg-send-*'
+              - Effect: Allow
+                Action: [sts:GetCallerIdentity]
+                Resource: '*'
+
+Outputs:
+  RoleArn:
+    Description: Set this as the AWS_DEPLOY_ROLE_ARN GitHub Actions secret
+    Value: !GetAtt DeployRole.Arn
