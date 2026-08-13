@@ -7,6 +7,21 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-08-13
+
+No new human briefs. One library guide added after the 08/12 session: `PUBLISHING-SGIT-VAULT-TO-GITHUB.md` (272 lines) — git-as-backup/distribution for sgit vaults, security rationale (bare/ is ciphertext-safe), five-step workflow, GitHub Actions secret pattern. CI version bump v0.33.55 → v0.33.56.
+
+Files changed:
+- `reality/index.md` — Version v0.33.55 → v0.33.56; Last updated → 2026-08-13
+- `reality/changelog.md` — 2026-08-13 entry added (this entry)
+- `team/roles/librarian/DAILY_RUN.md` — session added to COMPLETED; B-013 added to BACKLOG
+
+Session: 0 new briefs | New EXISTS items: 0 | New PROPOSED items: 0 | New guides: 1 | Cumulative docs: 936 (unchanged)
+Master index (08/13): `team/roles/librarian/reviews/08/13/v0.33.56__master-index__daily-check-13-aug-2026.md`
+Debrief (08/13): `team/humans/dinis_cruz/debriefs/08/13/v0.33.56__debrief__daily-check-13-aug-2026.md`
+
+---
+
 ## 2026-08-12
 
 No new human briefs. Team activity since 08/11: multi-target deployment plan (Architect spec + two technical briefs), DevOps review (code-verifies 4 of 7 claimed targets working), and vault extract-and-embed guide. CI version bump v0.33.54 → v0.33.55.
