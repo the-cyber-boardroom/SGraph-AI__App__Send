@@ -163,6 +163,16 @@ send agents to an archived 237KB monolith instead of the current 13-domain tree.
 **Note:** This file governs all Explorer sessions. A Conductor check is appropriate before
 changing the priorities section. Date references and reality path are safe to update.
 
+### B-013 · Cross-reference vault publication guides in reality domain files
+**Status:** TODO
+**What:** Two new vault-html guides arrived in Aug 2026 that are not cross-linked from the reality
+domain files: `EXTRACT-AND-EMBED-A-SUB-VAULT.md` (Aug 12) and `PUBLISHING-SGIT-VAULT-TO-GITHUB.md`
+(Aug 12, merged post-session). Add "Guides" sections (or a "See Also" block) in `cli/index.md`
+and `vault/index.md` pointing to these documents. Check `library/guides/vault-html/` for any
+other guides that should be cross-linked but aren't.
+**Why:** The reality domain files are the first stop for agents. Guides that exist but are
+invisible to agents checking domain indexes may be re-authored from scratch unnecessarily.
+
 ### B-006 · Health scan — Check broken relative links across team/ and library/
 **Status:** DONE (2026-07-17)
 **What:** Walk all `.md` files under `team/` and `library/`, extract relative links, verify
@@ -254,6 +264,7 @@ None currently active.
 | 2026-08-06 | No new briefs; addendum to 08/05 session with deeper commit-level detail | 7 EXISTS items detailed (image paste, SGVision, sg.llm.imagePart, ledger fix, auto-sync data-loss fix, claude-sonnet-5 default, picker notice); index.md last-updated + Black Hat note updated; changelog 08/06 + 08/05 merged; master index + debrief produced |
 | 2026-08-09 | No new briefs; no new commits; B-012 completed — explorer/CLAUDE.md stale references fixed | reality path → index.md; 3 stale debrief/index pointers updated; index.md + qa/index.md → 2026-08-09; master index + debrief produced |
 | 2026-08-08 | No new briefs; no new commits; date/last-updated brought current; B-012 added | index.md + qa/index.md updated to 2026-08-08; master index + debrief produced |
+| 2026-08-13 | No new briefs; PUBLISHING-SGIT-VAULT-TO-GITHUB.md guide documented (missed by 08/12 session); CI bump v0.33.55 → v0.33.56; B-013 added | Master index, 2 reality files updated (index.md, changelog), DAILY_RUN, debrief produced |
 | 2026-08-12 | No new briefs; multi-target deployment plan (P-405–P-412 confirmed); "7 targets" corrected to 4 working + 8 PROPOSED; vault extract-and-embed guide noted; CI bump v0.33.54 → v0.33.55 | Master index, 4 reality files updated (index.md, qa, ui, changelog), DAILY_RUN, debrief produced |
 | 2026-08-11 | 26 new briefs (02 Aug + 06 Aug); 5 new code commits; 1 standing decision corrected; 11 new PROPOSED items | Master index, Dev review, AppSec review, 6 reality files updated, changelog, debrief produced; OpenRouter resale prohibition annotated in index.md |
 | 2026-08-07 | No new briefs; date/last-updated brought current to today | qa/index.md + index.md "Last updated" updated to 2026-08-07; master index + debrief produced |
