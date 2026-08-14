@@ -301,6 +301,23 @@ Key proposals for this domain. Full details: see sub-files in `proposed/`.
 
 ---
 
+## Guides
+
+Operational guides for vault workflows (located at `library/guides/vault-html/`). See also the
+inline cross-reference on the static-host mode section above (HOSTING-ON-STATIC-STORAGE.md).
+
+| Guide | What It Covers |
+|-------|---------------|
+| [`AUTHORING.md`](../../../../../library/guides/vault-html/AUTHORING.md) | Vault content authoring workflow; file layout; update and commit cycle |
+| [`SUB-VAULTS-AND-LINKS.md`](../../../../../library/guides/vault-html/SUB-VAULTS-AND-LINKS.md) | Sub-vault architecture, `.link.json` convention, read-only link cards, owner link management |
+| [`EXTRACT-AND-EMBED-A-SUB-VAULT.md`](../../../../../library/guides/vault-html/EXTRACT-AND-EMBED-A-SUB-VAULT.md) | Extract and embed a sub-vault into a parent vault; sub-vault link convention; CLI round-trip (added Aug 2026) |
+| [`PUBLISHING-SGIT-VAULT-TO-GITHUB.md`](../../../../../library/guides/vault-html/PUBLISHING-SGIT-VAULT-TO-GITHUB.md) | Use a git remote as a second untrusted server for vault distribution; five-step workflow; GitHub Actions secret pattern (added Aug 2026) |
+| [`HOSTING-ON-STATIC-STORAGE.md`](../../../../../library/guides/vault-html/HOSTING-ON-STATIC-STORAGE.md) | GitHub Pages / S3 static hosting for vault apps; `window.SG_STATIC` / `SG_ENDPOINT`; path-mirroring |
+| [`MIGRATING-TO-THE-PERMISSION-MODEL.md`](../../../../../library/guides/vault-html/MIGRATING-TO-THE-PERMISSION-MODEL.md) | Migrating vault apps to the per-verb consent permission model |
+| [`PLAYWRIGHT-VAULT-APP-ACCESS.md`](../../../../../library/guides/vault-html/PLAYWRIGHT-VAULT-APP-ACCESS.md) | Accessing vault apps from Playwright tests; authentication; iframe interaction |
+
+---
+
 ## Sub-files
 
 - `proposed/structure-key-split.md` — 04/28 architect review content (the active four-team change)

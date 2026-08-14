@@ -1,6 +1,6 @@
 # Reality — Master Index
 
-**Version:** v0.33.56 | **Last updated:** 2026-08-13 | **Maintained by:** Librarian (daily run)
+**Version:** v0.33.57 | **Last updated:** 2026-08-14 | **Maintained by:** Librarian (daily run)
 **Structure:** Domain tree — each domain has its own directory with `index.md` and `proposed/`
 
 This file is the entry point. Read it to find the right domain, then go to that domain's
@@ -31,7 +31,7 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 
 ---
 
-## Quick Stats (as of 2026-08-13)
+## Quick Stats (as of 2026-08-14)
 
 | Metric | Count |
 |--------|-------|

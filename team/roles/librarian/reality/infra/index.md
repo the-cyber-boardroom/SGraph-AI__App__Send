@@ -116,7 +116,7 @@ Code: `sgraph_ai_app_send/lambda__user/storage/Storage_FS__S3.py` (commit `b61a1
 | Docker container (Docker Hub) | Container | EXISTS — `diniscruz/sg-send-vault` (multi-arch) |
 | Docker container (local build) | Container | EXISTS |
 | GCP (container) | Container | PROPOSED — image is portable, no GCP wiring in this repo |
-| ECS / Fargate | Container | PROPOSED — image is published, no task definition in this repo |
+| ECS / Fargate | Container | CFN template exists (`deploy/aws/ecs-fargate.cfn.yml`, cfn-lint clean); no live deployment yet (Phase B) |
 | EC2 provisioning | Server | MOVED to SG/Compute project |
 | CLI | CLI | EXISTS (sgit-ai PyPI) |
 | Memory/Disk (local dev) | Container | EXISTS |
