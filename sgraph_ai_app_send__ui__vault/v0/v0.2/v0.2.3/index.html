@@ -216,6 +216,11 @@
     <script src="_common/js/components/vault-subvaults-panel/vault-subvaults-panel.js"></script>
 
     <!-- 9. Vault components -->
+    <!-- Embed handshake (?embed=1): protocol + shared receiver — same modules the
+         /en-gb/app surface loads, so both shells run ONE receiver implementation.
+         Must load before vault-entry/vault-shell (both feature-detect EmbedProtocol). -->
+    <script src="_common/js/components/app-shell/embed-protocol.js"></script>
+    <script src="_common/js/components/app-shell/embed-receiver.js"></script>
     <script src="_common/js/components/vault-entry/vault-entry.js"></script>
     <script src="_common/js/components/vault-upload/vault-upload.js"></script>
     <script src="_common/js/components/vault-sgit-view/vault-sgit-view.js"></script>
@@ -293,11 +298,18 @@
         } catch (_) {}
         _set(20, 'Checking vault key…', isAppMode ? 'Loading Vault App' : 'Loading Vault');
 
+        // Embed mode (?embed=1): the key comes from the parent by postMessage, not
+        // storage — hide the loading panel quickly so the entry's "Waiting for vault
+        // key…" state shows until the handshake delivers the key. Inline check (not
+        // EmbedProtocol) so this head block keeps zero script dependencies.
+        var isEmbed = false;
+        try { isEmbed = new URLSearchParams(window.location.search).get('embed') === '1'; } catch (_) {}
+
         // If no vault key in localStorage, we'll show the entry form — hide loading
         // after a short delay so the vault-entry component can render.
         var hasKey = false;
         try { hasKey = !!(VaultLoader && VaultLoader.storage && VaultLoader.storage.getCurrentKey()); } catch (_) {}
-        if (!hasKey) {
+        if (!hasKey || isEmbed) {
             setTimeout(function() { _hide(); }, 300);
             return;
         }
@@ -468,7 +480,10 @@
         // Hide .vs-entry immediately when a vault token is loaded (from localStorage).
         // The top-level routing script saves any incoming hash token to
         // localStorage('sg-vault-key') before this runs.
+        // EMBED MODE: skip — the key arrives by postMessage, storage is ignored, and
+        // the entry must stay visible to show the "Waiting for vault key…" state.
         (function () {
+            try { if (new URLSearchParams(window.location.search).get('embed') === '1') return; } catch (_) {}
             var token = '';
             try { token = (sessionStorage.getItem('sg-vault-key') || localStorage.getItem('sg-vault-key') || '').toLowerCase(); } catch (_) {}
             if (!token) return;

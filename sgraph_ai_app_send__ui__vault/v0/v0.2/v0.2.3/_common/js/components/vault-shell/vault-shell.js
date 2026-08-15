@@ -62,6 +62,56 @@
             // Restore the debug pane (right-side, resizable) from the last session — matches
             // /app mode: open/width/active-tab persisted to sessionStorage, survives reload.
             this._restoreDebugState();
+            // Embed mode (?embed=1): the key arrives from the parent page by postMessage,
+            // never from the hash or storage. Mirrors app-shell._initEmbed via the SHARED
+            // embed-receiver.js. vault-entry independently suppresses its storage auto-open
+            // in embed mode, so a stray sg-vault-key can't open the wrong vault here.
+            if (typeof EmbedProtocol !== 'undefined' && typeof EmbedReceiver !== 'undefined'
+                && EmbedProtocol.isEmbedMode()) {
+                this._initEmbed();
+            }
+        }
+
+        // --- Embed mode (child side of the handshake — see embed-protocol.js) --------
+        _initEmbed() {
+            var self = this;
+            this._embedMode = true;
+
+            this._embedReceiver = EmbedReceiver.start({
+                onOpen: function (parsed) {
+                    // noPersist: the credential stays in memory for the embed session —
+                    // never written to (partitioned) storage, never in the recent list.
+                    VaultLoader.open(parsed.key, { noPersist: true })
+                        .then(function (result) {
+                            return self._onVaultOpened(result.vault, result.vaultKey, '', parsed.deepLink || null);
+                        })
+                        .catch(function (err) {
+                            console.error('[vault-shell] embed init failed:', err);
+                            window.sgraphVault.events.emit('vault-open-failed-fatal', { error: err });
+                            var entry = self.querySelector('vault-entry');
+                            if (entry && entry._showError) entry._showError('Vault open failed: ' + (err && err.message || err));
+                        });
+                }
+            });
+
+            // vault-ready → parent, once the file browser is mounted and interactive.
+            // One-shot: _mountBrowse re-fires on refresh/remount; the parent only needs
+            // the first signal.
+            var onMounted = function () {
+                window.sgraphVault.events.off('vault-browse-mounted', onMounted);
+                var fileCount = 0;
+                try {
+                    if (self._dataSource && self._dataSource.getFileList) {
+                        fileCount = self._dataSource.getFileList().length;
+                    }
+                } catch (_) {}
+                self._embedReceiver.notifyReady({
+                    vaultName: (self._vault && self._vault.name) || '',
+                    fileCount: fileCount,
+                    hasApp:    false                    // the vault surface never auto-runs an app
+                });
+            };
+            window.sgraphVault.events.on('vault-browse-mounted', onMounted);
         }
 
         disconnectedCallback() {
@@ -421,9 +471,11 @@
             try {
                 let vault;
                 if (this._isROMode) {
-                    // RO-token vaults: re-open via VaultLoader so format 5 dispatch runs correctly.
-                    // SGVault.open() cannot handle ro-word-word-NNNN keys.
-                    const result = await VaultLoader.open(this._vaultKey);
+                    // RO vaults (ro-token format 5 / read-key format 6): re-open via
+                    // VaultLoader so the right dispatch runs — SGVault.open() cannot
+                    // handle either credential. noPersist in embed mode: a refresh must
+                    // not write the credential into (partitioned) storage.
+                    const result = await VaultLoader.open(this._vaultKey, { noPersist: !!this._embedMode });
                     vault = result.vault;
                 } else {
                     const entry  = this.querySelector('vault-entry');

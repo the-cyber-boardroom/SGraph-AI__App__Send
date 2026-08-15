@@ -61,6 +61,15 @@ class VaultEntry extends VaultComponent {
         // Show recent vaults
         this._renderRecentVaults()
 
+        // Embed mode (?embed=1): the key arrives from the PARENT page by postMessage
+        // (vault-shell._initEmbed) — never from storage. A stray sg-vault-key from a
+        // previous session (or an earlier embed in the same storage partition) must
+        // not auto-open the wrong vault under the parent's handshake.
+        if (typeof EmbedProtocol !== 'undefined' && EmbedProtocol.isEmbedMode()) {
+            this._showStatus('Waiting for vault key from the embedding page…')
+            return
+        }
+
         // The head routing script handles any /#token hash: it saves the token to
         // localStorage('sg-vault-key') and strips the hash before this runs.
         // All we need to do is check localStorage for the current key.

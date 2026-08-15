@@ -15,6 +15,8 @@ node tests/unit/vault_ui/loader/test__composite_data_source.js
 node tests/unit/vault_ui/loader/test__storage_pertab.js
 node tests/unit/vault_ui/loader/test__vault_history.js
 node tests/unit/vault_ui/loader/test__ro_record_derivation.js
+node tests/unit/vault_ui/loader/test__read_key_creds.js
+node tests/unit/vault_ui/loader/test__vault_loader_open_readonly.js
 node tests/unit/vault_ui/loader/test__sgsend_access_token.js
 node tests/unit/vault_ui/loader/test__sgsend_static_mode.js
 node tests/unit/vault_ui/loader/test__sg_releases.js
@@ -63,6 +65,7 @@ node tests/unit/vault_ui/loader/test__app_hud_config.js
 node tests/unit/vault_ui/loader/test__sgit_diff.js
 node tests/unit/vault_ui/loader/test__sg_embed_helpers.js
 node tests/unit/vault_ui/loader/test__embed_protocol.js
+node tests/unit/vault_ui/loader/test__embed_receiver.js
 node tests/unit/vault_ui/loader/test__sg_append_client.js
 node tests/unit/vault_ui/loader/test__sg_append_checker.js
 node tests/unit/vault_ui/loader/test__bundle_freshness.js

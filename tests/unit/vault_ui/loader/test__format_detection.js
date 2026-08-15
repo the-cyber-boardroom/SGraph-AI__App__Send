@@ -183,3 +183,68 @@ suite('detectFormat — error cases', ({ test }) => {
         assert.throws(() => VaultLoader.detectFormat('abcdef012345' + '0'.repeat(64)));
     });
 });
+
+// ---------------------------------------------------------------------------
+// Format 6 — Read-key credential: <64-hex read_key>:<vault_id>
+// Must win over formats 2/3 (a 64-hex head parsed as a passphrase PBKDF2s into
+// garbage keys). Same routing rule the sgit CLI uses for read-only clone.
+// ---------------------------------------------------------------------------
+suite('detectFormat — Format 6: read_key:vault_id', ({ test }) => {
+
+    const RK = 'abcdef0123456789'.repeat(4);   // 64 hex chars
+
+    test('canonical: 64-hex colon 8-char vault_id', () => {
+        const r = VaultLoader.detectFormat(RK + ':abcd1234');
+        assert.equal(r.format, 6);
+        assert.equal(r.kind,   'read-key');
+        assert.equal(r.parts.vaultId,    'abcd1234');
+        assert.equal(r.parts.readKeyHex, RK);
+        assert.equal(r.parts.passphrase, null);
+    });
+
+    test('wins over format 2: 64-hex head + 12-hex vault_id is format 6, NOT 2', () => {
+        const r = VaultLoader.detectFormat(RK + ':abcdef012345');
+        assert.equal(r.format, 6);
+    });
+
+    test('wins over format 3: 64-hex head + alnum vault_id is format 6, NOT 3', () => {
+        const r = VaultLoader.detectFormat(RK + ':vault0042');
+        assert.equal(r.format, 6);
+    });
+
+    test('sgit_rk1_ prefixed form detects as format 6', () => {
+        const r = VaultLoader.detectFormat('sgit_rk1_' + RK + ':abcd1234');
+        assert.equal(r.format, 6);
+        assert.equal(r.parts.readKeyHex, RK);
+        assert.equal(r.parts.raw, RK + ':abcd1234');   // raw is the STRIPPED string
+    });
+
+    test('sgit_vk1_ prefixed vault key still detects as format 2/3 (prefix stripped)', () => {
+        const r = VaultLoader.detectFormat('sgit_vk1_apple-river-1234:abcdef012345');
+        assert.equal(r.format, 2);
+        assert.equal(r.parts.passphrase, 'apple-river-1234');
+        assert.equal(r.parts.raw, 'apple-river-1234:abcdef012345');
+    });
+
+    test('65-hex head is NOT format 6 (falls through to format 3 passphrase)', () => {
+        const r = VaultLoader.detectFormat('a' + RK + ':abcd1234');
+        assert.equal(r.format, 3);
+    });
+
+    test('uppercase hex head is NOT format 6', () => {
+        const r = VaultLoader.detectFormat(RK.toUpperCase() + ':abcd1234');
+        assert.equal(r.format, 3);   // uppercase head reads as a passphrase
+    });
+
+    test('64-hex head with invalid vault_id (25 chars) throws', () => {
+        assert.throws(() => VaultLoader.detectFormat(RK + ':' + 'a'.repeat(25)));
+    });
+
+    test('regression: formats 1-5 unchanged by format 6 + prefix stripping', () => {
+        assert.equal(VaultLoader.detectFormat('apple-river-1234').format, 1);
+        assert.equal(VaultLoader.detectFormat('pass:abcdef012345').format, 2);
+        assert.equal(VaultLoader.detectFormat('pass:vault004221').format, 3);
+        assert.equal(VaultLoader.detectFormat('abcdef012345 ' + RK).format, 4);
+        assert.equal(VaultLoader.detectFormat('ro-apple-river-1234').format, 5);
+    });
+});

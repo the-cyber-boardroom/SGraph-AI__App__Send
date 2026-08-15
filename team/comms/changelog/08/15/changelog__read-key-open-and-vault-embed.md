@@ -1,0 +1,116 @@
+# Changelog — Read-Key Open (formats 4/6) + Embeddable Vault Surfaces
+
+**Date:** 2026-08-15
+**Branch:** `claude/vault-key-readonly-review-2pvgdf`
+**Implements:** `team/roles/architect/reviews/08/15/architect-brief__read-key-open-and-embeddable-vault-surfaces.md`
+(Phases 1–4) as amended by
+`team/comms/briefs/08/15/addendum__read-key-open__cli-verification-and-prefix-alignment.md`
+(`sgit_rk1_` prefix instead of the brief's `rk:`; CLI parity verified).
+
+> No version prefix on these filenames: repo rule 27 forbids reading `sgraph_ai_app_send/version`.
+
+---
+
+## What changed (all under `sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.3/`)
+
+### Phase 1 — read-key open, main vault UI
+- `_common/js/lib/sg-vault/sg-vault-crypto.js` — NEW `deriveReadOnlyCreds(vaultId, readKeyHex)`
+  (refFileId + branchIndexFileId from the read key alone) and `stripKeyPrefix`
+  (`sgit_vk1_`/`sgit_rk1_`).
+- `_common/js/vault-loader/vault-loader-format.js` — NEW format 6
+  (`<64-hex>:<vault_id>`, bare + prefixed) detected BEFORE formats 2/3; prefixes stripped
+  before detection; `parts.raw` is the normalised string.
+- `_common/js/vault-loader/vault-loader.js` — `openReadOnly` stub REPLACED with the real
+  implementation (derive → `SGVault.openReadOnly` → `VAULT_OPENED {readOnly:true}`);
+  formats 4 and 6 both route there; NEW `opts.noPersist` on all open paths;
+  `open()` now derives from the prefix-stripped string.
+- `_common/js/vault-loader/vault-loader-routing.js` — `_stripHash` try/caught
+  (replaceState throws in opaque-origin frames).
+
+### Phase 2 — read-key open, App UI
+- `_common/js/components/app-shell/app-shell.js` — `_initWithKey` strips key prefixes and
+  adds a format-6 branch (same `deriveReadOnlyCreds`; `isRO` identical to ro-token);
+  entry-form badge recognises read keys.
+
+### Phase 3 — embed receiver on the main vault UI
+- `_common/js/components/app-shell/embed-receiver.js` — NEW shared child-side handshake
+  (extracted from `app-shell._initEmbed`; one-shot, source/origin-validated).
+- `app-shell.js` — `_initEmbed` refactored onto the shared receiver (no behaviour change).
+- `_common/js/components/vault-shell/vault-shell.js` — NEW `_initEmbed` (receiver → 
+  `VaultLoader.open(key,{noPersist:true})` → `_onVaultOpened`; posts `vault-ready` on
+  browse mount); RO refresh honours `noPersist` in embed mode.
+- `_common/js/components/vault-entry/vault-entry.js` — embed mode suppresses the
+  storage auto-open ("Waiting for vault key from the embedding page…").
+- `index.html` (root → generates `en-gb/vault/index.html` at deploy) — loads
+  embed-protocol/receiver; loading screen + entry pre-hide are embed-aware.
+- `en-gb/app/index.html` — loads `embed-receiver.js` + `sg-vault-embed.js`.
+
+### Phase 4 — vendorable parent-side helper
+- `_common/js/lib/sg-embed/sg-vault-embed.js` — NEW: `<sg-vault-embed>` element +
+  `SgVaultEmbed.mount(el, key, opts)`; self-contained `_mountImpl` is now the ONE
+  handshake implementation — `app-shell._embedHelperSrc` injects it verbatim
+  (bespoke glue string deleted).
+
+### Rebuilt artefact
+- `_common/js/components/app-shell/kernel-shell-bundle.js` — regenerated
+  (`sg-vault-crypto.js` is a bundle source); freshness test green.
+
+## sgit.ai integration (the driving use case)
+
+```html
+<script src="https://dev.vault.sgraph.ai/_common/js/lib/sg-embed/sg-vault-embed.js"></script>
+<!-- main vault UI (files + SGit history) -->
+<sg-vault-embed surface="vault" key="sgit_rk1_<64-hex>:<vault_id>" style="height:600px"></sg-vault-embed>
+<!-- App UI (kernel + HUD, hosting the inner vault-app iframe) -->
+<sg-vault-embed surface="app"   key="sgit_rk1_<64-hex>:<vault_id>" style="height:600px"></sg-vault-embed>
+```
+
+Direct links also work now: `https://dev.vault.sgraph.ai/#<64-hex>:<vault_id>` (root hash
+inbox → App UI → falls back to the vault UI when the vault has no app.json).
+
+**DevOps prerequisite (brief §4.3, still open):** deployed CloudFront/S3 response headers
+must not send `X-Frame-Options: DENY` / restrictive `frame-ancestors`, or third-party
+framing is dead regardless of this client work. Not verifiable from the repo.
+
+## Test impact
+
+**Tests that SHOULD break (good failures — old contract removed):**
+- `tests/integration/vault_ui/loader/test__open_flow_full.js` — the suite asserting
+  format 4 throws "not yet supported" — UPDATED in this change to assert the new
+  read-key open contract (formats 4/6 resolve read-only).
+
+**Tests that should NOT break (bad failure if they do):**
+- `test__format_detection.js` formats 1–5 suites (regression-guarded in the new format-6 suite)
+- `test__ro_record_derivation.js`, `test__ro_token_resolution.js` (ro-token path untouched)
+- `test__embed_protocol.js`, `test__sg_embed_helpers.js` (wire format + pure helpers unchanged)
+- `test__app_shell_bridge_build.js` (bridge still exposes `embed:_embedVault`)
+- `test__bundle_freshness.js` (bundle regenerated in the same commit)
+
+**New tests:**
+- `tests/unit/vault_ui/loader/test__read_key_creds.js` (16) — THE derivation invariant
+  (`deriveReadOnlyCreds` ≡ `deriveKeys` file ids, standard + simple-token) + prefix stripping
+- `tests/unit/vault_ui/loader/test__vault_loader_open_readonly.js` (19) — formats 4/6 routing,
+  prefixed input, `noPersist`, storage-that-throws simulation
+- `tests/unit/vault_ui/loader/test__embed_receiver.js` (14) — handshake one-shot, source
+  pinning, origin enforcement, `stop()`
+- format-6 suite appended to `test__format_detection.js` (9)
+
+**Suites run locally, all green:** `npm run test:vault-unit`,
+`bash tests/integration/vault_ui/loader/run-all.sh`, `npm run test:vault-chat-unit`.
+Playwright e2e / browser-integration not run in this session (no browser stack) — QA:
+the embed receiver on `/en-gb/vault/` (Phase 3) is the piece that most wants a real-browser
+pass (null-origin storage behaviour is simulated, not browser-verified).
+
+## Security notes (for AppSec review)
+
+- Read keys cannot escalate to write — independent PBKDF2 derivations (pre-existing property;
+  the feature rests on it).
+- `SGVault.openReadOnly` fails closed (`_passphrase=null`, `_writeKey=null`, key imported
+  non-extractable/decrypt-only) — unchanged, now reachable from two more credential shapes.
+- Embed mode: credential never persisted (noPersist on open + refresh; entry auto-open
+  suppressed); one-shot re-key-proof listener; sandbox sanitiser still refuses
+  `allow-same-origin` / `allow-popups-to-escape-sandbox`.
+- The `<sg-vault-embed key>` HTML attribute is documented as publishable-credentials-only.
+- Open question for AppSec (brief §7.4): should any vault-shell surface (settings, token
+  manager, SGit view) be suppressed in embed mode? Not done in this change — the RO tier
+  already hides owner sections; embed currently shows exactly what a read-key holder sees.
