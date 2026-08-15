@@ -61,7 +61,12 @@ console.log('\n[suite] app-shell — an app error is attributed to the APP, not 
     const src = el._buildVfsBridgeScript('tools/dash.html');
 
     // The injected bridge is a <script> STRING — a typo in it fails only in a browser.
-    const body = src.replace(/^<script>/, '').replace(/<\/script>\s*$/, '');
+    // Since 2026-08-13 the builder also prefixes the frame CSP meta (see F1 in the
+    // 08/13 architect review), so take the script body from the first <script> onward
+    // rather than assuming the string starts with it.
+    ok('the bridge carries the egress CSP meta ahead of the script',
+        /^<meta http-equiv="Content-Security-Policy"[^>]*>\s*<script>/.test(src));
+    const body = src.slice(src.indexOf('<script>') + '<script>'.length).replace(/<\/script>\s*$/, '');
     let perr = null;
     try { new Function(body); } catch (e) { perr = e; }
     ok('the injected bridge still parses', perr === null, perr && perr.message);

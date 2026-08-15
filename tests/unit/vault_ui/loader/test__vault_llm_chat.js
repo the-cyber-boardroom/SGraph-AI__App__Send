@@ -553,7 +553,9 @@ console.log('\n[suite] the tool loop — send → dispatch → resend, all on th
         listFolder: (p) => (p === '/' ? [{ name: 'plan.md', type: 'file', size: 9 }] : null),
         getFile: async () => new TextEncoder().encode('THE PLAN!')
     };
-    el._grants = SGLlmTools.parseGrants({ 'files.read': { enabled: true } });
+    // files.read requires an explicit allow-list (F5) — this suite exercises the tool
+    // LOOP, not scoping, so grant it '**'.
+    el._grants = SGLlmTools.parseGrants({ 'files.read': { enabled: true, allow: ['**'] } });
 
     // A scripted client: round 1 returns a tool call, round 2 answers.
     const seen = [];

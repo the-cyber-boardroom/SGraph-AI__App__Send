@@ -665,6 +665,19 @@ transcript — one take, one result.
 - Per-app limit overrides are read (`limitsFor(policy, appId)`) but no UI writes them.
 - `permissions.network` is parsed but still unused.
 
+### sg.llm.* hardening — egress CSP, consent floors, per-app budget, tool scope (2026-08-13)
+
+Implements F1-F5 of `team/roles/architect/reviews/08/13/v0.33.47__architect-review__sg-llm-as-built-and-next-steps.md`.
+
+| Component | Status | Evidence |
+|-----------|--------|---------|
+| **Frame egress CSP** — `_buildVfsBridgeScript` prefixes `<meta http-equiv="Content-Security-Policy" content="connect-src blob: data:">`, injected first in `<head>` by `AppFrameBootstrap._injectHead`, so it governs all five bridge-build call sites. `blob:`/`data:` are required (the print RPC fetches blob: URLs); `'none'` would break printing. `img-src`/`script-src` are untouched, so vault images and CDN imports still work | **EXISTS** | `app-shell.js` `_buildVfsBridgeScript`; `test__llm_hardening.js`, `test__app_shell_bridge_build.js` |
+| **`permissions.network`** — now genuinely enforced: it is the only way to omit the CSP and re-open direct egress. Previously parsed and read by nothing (`true`/`false` were identical) | **EXISTS** | `app-permissions.js`; `test__llm_hardening.js` |
+| **Consent floors** — `AppShell.CONSENT_FLOOR` (`llm.chat`→`once`, `llm.listen`→`always`) + `strictestConsent`. `app.json` may only make consent STRICTER, never weaker: an app can no longer set `"consent":{"llm.chat":"auto"}` to disable the gate on a capability that spends the owner's money, and a microphone grant is never cached | **EXISTS** | `app-shell.js` `_consent`; `test__llm_hardening.js` |
+| **HUD standing grants** — `setPrivileges` lists `use AI models (costs money)`, `use the microphone` (danger), `direct network access (uncontained egress)` (danger). Previously LLM use surfaced only as a 6s transient toast | **EXISTS** | `app-hud.js` |
+| **Per-app spend attribution** — `VaultLlmLog` entries carry `app` (null = host chat); `totals(app)` scopes the tally; budget checks and `sg.llm.usage` are scoped to the caller. Per-app caps were previously compared against a session-GLOBAL counter, so the owner's own chat could trip an app's EBUDGET and two apps cannibalised each other. Argument-less `totals()` is unchanged, so the displayed one-bill-per-session figure is unaffected | **EXISTS** | `vault-llm-log.js`, `app-shell.js` `_llmTotals`; `test__llm_hardening.js`, `test__app_shell_llm_bridge.js` |
+| **Tool scope must be explicit** — for path-scoped groups (`files.read`) an empty `allow` now grants NOTHING (`ENOSCOPE`) instead of the whole vault minus the floor; the root-listing exemption narrowed to `ESCOPE` only, so an unscoped group cannot list the root either; `compileTools` states the absent scope to the model | **EXISTS** | `sg-llm-tools.js` `pathAllowed`/`PATH_SCOPED`; `test__llm_hardening.js`, `test__sg_llm_tools.js` |
+
 ### Vault Settings — AI (OpenRouter) config + read-only share block (2026-08-02)
 
 Admin surface for the PROPOSED `sg.llm.*` capability (plan:

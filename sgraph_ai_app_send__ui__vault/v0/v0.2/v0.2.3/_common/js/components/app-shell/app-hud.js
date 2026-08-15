@@ -376,6 +376,15 @@
             if (granted(fs['delete']))    list.push({ label: 'delete files',   danger: true  });
             if (granted(vault.unlink))    list.push({ label: 'unlink vaults',  danger: true  });
             if (vault['delete'] === true) list.push({ label: 'delete vaults',  danger: true  });
+            // LLM access spends the vault owner's money — surface it as a standing grant,
+            // not just a transient toast on first use.
+            var llm = (perm && perm.llm) || {};
+            if (llm.chat   === true) list.push({ label: 'use AI models (costs money)', danger: false });
+            if (llm.listen === true) list.push({ label: 'use the microphone',          danger: true  });
+            // `network` removes the connect-src CSP from the app frame: this app can reach
+            // any host directly, so decrypted vault content it holds is no longer contained
+            // by the bridge. Flagged danger because it is the one grant that re-opens egress.
+            if (perm && perm.network === true) list.push({ label: 'direct network access (uncontained egress)', danger: true });
             // Destructive grants sort last so the expanded list ends on the ones that matter.
             list.sort(function (a, b) { return (a.danger ? 1 : 0) - (b.danger ? 1 : 0); });
             this._privList = list;

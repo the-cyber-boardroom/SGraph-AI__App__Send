@@ -60,6 +60,12 @@
             model      : r.model || null,
             ts         : r.ts || Date.now(),
             status     : r.status || 'pending',        // pending | ok | error | aborted
+            // WHO spent this. null = the host's own chat (the vault owner driving the UI);
+            // a string = the appId of the sandboxed app that called sg.llm.chat. Without
+            // this, per-app caps in .vault/llm/config.json were compared against a
+            // session-GLOBAL counter: the owner's own spend could trip an app's EBUDGET,
+            // and two apps in one session cannibalised each other's budget.
+            app        : (typeof r.app === 'string' && r.app) ? r.app : null,
             files      : Array.isArray(r.files) ? r.files.slice() : [],
             promptChars: _num(r.promptChars) || 0,
             // Images are their own count, never folded into promptChars: a screenshot and
@@ -101,17 +107,27 @@
     // the sum a UI may show as "spend so far", but `estimatedCost`/`billedCost` let it
     // say HOW MUCH of that is actually known — which is the difference between a
     // number a user can trust and one they can't.
-    function totals() {
+    // `app` (optional): restrict the tally to one spender.
+    //   undefined → every call in the session (the figure a UI shows as "spend so far")
+    //   '<appId>' → only that app's calls
+    //   null      → only the host's own chat (calls with no app attribution)
+    // Budget enforcement passes an appId so a per-app cap means what the config says;
+    // the display keeps using the unfiltered total, because one bill per session is the
+    // honest thing to show a user.
+    function totals(app) {
+        var scoped = (arguments.length === 0)
+            ? _entries
+            : _entries.filter(function (e) { return (e.app || null) === (app || null); });
         var t = {
-            calls: _entries.length, ok: 0, pending: 0, errors: 0, aborted: 0,
+            calls: scoped.length, ok: 0, pending: 0, errors: 0, aborted: 0,
             billedCost: 0, estimatedCost: 0, totalCost: 0,
             costedCalls: 0, uncostedCalls: 0,
             promptTokens: 0, completionTokens: 0, totalTokens: 0,
             files: 0
         };
         var seen = {};
-        for (var i = 0; i < _entries.length; i++) {
-            var e = _entries[i];
+        for (var i = 0; i < scoped.length; i++) {
+            var e = scoped[i];
             if (e.status === 'ok')            t.ok++;
             else if (e.status === 'pending')  t.pending++;
             else if (e.status === 'error')    t.errors++;

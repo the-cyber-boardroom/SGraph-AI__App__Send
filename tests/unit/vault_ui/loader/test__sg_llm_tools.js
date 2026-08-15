@@ -47,8 +47,10 @@ function makeVault(tree, opts = {}) {
     };
 }
 
+// files.read now REQUIRES an explicit allow-list (an empty one grants nothing), so the
+// shared helper opts into '**'. The unscoped case is asserted on its own below.
 const grantsOn = (over) => T.parseGrants(Object.assign({
-    'session': { enabled: true }, 'files.read': { enabled: true }
+    'session': { enabled: true }, 'files.read': { enabled: true, allow: ['**'] }
 }, over || {}));
 
 console.log('\n[suite] the default is NOTHING');
@@ -63,8 +65,14 @@ console.log('\n[suite] the default is NOTHING');
         return rt['future.group'] && rt['future.group'].enabled === true;
     })());
     ok('serialize omits empty allow/deny (small diffs in the audit log)', (() => {
-        const rt = T.serializeGrants(grantsOn());
+        // Explicitly-empty grant: grantsOn() now carries allow:['**'], which would be
+        // serialised (correctly) and defeat the point of this assertion.
+        const rt = T.serializeGrants(T.parseGrants({ 'files.read': { enabled: true } }));
         return !('allow' in rt['files.read']) && !('deny' in rt['files.read']);
+    })());
+    ok('serialize KEEPS a non-empty allow (the scope must survive a save)', (() => {
+        const rt = T.serializeGrants(grantsOn());
+        return Array.isArray(rt['files.read'].allow) && rt['files.read'].allow[0] === '**';
     })());
 }
 
@@ -89,7 +97,12 @@ console.log('\n[suite] scope globs — deny wins, * does not span, ** does');
     ok('* does NOT span segments',         T.pathAllowed(g, 'files.read', 'other/readme.md').code === 'ESCOPE');
     ok('deny wins over allow',             T.pathAllowed(g, 'files.read', 'docs/private/x.md').code === 'ESCOPE');
     ok('…and the refusal names the scope', /docs\/private/.test(T.pathAllowed(g, 'files.read', 'docs/private/x.md').reason));
-    ok('empty allow = everything (minus floor)',
+    // CHANGED 2026-08-13 (F5): an empty allow-list used to mean "the whole vault minus the
+    // floor". Enabling a group is not by itself a grant over everything, so absent scope
+    // now means NO scope.
+    ok('empty allow grants NOTHING',
+        T.pathAllowed(T.parseGrants({ 'files.read': { enabled: true } }), 'files.read', 'anything/at/all.txt').code === 'ENOSCOPE');
+    ok('an explicit ** still grants everything (minus floor)',
         T.pathAllowed(grantsOn(), 'files.read', 'anything/at/all.txt').ok);
     ok('a disabled group refuses with EOFF',
         T.pathAllowed(T.parseGrants(null), 'files.read', 'docs/a.md').code === 'EOFF');
@@ -137,7 +150,13 @@ console.log('\n[suite] dispatch — file tools against a fake vault');
     const ctx = { vault, grants: g };
 
     const ls = await T.dispatch({ name: 'list_folder', args: { path: '' } }, ctx);
-    ok('list_folder lists the root', ls.ok && ls.result.entries.some((e) => e.name === 'docs'));
+    ok('list_folder lists the root when scoped', ls.ok && ls.result.entries.some((e) => e.name === 'docs'));
+
+    // The root-listing exemption exists so a SCOPED model can navigate. It must not paper
+    // over a group with no scope at all, or "no allow-list" would still leak the root.
+    const unscopedCtx = { vault, grants: T.parseGrants({ 'files.read': { enabled: true } }) };
+    const lsNo = await T.dispatch({ name: 'list_folder', args: { path: '' } }, unscopedCtx);
+    ok('…but an UNSCOPED group cannot even list the root', !lsNo.ok && lsNo.code === 'ENOSCOPE');
     ok('…but NEVER shows .vault',    !ls.result.entries.some((e) => e.name === '.vault'));
 
     const rd = await T.dispatch({ name: 'read_file', args: { path: 'docs/plan.md' } }, ctx);

@@ -19,8 +19,10 @@
      session     get_costs, get_exchanges          — the ledger, from VaultLlmLog
      files.read  list_folder, read_file, stat, exists
 
-   Scope: per-group allow/deny path globs (`docs/**`, `*.md`). Deny wins. Empty allow
-   means "everything (minus the floor)". Scope is enforced at dispatch AND stated in
+   Scope: per-group allow/deny path globs (`docs/**`, `*.md`). Deny wins. For path-scoped
+   groups an EMPTY allow means NOTHING is reachable — enabling a group is not by itself a
+   grant over the whole vault; the admin states what the model may read.
+   Scope is enforced at dispatch AND stated in
    the tool description the model receives, so it does not burn paid calls discovering
    the boundary. Fencing: file content enters the conversation wrapped in the same
    UNTRUSTED DATA fence as the vault-chat pack, and the system suffix tells the model
@@ -93,11 +95,23 @@
         return p === '.vault' || p.indexOf('.vault/') === 0;
     }
 
+    // Groups whose tools address vault paths. These REQUIRE an explicit allow-list:
+    // enabling the group is not by itself a grant over the whole vault.
+    var PATH_SCOPED = { 'files.read': true };
+
     function pathAllowed(grants, group, path) {
         var p = _norm(path);
         if (isFloor(p)) return { ok: false, code: 'EPROTECTED', reason: '.vault/** is never reachable by tools' };
         var g = grants && grants.groups && grants.groups[group];
         if (!g || !g.enabled) return { ok: false, code: 'EOFF', reason: 'group "' + group + '" is not enabled' };
+        // An empty allow-list used to mean "the entire vault". That made the blast radius of
+        // ticking one checkbox the whole vault minus the floor, which is not what a default
+        // reads as. Absent scope now means NO scope: the admin states what the model may read.
+        if (PATH_SCOPED[group] && !(g.allow && g.allow.length)) {
+            return { ok: false, code: 'ENOSCOPE',
+                     reason: 'group "' + group + '" has no allowed paths — set an explicit allow list ' +
+                             '(e.g. ["docs/**"]) for it in .vault/llm/tools.json' };
+        }
         if (g.deny && g.deny.length && _matchAny(g.deny, p)) {
             return { ok: false, code: 'ESCOPE', reason: 'path is denied by scope (' + g.deny.join(', ') + ')' };
         }
@@ -205,7 +219,10 @@
         var bits = [];
         if (g.allow && g.allow.length) bits.push('only paths matching: ' + g.allow.join(', '));
         if (g.deny  && g.deny.length)  bits.push('never: ' + g.deny.join(', '));
-        return bits.length ? (' Scope — ' + bits.join('; ') + '.') : '';
+        // Tell the model plainly when a path-scoped group has no scope, so it does not
+        // burn paid calls discovering that every path is refused.
+        if (!bits.length) return ' Scope — no paths configured: every path will be refused.';
+        return ' Scope — ' + bits.join('; ') + '.';
     }
 
     function _defs(grants) {
@@ -300,10 +317,13 @@
             var scope = pathAllowed(grants, group, path || '.');
             // '' (the root) must stay listable when allow-globs are set — a scoped model
             // still needs to see the top level to navigate. Files are what scope guards.
+            // But the exemption is ONLY for ESCOPE (a path outside an existing allow-list):
+            // it must not paper over a group that is off, floored, or has no scope at all,
+            // or "no allow-list" would still leak the whole root listing.
             if (name !== 'list_folder' || path !== '') {
                 if (!scope.ok) return _err(scope.code, scope.reason);
-            } else if (isFloor(path)) {
-                return _err('EPROTECTED', '.vault/** is never reachable by tools');
+            } else if (!scope.ok && scope.code !== 'ESCOPE') {
+                return _err(scope.code, scope.reason);
             }
 
             await _ensureSubtree(vault, '/' + path);
