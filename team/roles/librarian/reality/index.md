@@ -1,6 +1,6 @@
 # Reality — Master Index
 
-**Version:** v0.33.57 | **Last updated:** 2026-08-15 | **Maintained by:** Librarian (daily run)
+**Version:** v0.33.57 | **Last updated:** 2026-08-16 | **Maintained by:** Librarian (daily run)
 **Structure:** Domain tree — each domain has its own directory with `index.md` and `proposed/`
 
 This file is the entry point. Read it to find the right domain, then go to that domain's
