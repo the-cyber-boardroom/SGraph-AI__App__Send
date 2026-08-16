@@ -274,6 +274,9 @@
         });
 
         document.addEventListener('app-hud:llm',            function () { _openLlm('chat', '\u2728 AI Chat'); });
+        // The HUD's session-cost pill (A1/A4) \u2014 spend must be auditable from where it is
+        // displayed, without switching to the /vault surface.
+        document.addEventListener('app-hud:llm-ledger',     function () { _openLlm('requests', 'AI Requests'); });
         document.addEventListener('vault-llm-open',         function () { _openLlm('chat', '\u2728 AI Chat'); });
         document.addEventListener('vault-llm-close',        function () { _llm.close('chat'); });
         document.addEventListener('vault-llm-requests-open',  function () { _openLlm('requests', 'AI Requests'); });

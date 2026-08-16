@@ -512,6 +512,20 @@
         close() { this.dispatchEvent(new CustomEvent('vault-llm-close', { bubbles: true, composed: true })); }
 
         // ── rendering ────────────────────────────────────────────────────────────
+        // The HOST surface's spend, read from the ledger (app: null = the host's own
+        // calls). The ledger is module-global, so the figure SURVIVES the panel being
+        // closed and re-mounted — the old `this._cost`/`this._calls` were instance state
+        // that reset to zero on every remount, which made the vault policy's session
+        // caps evadable by simply reopening the pane (08/16 review, B1). The instance
+        // counters remain only as a fallback for pages without VaultLlmLog.
+        _hostTotals() {
+            if (globalThis.VaultLlmLog) {
+                const t = VaultLlmLog.totals(null);
+                return { cost: t.totalCost, calls: t.calls, pending: t.pending, estimated: t.estimatedCost > 0 };
+            }
+            return { cost: this._cost, calls: this._calls, pending: 0, estimated: true };
+        }
+
         _renderHead() {
             const m = this.shadowRoot.querySelector('.vlc-model');
             const c = this.shadowRoot.querySelector('.vlc-cost');
@@ -520,7 +534,10 @@
             // The <select> is the model display once it is populated; the text span is the
             // fallback for the pre-fetch moment (and when /models is unreachable).
             m.textContent = (sel && !sel.hidden) ? '' : (this._model || '');
-            c.textContent = this._calls ? ('~$' + this._cost.toFixed(4) + ' · ' + this._calls + ' calls') : '';
+            const t = this._hostTotals();
+            c.textContent = t.calls
+                ? ((t.estimated ? '~' : '') + '$' + t.cost.toFixed(4) + ' · ' + t.calls + ' calls' + (t.pending ? ' …' : ''))
+                : '';
         }
 
         _renderCtx() {
@@ -554,8 +571,10 @@
                 return;
             }
 
-            const total = this._files.reduce((n, f) => n + f.chars, 0);
-            const over  = total > MAX_CONTEXT_CHARS;
+            const total    = this._files.reduce((n, f) => n + f.chars, 0);
+            const over     = total > MAX_CONTEXT_CHARS;
+            const nText    = this._files.filter((f) => f.text != null).length;
+            const nExcluded = Math.max(0, nText - this._contextCapacity());
             el.innerHTML = imgHtml + imgNote +
                 this._files.map((f) =>
                     '<span class="vlc-chip' + (f.text == null ? ' vlc-chip--bin' : '') + '">' +
@@ -566,7 +585,8 @@
                     '</span>').join('') +
                 '<span class="vlc-dim vlc-ctxsum"> ' + this._files.length + ' file' + (this._files.length > 1 ? 's' : '') +
                     ' · ' + total.toLocaleString() + ' chars' +
-                    (over ? ' <span class="vlc-warn">(trimmed to ' + MAX_CONTEXT_CHARS.toLocaleString() + ' total)</span>' : '') +
+                    (nExcluded ? ' <span class="vlc-warn">(' + nExcluded + ' file' + (nExcluded > 1 ? 's' : '') + ' won\'t fit — remove some)</span>'
+                               : (over ? ' <span class="vlc-warn">(trimmed to ' + MAX_CONTEXT_CHARS.toLocaleString() + ' total)</span>' : '')) +
                 '</span>' +
                 '<button class="vlc-mini vlc-clear" type="button" title="Remove all attached files">clear all</button>';
         }
@@ -635,13 +655,33 @@
         _contextMessages() {
             const withText = this._files.filter((f) => f.text != null);
             if (!withText.length) return [];
-            let per = Math.floor(MAX_CONTEXT_CHARS / withText.length);
-            if (per < MIN_PER_FILE) per = MIN_PER_FILE;
-            return withText.map((f) => ({
+            let per      = Math.floor(MAX_CONTEXT_CHARS / withText.length);
+            let included = withText, excluded = [];
+            if (per < MIN_PER_FILE) {
+                // Splitting below MIN_PER_FILE gives every file a useless sliver — worse,
+                // the old code raised `per` back to the floor and quietly OVERSHOT the
+                // stated budget by up to 25% (B4). Keep whole files at the floor size and
+                // exclude the rest, saying so to both the user (chip row) and the model.
+                const k  = Math.max(1, Math.floor(MAX_CONTEXT_CHARS / MIN_PER_FILE));
+                included = withText.slice(0, k);
+                excluded = withText.slice(k);
+                per      = MIN_PER_FILE;
+            }
+            const msgs = included.map((f) => ({
                 role: 'system',
                 content: SGLlm.buildFileContext({ path: f.path, content: f.text, maxChars: per }).text
             }));
+            if (excluded.length) {
+                msgs.push({ role: 'system',
+                    content: 'NOTE: ' + excluded.length + ' more attached file(s) did NOT fit the shared context budget and their contents are NOT included: ' +
+                             excluded.map((f) => f.path).join(', ') +
+                             '. If the user asks about these, say you cannot see them and suggest detaching other files first.' });
+            }
+            return msgs;
         }
+
+        // How many text files actually fit the budget — the chip row uses this to warn.
+        _contextCapacity() { return Math.max(1, Math.floor(MAX_CONTEXT_CHARS / MIN_PER_FILE)); }
 
         // One LLM request: its own ledger entry, its own streaming bubble, its own cost
         // accrual. The tool loop calls this per round, so nothing about a tool-using turn
@@ -649,6 +689,13 @@
         async _chatOnce(msgs, tools, meta) {
             const s      = this._session;
             const limits = SGLlmConfig.limitsFor(s.policy, null);
+            // Re-checked EVERY call, not once per turn: a tool turn makes up to 9 calls,
+            // and a cap checked only at the door lets rounds 2..9 spend past it (B5).
+            const spent = this._hostTotals();
+            if ((limits.maxCallsPerSession && spent.calls >= limits.maxCallsPerSession) ||
+                (limits.maxCostPerSession  && spent.cost  >= limits.maxCostPerSession)) {
+                throw Object.assign(new Error('Session budget reached mid-turn — answered with what was gathered. Raise the caps in Settings → AI models.'), { code: 'EBUDGET' });
+            }
             const pc     = (typeof SGVision !== 'undefined') ? SGVision.promptChars(msgs)
                                                              : { chars: 0, images: 0 };
             const rec = (globalThis.VaultLlmLog || null) && VaultLlmLog.add({
@@ -764,14 +811,27 @@
 
             const writable = !!(this._vault && this._vault.writable);
             const rows = SGLlmTools.GROUP_NAMES.map((name) => {
-                const g     = this._grants.groups[name] || { enabled: false, allow: [], deny: [] };
-                const scope = (g.allow.length ? ' · only ' + g.allow.join(', ') : '') +
-                              (g.deny.length  ? ' · never ' + g.deny.join(', ')  : '');
-                return '<label class="vlc-tool-grp" title="Adds ~' + SGLlmTools.tokenWeight(this._grants, name) + ' tokens to every request while enabled">' +
+                const g      = this._grants.groups[name] || { enabled: false, allow: [], deny: [] };
+                const scoped = SGLlmTools.isPathScoped && SGLlmTools.isPathScoped(name);
+                const deny   = g.deny.length ? ' · never ' + g.deny.join(', ') : '';
+                // A path-scoped group REQUIRES an allow-list (empty grants nothing — P3).
+                // The scope must therefore be editable RIGHT HERE: before this input
+                // existed, the only in-product flow was tick-the-box → every call refused
+                // with ENOSCOPE → hand-edit tools.json (08/16 review, B3).
+                const scopeUi = scoped
+                    ? '<input class="vlc-tool-scope" type="text" data-scope="' + esc(name) + '"' +
+                          ' value="' + esc(g.allow.join(', ')) + '" placeholder="docs/**, *.md"' +
+                          (writable ? '' : ' disabled') +
+                          ' title="Allowed paths — comma-separated globs (* within a folder, ** across folders). Required: an empty scope grants nothing.">' +
+                      (g.enabled && !g.allow.length
+                          ? '<span class="vlc-warn vlc-tool-noscope">no allowed paths — every call will be refused until a scope is set</span>'
+                          : '')
+                    : '';
+                return '<div class="vlc-tool-row-wrap"><label class="vlc-tool-grp" title="Adds ~' + SGLlmTools.tokenWeight(this._grants, name) + ' tokens to every request while enabled">' +
                     '<input type="checkbox" data-grp="' + esc(name) + '"' + (g.enabled ? ' checked' : '') + (writable ? '' : ' disabled') + '>' +
                     '<span class="vlc-tool-name">' + esc(name) + '</span>' +
-                    '<span class="vlc-dim">READ · ~' + SGLlmTools.tokenWeight(this._grants, name) + ' tok/req' + esc(scope) + '</span>' +
-                '</label>';
+                    '<span class="vlc-dim">READ · ~' + SGLlmTools.tokenWeight(this._grants, name) + ' tok/req' + esc(deny) + '</span>' +
+                '</label>' + scopeUi + '</div>';
             }).join('');
             bar.innerHTML = rows +
                 '<span class="vlc-dim vlc-tool-note">' +
@@ -783,6 +843,30 @@
             bar.querySelectorAll('input[data-grp]').forEach((cb) => {
                 cb.addEventListener('change', () => this._setGroupEnabled(cb.getAttribute('data-grp'), cb.checked, cb));
             });
+            bar.querySelectorAll('input[data-scope]').forEach((inp) => {
+                inp.addEventListener('change', () => this._setGroupScope(inp.getAttribute('data-scope'), inp.value, inp));
+            });
+        }
+
+        // Parse the comma-separated globs, save with the grant, revert on failure — the
+        // same claim-no-refused-authority rule as _setGroupEnabled.
+        async _setGroupScope(name, value, inp) {
+            const g = this._grants && this._grants.groups[name];
+            if (!g) return;
+            const before = g.allow.slice();
+            g.allow = String(value || '').split(',').map((x) => x.trim()).filter(Boolean);
+            try {
+                await SGLlmTools.saveGrants(this._vault, this._grants);
+                this._setStatus(g.allow.length
+                    ? 'Scope for "' + name + '" set to: ' + g.allow.join(', ') + ' — committed.'
+                    : 'Scope for "' + name + '" cleared — every call will be refused until one is set.',
+                    g.allow.length ? 'info' : 'warn');
+                this._renderTools();                       // refresh the no-scope warning
+            } catch (err) {
+                g.allow = before;
+                if (inp) inp.value = before.join(', ');
+                this._setStatus('Could not save the scope: ' + ((err && err.message) || err), 'warn');
+            }
         }
 
         async _setGroupEnabled(name, enabled, cb) {
@@ -819,11 +903,13 @@
                 }
             }
             const limits = SGLlmConfig.limitsFor(s.policy, null);
-            if (limits.maxCallsPerSession && this._calls >= limits.maxCallsPerSession) {
+            // From the LEDGER (survives panel remounts), not instance counters — see _hostTotals.
+            const spent = this._hostTotals();
+            if (limits.maxCallsPerSession && spent.calls >= limits.maxCallsPerSession) {
                 this._push('err', 'Session call limit reached (' + limits.maxCallsPerSession + '). Raise it in Settings → AI models.');
                 return;
             }
-            if (limits.maxCostPerSession && this._cost >= limits.maxCostPerSession) {
+            if (limits.maxCostPerSession && spent.cost >= limits.maxCostPerSession) {
                 this._push('err', 'Session spend cap reached ($' + limits.maxCostPerSession + '). Raise it in Settings → AI models.');
                 return;
             }
@@ -845,6 +931,7 @@
             // Cleared BEFORE the await: the image belongs to the message just sent, and a
             // second send while the first is in flight must not re-attach (and re-bill) it.
             const sentImages = this._images.length;
+            const sentImageNames = this._images.map((im) => im.name || 'image');
             this._images = [];
             this._renderCtx();
 
@@ -903,6 +990,16 @@
                     this._push('err', (err && err.message) || 'Request failed');
                 }
             } finally {
+                // B2: the pixels went with THIS request; they must not ride every later
+                // turn via the history window. The transcript keeps its thumbnails (DOM),
+                // and the model keeps a text record of what was attached — but the base64
+                // parts (the most expensive tokens we send) are not resent 19 more times.
+                // This also makes the chip note — "sent with your next message only" —
+                // true in billing terms, not only visually.
+                if (sentImages && Array.isArray(outgoing.content)) {
+                    outgoing.content = q + '\n[' + sentImages + ' image' + (sentImages > 1 ? 's' : '') +
+                        ' (' + sentImageNames.join(', ') + ') — attached to this message when it was sent]';
+                }
                 this._abort = null;
                 this._setBusy(false);
                 this._renderHead();
@@ -939,6 +1036,15 @@
     }
 
     VaultLlmChat.styles = `
+        .vlc-tool-row-wrap { display: flex; flex-direction: column; gap: .2rem; margin-bottom: .35rem; }
+        .vlc-tool-scope {
+            font: inherit; font-size: .72rem; font-family: var(--font-mono, monospace);
+            background: var(--bg-primary, #0d1120); color: inherit;
+            border: 1px solid var(--color-border, #24304a); border-radius: 5px;
+            padding: .25rem .45rem; margin-left: 1.6rem; outline: none;
+        }
+        .vlc-tool-noscope { font-size: .7rem; margin-left: 1.6rem; }
+
         :host { display: block; height: 100%; min-height: 0; }
         .vlc-panel {
             display: flex; flex-direction: column; height: 100%;

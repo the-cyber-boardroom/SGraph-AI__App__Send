@@ -377,7 +377,10 @@
         fence: fence, isFloor: isFloor, globToRegExp: globToRegExp, pathAllowed: pathAllowed,
         parseGrants: parseGrants, serializeGrants: serializeGrants, anyEnabled: anyEnabled,
         loadGrants: loadGrants, saveGrants: saveGrants,
-        compileTools: compileTools, tokenWeight: tokenWeight, dispatch: dispatch
+        compileTools: compileTools, tokenWeight: tokenWeight, dispatch: dispatch,
+        // UI needs to know which groups REQUIRE an allow-list (so it can render a scope
+        // editor and the "empty grants nothing" warning) without duplicating the list.
+        isPathScoped: function (name) { return PATH_SCOPED[name] === true; }
     };
 
     globalThis.SGLlmTools = API;

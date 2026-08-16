@@ -461,7 +461,11 @@ console.log('\n[suite] vault-llm-chat — the outgoing message and the ledger');
         ok: true,
         policy: SGLlmConfig.parse({ models: { allow: ['*'] }, limits: {} }),
         client: {
-            chat: async (req) => { sent = req; return { content: 'ok', model: 'seer/one', usage: {}, id: 'g1' }; },
+            // SNAPSHOT what crossed the wire: since the B2 fix (08/16), the component
+            // swaps the history message's image parts for a text placeholder after the
+            // turn, and it shares the object — a live reference read post-hoc would show
+            // the placeholder, not what was actually sent.
+            chat: async (req) => { sent = JSON.parse(JSON.stringify(req)); return { content: 'ok', model: 'seer/one', usage: {}, id: 'g1' }; },
             reconcileCost: async () => false
         }
     };

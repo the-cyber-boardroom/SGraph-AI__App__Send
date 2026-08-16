@@ -25,6 +25,7 @@ node tests/unit/vault_ui/loader/test__sg_llm.js
 node tests/unit/vault_ui/loader/test__sg_llm_vault.js
 node tests/unit/vault_ui/loader/test__sg_llm_tools.js
 node tests/unit/vault_ui/loader/test__llm_hardening.js
+node tests/unit/vault_ui/loader/test__llm_p4.js
 node tests/unit/vault_ui/loader/test__sg_voice.js
 node tests/unit/vault_ui/loader/test__sg_vision.js
 node tests/unit/vault_ui/loader/test__no_auto_reload.js

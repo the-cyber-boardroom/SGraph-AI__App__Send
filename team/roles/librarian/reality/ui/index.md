@@ -665,6 +665,19 @@ transcript — one take, one result.
 - Per-app limit overrides are read (`limitsFor(policy, appId)`) but no UI writes them.
 - `permissions.network` is parsed but still unused.
 
+### sg.llm.* P4 — spend surfacing + six re-review fixes (2026-08-16)
+
+Implements `team/comms/briefs/08/16/v0.33.47__brief__sg-llm-P4-surfacing-and-review-findings.md`
+(same-day). Highlights: standing HUD session-cost pill (`.hud-llm-cost`, VaultLlmLog.subscribe-
+driven, `~` estimate → billed upgrade in place, click → requests ledger via `app-hud:llm-ledger`);
+activity meter gains an `A` lane for `llm.*` (previously filtered out entirely); host-chat budget
+now gated on `VaultLlmLog.totals(null)` so caps survive panel remounts; pasted images are swapped
+to a text note in history after their turn (no silent re-billing); the 🔧 bar gained an
+allowed-paths editor for `files.read` (closing the P3 ENOSCOPE UX gap) with revert-on-failed-save;
+context budget drops files past 16 with an explicit model-facing NOTE; mid-turn budget re-check in
+`_chatOnce` bounds tool-turn overshoot to one call. Tests: `test__llm_p4.js` (32).
+User guide `library/guides/content/v0.33.47__guide__vault-ai-chat.md` updated in lockstep.
+
 ### sg.llm.* hardening — egress CSP, consent floors, per-app budget, tool scope (2026-08-13)
 
 Implements F1-F5 of `team/roles/architect/reviews/08/13/v0.33.47__architect-review__sg-llm-as-built-and-next-steps.md`.
