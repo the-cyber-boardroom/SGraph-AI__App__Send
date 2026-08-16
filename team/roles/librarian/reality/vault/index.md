@@ -1,6 +1,6 @@
 # vault — Reality Index
 
-**Domain:** `vault/` | **Last updated:** 2026-07-01 | **Maintained by:** Librarian (daily run)
+**Domain:** `vault/` | **Last updated:** 2026-08-15 | **Maintained by:** Librarian (daily run)
 
 The vault/SGit cryptographic storage system. This domain covers the encryption layer, the
 object storage model, the browser JS client, PKI, and the sgit CLI as it relates to vault
@@ -262,6 +262,27 @@ on `/app` refresh (a diverged clone can't fast-forward).
 | `seedFrom` now pushes the child's named ref so seeded content is visible to other openers | **EXISTS** (fix) |
 
 Brief: `team/comms/briefs/06/08/v0.33.5__brief__app-vault-sync-parity.md`.
+
+### Read-Key Open + Embeddable Vault Surfaces (2026-08-15)
+
+Implements the 08/15 architect brief (read-key open + embeddable surfaces) Phases 1–4.
+The read-only capability triple `{vault_id, read_key, ref_file_id}` is now openable from a
+raw read key on BOTH surfaces, and both surfaces are embeddable via the shared handshake.
+
+| Capability | Status | Evidence |
+|-----------|--------|---------|
+| **Format 6 credential** — `<64-hex read_key>:<vault_id>` (bare and `sgit_rk1_`-prefixed) detected BEFORE formats 2/3; sgit CLI read-only-clone parity (CLI verified this shape empirically 08/14) | **EXISTS** | `vault-loader-format.js`; `test__format_detection.js` (format 6 suite) |
+| **`SGVaultCrypto.deriveReadOnlyCreds(vaultId, readKeyHex)`** — derives `refFileId` + `branchIndexFileId` from the read key alone (one HMAC each; no passphrase). Invariant vs `deriveKeys` unit-tested for standard AND simple-token vaults | **EXISTS** | `sg-vault-crypto.js`; `test__read_key_creds.js` |
+| **`SGVaultCrypto.stripKeyPrefix`** — strips the CLI's canonical `sgit_vk1_`/`sgit_rk1_` prefixes on every key-input path (loader detectFormat + app-shell `_initWithKey`) | **EXISTS** | `sg-vault-crypto.js`; `test__read_key_creds.js` |
+| **`VaultLoader.openReadOnly` (was a throwing stub)** — formats 4 + 6 → derive creds → `SGVault.openReadOnly`; emits `VAULT_OPENED {readOnly:true}`; `opts.noPersist` keeps the credential out of storage (embed) | **EXISTS** | `vault-loader.js`; `test__vault_loader_open_readonly.js` (incl. storage-throws simulation) |
+| **App UI read-key open** — `_initWithKey` format-6 branch (same `deriveReadOnlyCreds`), RO handling identical to the ro-token path; entry-form badge shows "Read-only key" | **EXISTS** | `app-shell.js` |
+| **Shared embed receiver** — `embed-receiver.js` (one-shot, source/origin-validated handshake child side) consumed by BOTH `app-shell._initEmbed` (refactored, no behaviour change) and the NEW `vault-shell._initEmbed` | **EXISTS** | `embed-receiver.js`; `test__embed_receiver.js` |
+| **`/en-gb/vault/?embed=1`** — main vault UI (files + SGit view) opens inside a third-party iframe via postMessage; key never touches storage (`noPersist`); vault-entry suppresses storage auto-open in embed mode; `vault-ready` posted on browse mount | **EXISTS** | `vault-shell.js` `_initEmbed`; `vault-entry.js` guard; root `index.html` embed-aware glue |
+| **Vendorable parent helper** — `lib/sg-embed/sg-vault-embed.js`: `<sg-vault-embed surface="vault|app" key>` element + `SgVaultEmbed.mount()`; `app-shell._embedHelperSrc` now injects its `_mountImpl` (one implementation for websites AND vault apps); lazy-loads `SgEmbed` helpers from its own origin | **EXISTS** | `sg-vault-embed.js`; existing handshake glue removed from `app-shell.js` |
+
+Security posture unchanged: read keys cannot escalate to write (independent PBKDF2);
+`SGVault.openReadOnly` fails closed; a published read key exposes FULL history (structure-key
+split still inert) — publish only from dedicated publish-vaults.
 
 ---
 
