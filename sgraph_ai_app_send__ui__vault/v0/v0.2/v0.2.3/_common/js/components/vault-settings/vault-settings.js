@@ -36,12 +36,12 @@
                     </div>
 
                     <div class="vset-section">
-                        <label class="vset-label">Vault Key</label>
+                        <label class="vset-label vset-key-label">Vault Key</label>
                         <div class="vset-row">
                             <input class="vset-input vset-key-input" type="text" readonly>
                             <button class="vset-btn vset-copy-key">Copy</button>
                         </div>
-                        <p class="vset-hint vset-hint--warn">Anyone with this key can access all files in this vault.</p>
+                        <p class="vset-hint vset-hint--warn vset-key-hint">Anyone with this key can access all files in this vault.</p>
                     </div>
 
                     <div class="vset-section">
@@ -198,8 +198,33 @@
             if (!this._vault) return;
             const root = this.shadowRoot;
 
+            // Read-only session? (opened via ro-token or a read-key credential —
+            // no passphrase, no write key; same predicate the shells use)
+            const roMode = !this._vault._writeKey && !this._vault._passphrase;
+            // A read-key open carries the read key IN the vaultKey string
+            // (<64-hex>:<vault_id>) — recover it there, because the imported
+            // CryptoKey is non-extractable BY DESIGN and can never be exported.
+            const roCred = (typeof SGVaultCrypto !== 'undefined' && SGVaultCrypto.parseReadOnlyCredential)
+                ? SGVaultCrypto.parseReadOnlyCredential(this._vaultKey || '') : null;
+
             const nameInput = root.querySelector('.vset-name-input');
             if (nameInput) nameInput.value = this._vault.name || '';
+
+            // Read-only sessions can't rename — the save would only fail at the server.
+            const saveNameBtn = root.querySelector('.vset-save-name');
+            if (saveNameBtn) {
+                saveNameBtn.disabled = roMode;
+                saveNameBtn.title    = roMode ? 'Read-only session — renaming requires the full vault key' : '';
+            }
+
+            // In an RO session the credential in the URL/storage is NOT the vault key —
+            // label it honestly and scope the warning to what it actually grants.
+            const keyLabel = root.querySelector('.vset-key-label');
+            const keyHint  = root.querySelector('.vset-key-hint');
+            if (keyLabel) keyLabel.textContent = roMode ? 'Read-only key (this session’s credential)' : 'Vault Key';
+            if (keyHint)  keyHint.textContent  = roMode
+                ? 'Anyone with this key can read all files in this vault. It cannot write, and it cannot be turned into the vault key.'
+                : 'Anyone with this key can access all files in this vault.';
 
             const keyInput = root.querySelector('.vset-key-input');
             if (keyInput) keyInput.value = this._vaultKey;
@@ -210,7 +235,10 @@
                 urlInput.value = `${base}/#${this._vaultKey}`;
             }
 
-            // Export read key as hex for display
+            // Export read key as hex for display. In owner sessions the key exports;
+            // in read-key sessions export throws (non-extractable) and the roCred
+            // fallback supplies the hex we were opened with. Only ro-token sessions
+            // (key arrives sealed, hex never retained) legitimately show unavailable.
             const rkInput = root.querySelector('.vset-readkey-input');
             let   readHex = '';
             if (this._vault._readKey) {
@@ -220,6 +248,7 @@
                     readHex      = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
                 } catch (_) { readHex = ''; }
             }
+            if (!readHex && roCred) readHex = roCred.readKeyHex;
             if (rkInput) rkInput.value = readHex || '(unavailable)';
 
             // Read-only share block: the id alone is useless and the key alone is useless —
