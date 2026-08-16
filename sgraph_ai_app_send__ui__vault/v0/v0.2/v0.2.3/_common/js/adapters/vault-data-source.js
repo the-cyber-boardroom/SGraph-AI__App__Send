@@ -33,7 +33,25 @@ class VaultDataSource {
 
     getTree() {
         const root = this._vault._tree['/'];
-        return this._convertNode(root, '');
+        const tree = this._convertNode(root, '');
+        // .vault-settings.json lives in vault._settings (parsed out of the commit tree
+        // at load — see sg-vault._loadTreeFromCommit), so it is never in root.children.
+        // List it SYNTHETICALLY so the file that names the vault is visible and editable
+        // in the browser; reads/writes round-trip through the special cases in
+        // getFileBytes/saveFile. Guard: skip if a legacy real entry exists.
+        if (this._vault._settings && !(root.children && root.children['.vault-settings.json'])) {
+            tree.files.push({
+                path: '.vault-settings.json',
+                name: '.vault-settings.json',
+                size: this._settingsSize()
+            });
+        }
+        return tree;
+    }
+
+    _settingsSize() {
+        try { return new TextEncoder().encode(JSON.stringify(this._vault._settings, null, 2)).byteLength; }
+        catch (_) { return 0; }
     }
 
     // Load all lazy sub-trees recursively (call before getTree for full tree)
@@ -115,7 +133,12 @@ class VaultDataSource {
 
     getFileList() {
         const list = [];
-        this._flatten(this._vault._tree['/'], '', list);
+        const root = this._vault._tree['/'];
+        this._flatten(root, '', list);
+        // Synthetic settings entry — same rationale as getTree().
+        if (this._vault._settings && !(root.children && root.children['.vault-settings.json'])) {
+            list.push({ path: '.vault-settings.json', name: '.vault-settings.json', dir: false, size: this._settingsSize() });
+        }
         return list;
     }
 
@@ -183,6 +206,7 @@ class VaultDataSource {
                 // Preserve identity fields that callers must not clobber
                 const kept   = { vault_id: s.vault_id, created: s.created, version: s.version };
                 Object.assign(s, parsed, kept);
+                if (parsed.vault_name) this._vault._settingsDefaulted = false;   // explicit name via file edit
                 // Clean up any stale regular-file entry in root.children (defensive)
                 const root = this._vault._findNode('/');
                 if (root && root.children && root.children['.vault-settings.json']) {
@@ -217,12 +241,18 @@ class VaultDataSource {
 
     async renameFile(folderPath, oldName, newName) {
         if (!this.writable) throw new Error('Read-only: no access key');
+        if (oldName === '.vault-settings.json') {
+            throw new Error('.vault-settings.json is the vault settings record — it cannot be renamed');
+        }
         await this._vault.renameFile(folderPath, oldName, newName);
         if (this.onTreeChanged) this.onTreeChanged();
     }
 
     async deleteFile(folderPath, fileName) {
         if (!this.writable) throw new Error('Read-only: no access key');
+        if (fileName === '.vault-settings.json') {
+            throw new Error('.vault-settings.json is the vault settings record — edit it instead of deleting it');
+        }
         await this._vault.removeFile(folderPath, fileName);
         if (this.onTreeChanged) this.onTreeChanged();
     }

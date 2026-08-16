@@ -64,6 +64,7 @@ class SGVault {
         vault._initManagers()
 
         // 4. Create settings (stored as a blob in the initial commit's tree)
+        vault._settingsDefaulted = !options.name         // placeholder name → display may fall back to app.json title
         vault._settings = {
             vault_name:  options.name || 'Untitled Vault',
             vault_id:    vault._vaultId,
@@ -204,6 +205,12 @@ class SGVault {
 
     get vaultId()   { return this._vaultId              }
     get name()      { return this._settings?.vault_name }
+
+    // True when the vault carries a REAL name (a .vault-settings.json existed, or the
+    // owner set one) — false when _settings was synthesized with the 'Untitled Vault'
+    // placeholder. Display surfaces use this to fall back to app.json's title instead
+    // of showing the placeholder.
+    get hasCustomName() { return !!this._settings?.vault_name && !this._settingsDefaulted }
     get created()   { return this._settings?.created    }
     get writable()  { return !!this._writeKey           }
     get writeKeyHex() { return this._writeKey || null   }   // hex string (owner-secret store input); null in RO sessions
@@ -228,6 +235,7 @@ class SGVault {
         if (!this._settings) throw new Error('Vault not initialized')
         if (this._settings.vault_name === newName) return     // no-op rename
         this._settings.vault_name = newName
+        this._settingsDefaulted = false                       // explicit name — no more fallback
         this._settingsDirty = true
         await this._commit(`Rename vault to "${newName}"`)
     }
@@ -416,6 +424,7 @@ class SGVault {
                 const blob      = await this._objectStore.load(entry.blob_id)
                 const decrypted = await SGSendCrypto.decrypt(blob, this._readKey)
                 this._settings  = JSON.parse(new TextDecoder().decode(decrypted))
+                this._settingsDefaulted = false          // real settings record found
                 // Capture the original entry so subsequent commits can carry it forward
                 // un-rewritten (avoid producing a new blob_id when nothing changed).
                 this._currentSettingsEntry = entry
@@ -429,6 +438,7 @@ class SGVault {
         }
 
         if (!this._settings) {
+            this._settingsDefaulted = true               // no settings record — placeholder name
             this._settings = {
                 vault_name: 'Untitled Vault', vault_id: this._vaultId,
                 created: new Date().toISOString(), version: 2
