@@ -96,8 +96,16 @@
             if (opts.allow) iframe.setAttribute('allow', opts.allow);
             mount.appendChild(iframe);
             var sent  = false;
-            var timer = setTimeout(function () { cleanup(); reject(new Error('sg.vault.embed: handshake timed out')); }, opts.timeoutMs || 14000);
+            var timer = setTimeout(function () { fail(new Error('sg.vault.embed: handshake timed out')); }, opts.timeoutMs || 14000);
             function cleanup() { clearTimeout(timer); window.removeEventListener('message', onMsg); }
+            // Failure also REMOVES the iframe — a dead frame must not squat in the
+            // host page's layout, and a retry mount() must not stack a second frame
+            // next to it. (opts.keepFrameOnError opts out, for debugging.)
+            function fail(err) {
+                cleanup();
+                if (!opts.keepFrameOnError) { try { iframe.remove(); } catch (_) {} }
+                reject(err);
+            }
             function onMsg(e) {
                 if (e.source !== iframe.contentWindow) return;                       // pin to THIS frame
                 if (e.origin !== expectedFrom && e.origin !== 'null') return;        // host or opaque only
@@ -109,7 +117,7 @@
                 } else if (d.sg === 'vault-ready') {
                     cleanup(); resolve({ vaultName: d.vaultName || '', fileCount: d.fileCount | 0, hasApp: !!d.hasApp, iframe: iframe });
                 } else if (d.sg === 'vault-error') {
-                    cleanup(); reject(new Error(d.message || 'vault error'));
+                    fail(new Error(d.message || 'vault error'));
                 }
             }
             window.addEventListener('message', onMsg);
@@ -157,6 +165,17 @@
                     console.error('[sg-vault-embed]', err);
                     self.dispatchEvent(new CustomEvent('vault-error', { detail: { error: err } }));
                 });
+            }
+
+            // Reparenting an iframe RELOADS it (browser behaviour) — the reloaded
+            // child would re-post vault-embed-ready to a listener that resolved and
+            // detached long ago, leaving the frame stuck at 'Waiting for vault key…'
+            // forever. So on disconnect, drop the dead frame and re-arm: the next
+            // connectedCallback runs the full handshake again (and fires a fresh
+            // vault-ready event on this element).
+            disconnectedCallback() {
+                this._mounted = false;
+                try { this.innerHTML = ''; } catch (_) {}
             }
         }
         customElements.define('sg-vault-embed', SgVaultEmbedElement);

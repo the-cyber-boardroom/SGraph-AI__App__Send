@@ -64,10 +64,13 @@
             this._restoreDebugState();
             // Embed mode (?embed=1): the key arrives from the parent page by postMessage,
             // never from the hash or storage. Mirrors app-shell._initEmbed via the SHARED
-            // embed-receiver.js. Gate on embed mode ALONE — a missing EmbedReceiver
-            // (deploy skew) must fail closed inside _initEmbed, never fall through to
-            // the normal storage-driven entry flow.
-            if (typeof EmbedProtocol !== 'undefined' && EmbedProtocol.isEmbedMode()) {
+            // embed-receiver.js. The gate is DEP-FREE (not EmbedProtocol.isEmbedMode) so
+            // it holds even when the embed scripts themselves failed to load — missing
+            // modules fail CLOSED inside _initEmbed, never falling through to the
+            // normal storage-driven entry flow.
+            var isEmbedPage = false;
+            try { isEmbedPage = new URLSearchParams(window.location.search).get('embed') === '1'; } catch (_) {}
+            if (isEmbedPage) {
                 this._initEmbed();
             }
         }
@@ -92,11 +95,11 @@
                 waitEl = entryDiv.querySelector('.vs-embed-wait');
             }
 
-            // Fail CLOSED if the receiver module didn't load (deploy skew): keep the
+            // Fail CLOSED if the embed modules didn't load (deploy skew): keep the
             // waiting card as an explicit error, answer nothing.
-            if (typeof EmbedReceiver === 'undefined') {
-                console.error('[vault-shell] embed mode requested but embed-receiver.js is not loaded');
-                if (waitEl) waitEl.textContent = 'Embed mode unavailable: embed-receiver.js failed to load. Reload the page.';
+            if (typeof EmbedProtocol === 'undefined' || typeof EmbedReceiver === 'undefined') {
+                console.error('[vault-shell] embed mode requested but embed-protocol.js / embed-receiver.js is not loaded');
+                if (waitEl) waitEl.textContent = 'Embed mode unavailable: embed scripts failed to load. Reload the page.';
                 return;
             }
 

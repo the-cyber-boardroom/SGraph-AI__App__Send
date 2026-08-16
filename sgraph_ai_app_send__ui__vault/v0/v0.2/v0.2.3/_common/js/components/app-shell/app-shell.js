@@ -127,10 +127,13 @@
             // Has to run BEFORE the localStorage read so a stray saved key from a
             // previous non-embed session doesn't auto-open the wrong vault here.
             // ?embed=1 must NEVER fall through to the storage auto-open below (a
-            // stray saved key would open the wrong vault inside the parent's frame)
-            // — so the gate is on embed mode alone, and a missing EmbedReceiver
-            // (deploy skew / cached HTML) fails CLOSED inside _initEmbed.
-            if (typeof EmbedProtocol !== 'undefined' && EmbedProtocol.isEmbedMode()) {
+            // stray saved key would open the wrong vault inside the parent's frame).
+            // The gate is therefore DEP-FREE — it must hold even when
+            // embed-protocol.js itself failed to load (deploy skew / cached HTML);
+            // missing embed modules fail CLOSED inside _initEmbed.
+            var isEmbedPage = false;
+            try { isEmbedPage = new URLSearchParams(window.location.search).get('embed') === '1'; } catch (_) {}
+            if (isEmbedPage) {
                 this._initEmbed();
                 return;
             }
@@ -201,11 +204,11 @@
             // persist step. The key stays in memory only for the embed session.
             this._embedMode = true;
 
-            // Fail CLOSED if the receiver module didn't load (deploy skew): show an
+            // Fail CLOSED if the embed modules didn't load (deploy skew): show an
             // error, answer nothing — never fall back to the storage auto-open path.
-            if (typeof EmbedReceiver === 'undefined') {
-                console.error('[app-shell] embed mode requested but embed-receiver.js is not loaded');
-                this._showError('Embed mode unavailable: embed-receiver.js failed to load. Reload the page.');
+            if (typeof EmbedProtocol === 'undefined' || typeof EmbedReceiver === 'undefined') {
+                console.error('[app-shell] embed mode requested but embed-protocol.js / embed-receiver.js is not loaded');
+                this._showError('Embed mode unavailable: embed scripts failed to load. Reload the page.');
                 return;
             }
 
