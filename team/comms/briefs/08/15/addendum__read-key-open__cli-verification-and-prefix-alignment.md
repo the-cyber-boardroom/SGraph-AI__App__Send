@@ -78,7 +78,8 @@ consultation (parity with `SGVault.open`) and would eventually let ro-token payl
 
 ## 6 · Status
 
-Phases 1–3 of the brief (read-key open on both surfaces + embed receiver on the main vault UI)
+Phases 1–4 of the brief (read-key open on both surfaces, embed receiver on the main vault UI,
+and the vendorable parent-side helper `sg-vault-embed.js`)
 are implemented on branch `claude/vault-key-readonly-review-2pvgdf` — see the changelog entry
 `team/comms/changelog/08/15/changelog__read-key-open-and-vault-embed.md` for the file list and
 test-impact classification.

@@ -66,6 +66,23 @@ function b64(bytes) { return btoa(String.fromCharCode(...bytes)); }
         ok('uppercase hex rejected', threw);
     }
 
+    console.log('\n[suite] parseReadOnlyCredential — ONE matcher for both read-key forms');
+    {
+        const RK = 'ab'.repeat(32), VID = 'abcd1234';
+        const f6 = SGVaultCrypto.parseReadOnlyCredential(RK + ':' + VID);
+        ok('format 6 (colon) parses',         f6 && f6.vaultId === VID && f6.readKeyHex === RK);
+        const f4 = SGVaultCrypto.parseReadOnlyCredential(VID + '  ' + RK);
+        ok('format 4 (space) parses',         f4 && f4.vaultId === VID && f4.readKeyHex === RK);
+        const pf = SGVaultCrypto.parseReadOnlyCredential('sgit_rk1_' + RK + ':' + VID);
+        ok('sgit_rk1_ prefixed form parses',  pf && pf.vaultId === VID && pf.readKeyHex === RK);
+        ok('passphrase key → null',           SGVaultCrypto.parseReadOnlyCredential('my-pass:' + VID) === null);
+        ok('simple token → null',             SGVaultCrypto.parseReadOnlyCredential('apple-river-1234') === null);
+        ok('ro-token → null',                 SGVaultCrypto.parseReadOnlyCredential('ro-apple-river-1234') === null);
+        ok('63-hex → null',                   SGVaultCrypto.parseReadOnlyCredential(RK.slice(1) + ':' + VID) === null);
+        ok('uppercase hex → null',            SGVaultCrypto.parseReadOnlyCredential(RK.toUpperCase() + ':' + VID) === null);
+        ok('empty/null safe',                 SGVaultCrypto.parseReadOnlyCredential(null) === null);
+    }
+
     console.log('\n[suite] stripKeyPrefix — sgit canonical key prefixes');
     {
         const RK = 'ab'.repeat(32);

@@ -114,6 +114,13 @@
                 fileCount: (info.fileCount | 0),
                 hasApp:    !!info.hasApp
             };
+        },
+
+        // Build the vault-error message (vault → parent) when the open FAILS. The
+        // parent's mount() already handles {sg:'vault-error'} — without this the
+        // only failure signal is its generic 14s handshake timeout.
+        vaultErrorMessage: function (message) {
+            return { sg: 'vault-error', message: String(message || 'vault error') };
         }
     };
 

@@ -70,6 +70,9 @@
             s.onerror = function () { reject(new Error('SgVaultEmbed: failed to load sg-embed-helpers.js')); };
             document.head.appendChild(s);
         });
+        // A transient load failure must not poison every future mount() on the page:
+        // drop the cached promise on rejection so the next call retries the load.
+        _helpersReady.catch(function () { _helpersReady = null; });
         return _helpersReady;
     }
 

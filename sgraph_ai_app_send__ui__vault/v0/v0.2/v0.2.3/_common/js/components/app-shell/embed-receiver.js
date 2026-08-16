@@ -74,6 +74,14 @@
                 } catch (_) {}
             },
 
+            // Post vault-error to the parent (call when the open FAILS, so its
+            // mount() rejects with the real reason instead of the 14s timeout).
+            notifyError: function (message) {
+                try {
+                    win.parent.postMessage(EmbedProtocol.vaultErrorMessage(message), targetOrigin);
+                } catch (_) {}
+            },
+
             // Remove the open listener if it is still armed (e.g. teardown before
             // any valid message arrived).
             stop: function () {

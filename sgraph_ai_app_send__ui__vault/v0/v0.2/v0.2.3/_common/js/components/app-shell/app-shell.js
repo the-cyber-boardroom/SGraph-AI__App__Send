@@ -95,7 +95,7 @@
             clearTimeout(this._autoPushTimer);
             clearTimeout(this._behindCheckTimer);
             clearTimeout(this._appendCheckTimer);
-            if (this._embedOpenHandler)  { window.removeEventListener('message', this._embedOpenHandler); this._embedOpenHandler = null; }
+            if (this._embedReceiver)     { this._embedReceiver.stop(); this._embedReceiver = null; }
             if (this._embedReadyHandler) { this.removeEventListener('app-shell:ready', this._embedReadyHandler); this._embedReadyHandler = null; }
             if (this._vfsBridgeHandler) {
                 window.removeEventListener('message', this._vfsBridgeHandler);
@@ -126,8 +126,11 @@
             // and the rationale (storage partitioning + key-in-URL avoidance).
             // Has to run BEFORE the localStorage read so a stray saved key from a
             // previous non-embed session doesn't auto-open the wrong vault here.
-            if (typeof EmbedProtocol !== 'undefined' && typeof EmbedReceiver !== 'undefined'
-                && EmbedProtocol.isEmbedMode()) {
+            // ?embed=1 must NEVER fall through to the storage auto-open below (a
+            // stray saved key would open the wrong vault inside the parent's frame)
+            // — so the gate is on embed mode alone, and a missing EmbedReceiver
+            // (deploy skew / cached HTML) fails CLOSED inside _initEmbed.
+            if (typeof EmbedProtocol !== 'undefined' && EmbedProtocol.isEmbedMode()) {
                 this._initEmbed();
                 return;
             }
@@ -198,6 +201,14 @@
             // persist step. The key stays in memory only for the embed session.
             this._embedMode = true;
 
+            // Fail CLOSED if the receiver module didn't load (deploy skew): show an
+            // error, answer nothing — never fall back to the storage auto-open path.
+            if (typeof EmbedReceiver === 'undefined') {
+                console.error('[app-shell] embed mode requested but embed-receiver.js is not loaded');
+                this._showError('Embed mode unavailable: embed-receiver.js failed to load. Reload the page.');
+                return;
+            }
+
             this._setStatus('Waiting for vault key…');
 
             // Handshake receiver is SHARED with the /en-gb/vault surface
@@ -220,6 +231,11 @@
                     self._initWithKey(parsed.key, null).catch(function (err) {
                         console.error('[app-shell] embed init failed:', err);
                         self._showError('Vault open failed: ' + (err && err.message || err));
+                        // Tell the parent — its mount() handles vault-error; without
+                        // this the only signal is its generic 14s handshake timeout.
+                        // Null-guard: disconnectedCallback may have torn the receiver
+                        // down while the open was in flight.
+                        if (self._embedReceiver) self._embedReceiver.notifyError((err && err.message) || err);
                     });
                 }
             });
@@ -335,12 +351,13 @@
                 || 'https://dev.send.sgraph.ai').replace(/\/$/, '');
             var sgSend   = new SGSend({ endpoint: endpoint });
 
-            // Read-key credential (format 6): <64-hex read_key>:<vault_id>. Checked
-            // BEFORE the generic SGVault.open branch — a 64-hex head parsed as a
-            // passphrase would PBKDF2 into garbage. Same routing rule as the sgit CLI.
-            var readKeyMatch = /^([a-f0-9]{64}):([a-z0-9]{4,24})$/.exec(key);
+            // Read-key credential (formats 6 and 4): SHARED matcher in SGVaultCrypto
+            // — same acceptance as the vault surface's loader. Checked BEFORE the
+            // generic SGVault.open branch — a 64-hex head parsed as a passphrase
+            // would PBKDF2 into garbage. Same routing rule as the sgit CLI.
+            var readKeyCred = SGVaultCrypto.parseReadOnlyCredential(key);
 
-            this._emitVaultEvent('open-start', { label: 'Opening vault', key: this._maskKey(key), isRO: key.startsWith('ro-') || !!readKeyMatch });
+            this._emitVaultEvent('open-start', { label: 'Opening vault', key: this._maskKey(key), isRO: key.startsWith('ro-') || !!readKeyCred });
             var vault, isRO = false;
             this._setStatus('Opening vault…');
 
@@ -348,10 +365,10 @@
                 var creds = await this._resolveROToken(sgSend, key);
                 vault     = await SGVault.openReadOnly(sgSend, creds.vaultId, creds.readKeyB64, creds.refFileId);
                 isRO      = true;
-            } else if (readKeyMatch) {
+            } else if (readKeyCred) {
                 // Same capability triple as the ro-token path, derived locally from the
                 // read key (one HMAC — no transfer download, no passphrase involved).
-                var rkCreds = await SGVaultCrypto.deriveReadOnlyCreds(readKeyMatch[2], readKeyMatch[1]);
+                var rkCreds = await SGVaultCrypto.deriveReadOnlyCreds(readKeyCred.vaultId, readKeyCred.readKeyHex);
                 vault       = await SGVault.openReadOnly(sgSend, rkCreds.vaultId, rkCreds.readKeyB64, rkCreds.refFileId);
                 isRO        = true;
             } else {
@@ -982,11 +999,11 @@
             keyInput.addEventListener('input', function () {
                 var v = keyInput.value.trim();
                 if (!v || !modeEl) { if (modeEl) modeEl.innerHTML = ''; return; }
-                var vStripped = (typeof SGVaultCrypto !== 'undefined' && SGVaultCrypto.stripKeyPrefix)
-                    ? SGVaultCrypto.stripKeyPrefix(v) : v;
+                var isReadKey = (typeof SGVaultCrypto !== 'undefined' && SGVaultCrypto.parseReadOnlyCredential)
+                    ? !!SGVaultCrypto.parseReadOnlyCredential(v) : false;
                 if (v.startsWith('ro-')) {
                     modeEl.innerHTML = '<span class="ef-mode-badge ef-mode-ro">&#128065; Read-only token</span>';
-                } else if (/^[a-f0-9]{64}:[a-z0-9]{4,24}$/.test(vStripped)) {
+                } else if (isReadKey) {
                     modeEl.innerHTML = '<span class="ef-mode-badge ef-mode-ro">&#128065; Read-only key</span>';
                 } else if (v.indexOf('-') > 0 || (v.indexOf(':') > 0 && !/\s/.test(v))) {
                     modeEl.innerHTML = '<span class="ef-mode-badge ef-mode-full">&#128273; Full vault key</span>';

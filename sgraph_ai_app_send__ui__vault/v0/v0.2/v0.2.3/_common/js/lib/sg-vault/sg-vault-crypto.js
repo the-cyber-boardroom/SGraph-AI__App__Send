@@ -41,6 +41,24 @@ class SGVaultCrypto {
         return s
     }
 
+    // --- Read-only credential parsing ---------------------------------------------
+    // ONE matcher for read-key credentials, shared by every dispatch site that can't
+    // use vault-loader-format.js (app-shell loads no loader scripts; the loader module
+    // itself stays dep-free and keeps its own regex, drift-guarded by tests).
+    // Accepts, after sgit_vk1_/sgit_rk1_ prefix stripping:
+    //   format 6:  <64-hex read_key>:<vault_id>     (colon — sgit CLI clone parity)
+    //   format 4:  <vault_id> <64-hex read_key>     (space — legacy web form)
+    // Returns { vaultId, readKeyHex } or null (never throws — callers fall through
+    // to their passphrase path on null).
+    static parseReadOnlyCredential(input) {
+        const s = this.stripKeyPrefix(input)
+        let m = /^([a-f0-9]{64}):([a-z0-9]{4,24})$/.exec(s)
+        if (m) return { vaultId: m[2], readKeyHex: m[1] }
+        m = /^([a-z0-9]{4,24})\s+([a-f0-9]{64})$/.exec(s)
+        if (m) return { vaultId: m[1], readKeyHex: m[2] }
+        return null
+    }
+
     // --- Vault Key Parsing ------------------------------------------------------
 
     static parseVaultKey(fullVaultKey) {

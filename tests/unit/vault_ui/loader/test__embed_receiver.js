@@ -67,6 +67,11 @@ console.log('\n[suite] EmbedReceiver — ready ping + one-shot open');
     r.notifyReady({ vaultName: 'V', fileCount: 3, hasApp: false });
     const ready = win.parentPosts[win.parentPosts.length - 1].msg;
     ok('notifyReady posts vault-ready shape',    ready.sg === 'vault-ready' && ready.vaultName === 'V' && ready.fileCount === 3 && ready.hasApp === false);
+
+    r.notifyError('HEAD ref missing');
+    const errMsg = win.parentPosts[win.parentPosts.length - 1].msg;
+    ok('notifyError posts vault-error shape (parent mount() rejects with the real reason)',
+       errMsg.sg === 'vault-error' && errMsg.message === 'HEAD ref missing');
 }
 
 console.log('\n[suite] EmbedReceiver — ?parent origin enforcement');

@@ -119,6 +119,35 @@ const events = global.sgraphVault.events;
         console.log('  ' + pass + ' pass, ' + fail + ' fail');
     }
 
+    console.log('\n[suite] drift guard — SGVaultCrypto.parseReadOnlyCredential ≡ VaultLoaderFormat read-key formats');
+    {
+        // app-shell dispatches on parseReadOnlyCredential; the vault surface on
+        // detectFormat (dep-free module, own regexes). They MUST agree on what is a
+        // read credential, or the two surfaces accept different keys.
+        let pass = 0, fail = 0;
+        const ok = (n, c) => { if (c) { pass++; console.log('  ✓ ' + n); } else { fail++; console.log('  ✗ ' + n); process.exitCode = 1; } };
+
+        const CASES = [
+            KEY6,                              // format 6 bare
+            'sgit_rk1_' + KEY6,                // format 6 prefixed
+            VID + ' ' + RK,                    // format 4
+            'pass:' + VID,                     // passphrase (not a read cred)
+            'apple-river-1234',                // simple token
+            'ro-apple-river-1234',             // ro-token
+            'a' + RK + ':' + VID,              // 65-hex head
+            RK.toUpperCase() + ':' + VID       // uppercase hex
+        ];
+        for (const input of CASES) {
+            const cred = SGVaultCrypto.parseReadOnlyCredential(input);
+            let fmt = null;
+            try { fmt = VaultLoader.detectFormat(input); } catch (_) {}
+            const loaderSaysRead = !!fmt && (fmt.format === 4 || fmt.format === 6);
+            ok(`agree on ${JSON.stringify(input.slice(0, 40))}… (read-cred=${!!cred})`, !!cred === loaderSaysRead
+               && (!cred || (cred.vaultId === fmt.parts.vaultId && cred.readKeyHex === fmt.parts.readKeyHex)));
+        }
+        console.log('  ' + pass + ' pass, ' + fail + ' fail');
+    }
+
     console.log('\n[suite] VaultLoader.openReadOnly — storage that THROWS cannot break the open');
     {
         openReadOnlyCalls = []; events.clearLog();

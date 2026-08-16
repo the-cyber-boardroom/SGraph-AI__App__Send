@@ -101,6 +101,36 @@ Playwright e2e / browser-integration not run in this session (no browser stack) 
 the embed receiver on `/en-gb/vault/` (Phase 3) is the piece that most wants a real-browser
 pass (null-origin storage behaviour is simulated, not browser-verified).
 
+## Review fixes (same day — post-implementation code review, 7 findings, all fixed)
+
+A clean-room review of the branch diff surfaced 7 findings; all are fixed in the follow-up commit:
+
+1. **`vault-error` was never sent** — a failed embed open left the parent's `mount()` hanging
+   to its generic 14s timeout. Added `EmbedProtocol.vaultErrorMessage` +
+   `EmbedReceiver.notifyError`; both shells' open-failure paths now post the real reason.
+2. **Embed-mode entry form was still live** — the recent-vaults buttons and manual form could
+   open (and PERSIST) a credential inside the iframe, contradicting the no-persist invariant.
+   `vault-shell._initEmbed` now replaces the entry card with a waiting/error state;
+   `_onRefresh` falls back to the open vault's transport since the entry component is gone.
+3. **App UI rejected format 4** — `_initWithKey` only matched the colon form. Replaced the
+   two hand-copied regexes (dispatch + badge) with a NEW shared
+   `SGVaultCrypto.parseReadOnlyCredential` accepting both forms; both surfaces now agree.
+4. **Embed teardown lost in the refactor** — `disconnectedCallback` cleaned the now-dead
+   `_embedOpenHandler` and never stopped the receiver. Both shells now call
+   `_embedReceiver.stop()` (and vault-shell also unsubscribes its mounted handler).
+5. **`?embed=1` failed OPEN on deploy skew** — gating `_initEmbed` on
+   `typeof EmbedReceiver !== 'undefined'` fell through to the storage auto-open when the
+   script was missing. Gate reverted to embed-mode-only; a missing receiver now fails
+   CLOSED with an explicit error inside `_initEmbed`.
+6. **`SgVaultEmbed._ensureHelpers` cached a rejected promise forever** — one transient
+   script-load failure bricked every later `mount()`. The cache now clears on rejection.
+7. **Format-6 regex hand-copied ×3** — consolidated to `parseReadOnlyCredential` (app-shell
+   sites) + a drift-guard test asserting it agrees with `VaultLoaderFormat` on both read
+   formats and all the near-misses.
+
+New/extended tests: `notifyError` wire shape; `parseReadOnlyCredential` suite (9); the
+cross-module drift guard (8). Kernel bundle regenerated again (crypto lib changed).
+
 ## Security notes (for AppSec review)
 
 - Read keys cannot escalate to write — independent PBKDF2 derivations (pre-existing property;

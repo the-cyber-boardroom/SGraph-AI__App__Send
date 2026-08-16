@@ -64,10 +64,10 @@
             this._restoreDebugState();
             // Embed mode (?embed=1): the key arrives from the parent page by postMessage,
             // never from the hash or storage. Mirrors app-shell._initEmbed via the SHARED
-            // embed-receiver.js. vault-entry independently suppresses its storage auto-open
-            // in embed mode, so a stray sg-vault-key can't open the wrong vault here.
-            if (typeof EmbedProtocol !== 'undefined' && typeof EmbedReceiver !== 'undefined'
-                && EmbedProtocol.isEmbedMode()) {
+            // embed-receiver.js. Gate on embed mode ALONE — a missing EmbedReceiver
+            // (deploy skew) must fail closed inside _initEmbed, never fall through to
+            // the normal storage-driven entry flow.
+            if (typeof EmbedProtocol !== 'undefined' && EmbedProtocol.isEmbedMode()) {
                 this._initEmbed();
             }
         }
@@ -77,8 +77,32 @@
             var self = this;
             this._embedMode = true;
 
+            // Replace the entry card with a minimal waiting state. This is load-bearing,
+            // not cosmetic: the entry form and its recent-vaults Open buttons would
+            // otherwise stay live inside the embed and open vaults through the normal
+            // persisting path — writing credentials into the iframe's partitioned
+            // storage and posting vault-ready for a vault the parent never keyed.
+            var entryDiv = this.querySelector('.vs-entry');
+            var waitEl   = null;
+            if (entryDiv) {
+                entryDiv.innerHTML =
+                    '<div class="vs-embed-wait" style="display:flex;align-items:center;justify-content:center;' +
+                    'height:100%;padding:2rem;text-align:center;color:var(--muted,#6e7a8a);' +
+                    'font:0.9rem system-ui,sans-serif">Waiting for vault key from the embedding page…</div>';
+                waitEl = entryDiv.querySelector('.vs-embed-wait');
+            }
+
+            // Fail CLOSED if the receiver module didn't load (deploy skew): keep the
+            // waiting card as an explicit error, answer nothing.
+            if (typeof EmbedReceiver === 'undefined') {
+                console.error('[vault-shell] embed mode requested but embed-receiver.js is not loaded');
+                if (waitEl) waitEl.textContent = 'Embed mode unavailable: embed-receiver.js failed to load. Reload the page.';
+                return;
+            }
+
             this._embedReceiver = EmbedReceiver.start({
                 onOpen: function (parsed) {
+                    if (waitEl) waitEl.textContent = 'Opening vault…';
                     // noPersist: the credential stays in memory for the embed session —
                     // never written to (partitioned) storage, never in the recent list.
                     VaultLoader.open(parsed.key, { noPersist: true })
@@ -87,37 +111,50 @@
                         })
                         .catch(function (err) {
                             console.error('[vault-shell] embed init failed:', err);
-                            window.sgraphVault.events.emit('vault-open-failed-fatal', { error: err });
-                            var entry = self.querySelector('vault-entry');
-                            if (entry && entry._showError) entry._showError('Vault open failed: ' + (err && err.message || err));
+                            var msg = (err && err.message) || String(err);
+                            if (waitEl) waitEl.textContent = 'Vault open failed: ' + msg;
+                            // Tell the parent — its mount() handles vault-error; without
+                            // this the only signal is its generic 14s handshake timeout.
+                            if (self._embedReceiver) self._embedReceiver.notifyError(msg);
                         });
                 }
             });
 
             // vault-ready → parent, once the file browser is mounted and interactive.
             // One-shot: _mountBrowse re-fires on refresh/remount; the parent only needs
-            // the first signal.
-            var onMounted = function () {
-                window.sgraphVault.events.off('vault-browse-mounted', onMounted);
+            // the first signal. Handler ref kept for disconnectedCallback teardown.
+            this._embedMountedHandler = function () {
+                window.sgraphVault.events.off('vault-browse-mounted', self._embedMountedHandler);
+                self._embedMountedHandler = null;
                 var fileCount = 0;
                 try {
                     if (self._dataSource && self._dataSource.getFileList) {
                         fileCount = self._dataSource.getFileList().length;
                     }
                 } catch (_) {}
-                self._embedReceiver.notifyReady({
-                    vaultName: (self._vault && self._vault.name) || '',
-                    fileCount: fileCount,
-                    hasApp:    false                    // the vault surface never auto-runs an app
-                });
+                if (self._embedReceiver) {
+                    self._embedReceiver.notifyReady({
+                        vaultName: (self._vault && self._vault.name) || '',
+                        fileCount: fileCount,
+                        hasApp:    false                // the vault surface never auto-runs an app
+                    });
+                }
             };
-            window.sgraphVault.events.on('vault-browse-mounted', onMounted);
+            window.sgraphVault.events.on('vault-browse-mounted', this._embedMountedHandler);
         }
 
         disconnectedCallback() {
             document.removeEventListener('visibilitychange', this._visibilityHandler);
             clearTimeout(this._behindCheckTimer);
             clearTimeout(this._appendCheckTimer);
+            // Embed teardown: disarm the window message listener and the one-shot
+            // bus subscription so a late parent message can't run an open against a
+            // disconnected component.
+            if (this._embedReceiver)       { this._embedReceiver.stop(); this._embedReceiver = null; }
+            if (this._embedMountedHandler) {
+                window.sgraphVault.events.off('vault-browse-mounted', this._embedMountedHandler);
+                this._embedMountedHandler = null;
+            }
         }
 
         // --- Render ---------------------------------------------------------------
@@ -478,8 +515,12 @@
                     const result = await VaultLoader.open(this._vaultKey, { noPersist: !!this._embedMode });
                     vault = result.vault;
                 } else {
+                    // In embed mode the entry component was replaced by the waiting
+                    // card — reuse the open vault's transport instead of reading the
+                    // (absent) entry form.
                     const entry  = this.querySelector('vault-entry');
-                    const sgSend = entry._getSGSend();
+                    const sgSend = (entry && entry._getSGSend) ? entry._getSGSend()
+                        : (this._vault && this._vault._sgSend) || new SGSend({ endpoint: VaultLoader.storage.getEndpoint(), token: this._accessKey || '' });
                     vault = await SGVault.open(sgSend, this._vaultKey);
 
                     // Auto-merge if clone ref is behind named ref — Refresh should always
