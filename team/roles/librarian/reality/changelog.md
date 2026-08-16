@@ -7,6 +7,55 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-08-16
+
+No new human briefs. No new code commits on `origin/dev` since 2026-08-13 (Phase A/B/C1 deployment, already documented). Quiet daily hold.
+
+Files changed:
+- `reality/index.md` — Last updated → 2026-08-16 (date maintenance)
+- `reality/changelog.md` — 2026-08-16 entry added (this entry)
+- `team/roles/librarian/DAILY_RUN.md` — session added to COMPLETED
+
+Session: 0 new briefs | New EXISTS items: 0 | New PROPOSED items: 0 | Test count: ~2970+ (unchanged) | Cumulative docs: 936 (unchanged)
+Master index (08/16): `team/roles/librarian/reviews/08/16/v0.33.57__master-index__daily-check-16-aug-2026.md`
+Debrief (08/16): `team/humans/dinis_cruz/debriefs/08/16/v0.33.57__debrief__daily-check-16-aug-2026.md`
+
+---
+
+## 2026-08-15
+
+No new human briefs. Test count corrections from Phase A/B/C1 deployment code (merged 08/13, not counted in 08/14 session): Container App 9→16, Container App Auth 7→8 (+1 ADR-12 login test), +3 port tests (new file), +8 deploy/target smoke tests (new file). Total ~2950+ → ~2970+.
+
+Files changed:
+- `reality/index.md` — Last updated → 2026-08-15; test count ~2950+ → ~2970+
+- `reality/qa/index.md` — Container App 9→16, Auth 7→8, +3 port, +8 deploy smoke; Last updated → 2026-08-15
+- `reality/changelog.md` — 2026-08-15 entry added (this entry)
+- `team/roles/librarian/DAILY_RUN.md` — session added to COMPLETED
+
+Session: 0 new briefs | New EXISTS items: 0 | New PROPOSED items: 0 | Test count +19 | Cumulative docs: 936 (unchanged)
+Master index (08/15): `team/roles/librarian/reviews/08/15/v0.33.57__master-index__daily-check-15-aug-2026.md`
+Debrief (08/15): `team/humans/dinis_cruz/debriefs/08/15/v0.33.57__debrief__daily-check-15-aug-2026.md`
+
+---
+
+## 2026-08-14
+
+No new human briefs. Key code activity from 08/13 not captured in that session's master index: Multi-Target Deployment Phase A/B/C1 merged to dev (`f117034`) — Phase A (universal container image + login page), Phase B (4 AWS CFN templates: lambda, ec2, ecs-fargate, ami-pipeline), Phase C1 (full-cycle deploy/destroy pipeline + OIDC + Heroku contract). CI version bump v0.33.56 → v0.33.57. Backlog task B-013 completed: cross-reference vault-html guides added to `cli/index.md` and `vault/index.md`.
+
+Files changed:
+- `reality/index.md` — Version v0.33.56 → v0.33.57; Last updated → 2026-08-14; Quick Stats date → 2026-08-14
+- `reality/infra/index.md` — ECS/Fargate deployment targets table: corrected to reflect CFN template exists (Phase B)
+- `reality/cli/index.md` — Guides section added (6 vault-html guides cross-linked)
+- `reality/vault/index.md` — Guides section added (7 vault-html guides cross-linked)
+- `reality/changelog.md` — 2026-08-14 entry added (this entry)
+- `team/roles/librarian/DAILY_RUN.md` — B-013 marked DONE; session added to COMPLETED
+
+Session: 0 new briefs | New EXISTS items: 0 | New PROPOSED items: 0 | Guides cross-linked: 13 pointers | Cumulative docs: 936 (unchanged)
+Master index (08/14): `team/roles/librarian/reviews/08/14/v0.33.57__master-index__daily-check-14-aug-2026.md`
+Debrief (08/14): `team/humans/dinis_cruz/debriefs/08/14/v0.33.57__debrief__daily-check-14-aug-2026.md`
+
+---
+
 ## 2026-08-13
 
 No new human briefs. One library guide added after the 08/12 session: `PUBLISHING-SGIT-VAULT-TO-GITHUB.md` (272 lines) — git-as-backup/distribution for sgit vaults, security rationale (bare/ is ciphertext-safe), five-step workflow, GitHub Actions secret pattern. CI version bump v0.33.55 → v0.33.56.

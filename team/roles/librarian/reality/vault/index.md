@@ -1,6 +1,6 @@
 # vault — Reality Index
 
-**Domain:** `vault/` | **Last updated:** 2026-07-01 | **Maintained by:** Librarian (daily run)
+**Domain:** `vault/` | **Last updated:** 2026-08-15 | **Maintained by:** Librarian (daily run)
 
 The vault/SGit cryptographic storage system. This domain covers the encryption layer, the
 object storage model, the browser JS client, PKI, and the sgit CLI as it relates to vault
@@ -263,6 +263,27 @@ on `/app` refresh (a diverged clone can't fast-forward).
 
 Brief: `team/comms/briefs/06/08/v0.33.5__brief__app-vault-sync-parity.md`.
 
+### Read-Key Open + Embeddable Vault Surfaces (2026-08-15)
+
+Implements the 08/15 architect brief (read-key open + embeddable surfaces) Phases 1–4.
+The read-only capability triple `{vault_id, read_key, ref_file_id}` is now openable from a
+raw read key on BOTH surfaces, and both surfaces are embeddable via the shared handshake.
+
+| Capability | Status | Evidence |
+|-----------|--------|---------|
+| **Format 6 credential** — `<64-hex read_key>:<vault_id>` (bare and `sgit_rk1_`-prefixed) detected BEFORE formats 2/3; sgit CLI read-only-clone parity (CLI verified this shape empirically 08/14) | **EXISTS** | `vault-loader-format.js`; `test__format_detection.js` (format 6 suite) |
+| **`SGVaultCrypto.deriveReadOnlyCreds(vaultId, readKeyHex)`** — derives `refFileId` + `branchIndexFileId` from the read key alone (one HMAC each; no passphrase). Invariant vs `deriveKeys` unit-tested for standard AND simple-token vaults | **EXISTS** | `sg-vault-crypto.js`; `test__read_key_creds.js` |
+| **`SGVaultCrypto.stripKeyPrefix`** — strips the CLI's canonical `sgit_vk1_`/`sgit_rk1_` prefixes on every key-input path (loader detectFormat + app-shell `_initWithKey`) | **EXISTS** | `sg-vault-crypto.js`; `test__read_key_creds.js` |
+| **`VaultLoader.openReadOnly` (was a throwing stub)** — formats 4 + 6 → derive creds → `SGVault.openReadOnly`; emits `VAULT_OPENED {readOnly:true}`; `opts.noPersist` keeps the credential out of storage (embed) | **EXISTS** | `vault-loader.js`; `test__vault_loader_open_readonly.js` (incl. storage-throws simulation) |
+| **App UI read-key open** — `_initWithKey` format-6 branch (same `deriveReadOnlyCreds`), RO handling identical to the ro-token path; entry-form badge shows "Read-only key" | **EXISTS** | `app-shell.js` |
+| **Shared embed receiver** — `embed-receiver.js` (one-shot, source/origin-validated handshake child side) consumed by BOTH `app-shell._initEmbed` (refactored, no behaviour change) and the NEW `vault-shell._initEmbed` | **EXISTS** | `embed-receiver.js`; `test__embed_receiver.js` |
+| **`/en-gb/vault/?embed=1`** — main vault UI (files + SGit view) opens inside a third-party iframe via postMessage; key never touches storage (`noPersist`); vault-entry suppresses storage auto-open in embed mode; `vault-ready` posted on browse mount | **EXISTS** | `vault-shell.js` `_initEmbed`; `vault-entry.js` guard; root `index.html` embed-aware glue |
+| **Vendorable parent helper** — `lib/sg-embed/sg-vault-embed.js`: `<sg-vault-embed surface="vault|app" key>` element + `SgVaultEmbed.mount()`; `app-shell._embedHelperSrc` now injects its `_mountImpl` (one implementation for websites AND vault apps); lazy-loads `SgEmbed` helpers from its own origin | **EXISTS** | `sg-vault-embed.js`; existing handshake glue removed from `app-shell.js` |
+
+Security posture unchanged: read keys cannot escalate to write (independent PBKDF2);
+`SGVault.openReadOnly` fails closed; a published read key exposes FULL history (structure-key
+split still inert) — publish only from dedicated publish-vaults.
+
 ---
 
 ## DOES NOT EXIST (Commonly Confused)
@@ -298,6 +319,23 @@ Key proposals for this domain. Full details: see sub-files in `proposed/`.
 - **PKI Public Key Registry** — PROPOSED: a vault that stores public keys + trust relationships (graph database); two-level trust (downward explicit: A trusts B; upward self-declared: B says A should trust it); clues not storage; federation across registries; caller-side resolver with graded partial results. Replaces a prior FastAPI prototype. Source: `briefs/06/05/v0.32.4__dev-brief__sg-send-pki-public-key-registry-on-vaults.md`.
 - **Large-File Chunked Vault Upload** — PROPOSED: 100% vault upload workflow for large files (live case: 15 GB); `file.slice()` streaming chunks; SHA-256 per chunk; existence check via deterministic value index; resumable upload; recipient loads vault structure without downloading data; selective chunk download; video slices (FFmpeg) + first-frame thumbnails. Source: `briefs/06/07/v0.32.7__dev-brief__sg-send-large-file-sharing-chunked-upload-ui.md`.
 - **Central Key Management / OpenRouter Distribution** — PROPOSED: parent vault manages OpenRouter key centrally; distributes to child vaults via vault-to-vault comms inbox; children use key for in-vault LLM capabilities (infographics, chat); return results to parent over comms. Per-child billing + credit allocation. Source: `briefs/06/07/v0.32.7__dev-brief__sg-send-central-key-management-openrouter-keys-to-child-vaults.md`.
+
+---
+
+## Guides
+
+Operational guides for vault workflows (located at `library/guides/vault-html/`). See also the
+inline cross-reference on the static-host mode section above (HOSTING-ON-STATIC-STORAGE.md).
+
+| Guide | What It Covers |
+|-------|---------------|
+| [`AUTHORING.md`](../../../../../library/guides/vault-html/AUTHORING.md) | Vault content authoring workflow; file layout; update and commit cycle |
+| [`SUB-VAULTS-AND-LINKS.md`](../../../../../library/guides/vault-html/SUB-VAULTS-AND-LINKS.md) | Sub-vault architecture, `.link.json` convention, read-only link cards, owner link management |
+| [`EXTRACT-AND-EMBED-A-SUB-VAULT.md`](../../../../../library/guides/vault-html/EXTRACT-AND-EMBED-A-SUB-VAULT.md) | Extract and embed a sub-vault into a parent vault; sub-vault link convention; CLI round-trip (added Aug 2026) |
+| [`PUBLISHING-SGIT-VAULT-TO-GITHUB.md`](../../../../../library/guides/vault-html/PUBLISHING-SGIT-VAULT-TO-GITHUB.md) | Use a git remote as a second untrusted server for vault distribution; five-step workflow; GitHub Actions secret pattern (added Aug 2026) |
+| [`HOSTING-ON-STATIC-STORAGE.md`](../../../../../library/guides/vault-html/HOSTING-ON-STATIC-STORAGE.md) | GitHub Pages / S3 static hosting for vault apps; `window.SG_STATIC` / `SG_ENDPOINT`; path-mirroring |
+| [`MIGRATING-TO-THE-PERMISSION-MODEL.md`](../../../../../library/guides/vault-html/MIGRATING-TO-THE-PERMISSION-MODEL.md) | Migrating vault apps to the per-verb consent permission model |
+| [`PLAYWRIGHT-VAULT-APP-ACCESS.md`](../../../../../library/guides/vault-html/PLAYWRIGHT-VAULT-APP-ACCESS.md) | Accessing vault apps from Playwright tests; authentication; iframe interaction |
 
 ---
 

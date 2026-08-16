@@ -64,6 +64,16 @@ function loadFrom(baseUrl, file) {
 
 loadFrom(THIS_DIR, 'in-memory-sg-vault.js');
 
+// Real crypto lib (Node's WebCrypto backs crypto.subtle): the loader's read-key
+// open path (formats 4/6) derives the RO capability triple at runtime via
+// SGVaultCrypto.deriveReadOnlyCreds.
+const SG_VAULT_LIB_DIR = new URL(
+    '../../../../sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.3/_common/js/lib/sg-vault/',
+    import.meta.url
+);
+loadFrom(SG_VAULT_LIB_DIR, 'sg-vault-crypto.js');
+runInThisContext('globalThis.SGVaultCrypto = SGVaultCrypto;');
+
 // --- Load vault-loader modules in dependency order ----------------------------
 
 loadFrom(LOADER_DIR, 'vault-loader-events.js');

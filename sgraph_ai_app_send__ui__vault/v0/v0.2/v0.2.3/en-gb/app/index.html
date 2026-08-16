@@ -125,7 +125,11 @@
     <script src="/_common/js/components/app-shell/app-shell-nav-helpers.js"></script>
     <script src="/_common/js/components/app-shell/app-hud-config.js"></script>
     <script src="/_common/js/components/app-shell/embed-protocol.js"></script>
+    <script src="/_common/js/components/app-shell/embed-receiver.js"></script>
     <script src="/_common/js/components/app-shell/sg-embed-helpers.js"></script>
+    <!-- Vendorable parent-side embed helper — sg.vault.embed injects its _mountImpl
+         into the app bridge (one implementation shared with third-party websites) -->
+    <script src="/_common/js/lib/sg-embed/sg-vault-embed.js"></script>
     <script src="/_common/js/components/app-shell/app-shell.js"></script>
 
     <style>

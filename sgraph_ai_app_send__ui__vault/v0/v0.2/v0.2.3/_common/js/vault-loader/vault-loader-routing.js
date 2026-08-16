@@ -45,7 +45,10 @@
 
     function _stripHash() {
         if (_hasHash()) {
-            history.replaceState(null, '', location.pathname + location.search);
+            // try/catch: replaceState throws in an opaque-origin (sandboxed) iframe —
+            // e.g. the vault surface embedded with sandbox="allow-scripts". The hash
+            // is unused in embed mode anyway; a stray one must not kill the head script.
+            try { history.replaceState(null, '', location.pathname + location.search); } catch (_) {}
         }
     }
 

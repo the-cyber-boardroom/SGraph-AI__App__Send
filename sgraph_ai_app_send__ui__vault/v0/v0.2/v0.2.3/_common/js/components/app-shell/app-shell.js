@@ -95,7 +95,7 @@
             clearTimeout(this._autoPushTimer);
             clearTimeout(this._behindCheckTimer);
             clearTimeout(this._appendCheckTimer);
-            if (this._embedOpenHandler)  { window.removeEventListener('message', this._embedOpenHandler); this._embedOpenHandler = null; }
+            if (this._embedReceiver)     { this._embedReceiver.stop(); this._embedReceiver = null; }
             if (this._embedReadyHandler) { this.removeEventListener('app-shell:ready', this._embedReadyHandler); this._embedReadyHandler = null; }
             if (this._vfsBridgeHandler) {
                 window.removeEventListener('message', this._vfsBridgeHandler);
@@ -126,7 +126,14 @@
             // and the rationale (storage partitioning + key-in-URL avoidance).
             // Has to run BEFORE the localStorage read so a stray saved key from a
             // previous non-embed session doesn't auto-open the wrong vault here.
-            if (typeof EmbedProtocol !== 'undefined' && EmbedProtocol.isEmbedMode()) {
+            // ?embed=1 must NEVER fall through to the storage auto-open below (a
+            // stray saved key would open the wrong vault inside the parent's frame).
+            // The gate is therefore DEP-FREE — it must hold even when
+            // embed-protocol.js itself failed to load (deploy skew / cached HTML);
+            // missing embed modules fail CLOSED inside _initEmbed.
+            var isEmbedPage = false;
+            try { isEmbedPage = new URLSearchParams(window.location.search).get('embed') === '1'; } catch (_) {}
+            if (isEmbedPage) {
                 this._initEmbed();
                 return;
             }
@@ -191,50 +198,50 @@
         //   4. Once mounted (app-shell:ready fires), we post {sg:'vault-ready', ...}
         //      back so the parent knows the vault is interactive.
         _initEmbed() {
-            var self           = this;
-            var expectedParent = EmbedProtocol.getExpectedParentOrigin();
-            var targetOrigin   = expectedParent || '*';
+            var self = this;
 
             // Sentinel for downstream code (_initWithKey) to skip the storage-
             // persist step. The key stays in memory only for the embed session.
             this._embedMode = true;
 
+            // Fail CLOSED if the embed modules didn't load (deploy skew): show an
+            // error, answer nothing — never fall back to the storage auto-open path.
+            if (typeof EmbedProtocol === 'undefined' || typeof EmbedReceiver === 'undefined') {
+                console.error('[app-shell] embed mode requested but embed-protocol.js / embed-receiver.js is not loaded');
+                this._showError('Embed mode unavailable: embed scripts failed to load. Reload the page.');
+                return;
+            }
+
             this._setStatus('Waiting for vault key…');
 
-            // Post the ready ping. Wrapped in try because window.parent may throw
-            // in pathological setups (sandboxed top-level page with no parent, etc.).
-            try {
-                window.parent.postMessage(EmbedProtocol.readyMessage(), targetOrigin);
-            } catch (_) {}
+            // Handshake receiver is SHARED with the /en-gb/vault surface
+            // (embed-receiver.js) — one implementation, no drifting copies. It posts
+            // the ready ping and arms a one-shot, source/origin-validated listener
+            // (a misbehaving parent can't re-key the vault mid-session).
+            this._embedReceiver = EmbedReceiver.start({
+                onOpen: function (parsed) {
+                    // Deep-link goes to INSTANCE MEMORY, not sessionStorage. In a null-
+                    // origin parent (App Iframe srcdoc), storage access throws — the
+                    // catch would swallow the SET silently, then _continue's GET would
+                    // also throw silently, and the deep-link would be lost without any
+                    // signal. _continue prefers self._embedDeepLink when it's set, so
+                    // the embed deep-link is null-origin-safe.
+                    if (parsed.deepLink) {
+                        self._embedDeepLink = parsed.deepLink;
+                    }
 
-            // One-shot listener for the open message. Removed on first valid message
-            // so subsequent stray postMessages (e.g. a misbehaving parent re-keying)
-            // can't reset the vault under the user.
-            this._embedOpenHandler = function (event) {
-                if (!EmbedProtocol.validateSource(event, expectedParent, window.parent)) return;
-                var parsed = EmbedProtocol.parseOpenMessage(event.data);
-                if (!parsed) return;
-
-                window.removeEventListener('message', self._embedOpenHandler);
-                self._embedOpenHandler = null;
-
-                // Deep-link goes to INSTANCE MEMORY, not sessionStorage. In a null-
-                // origin parent (App Iframe srcdoc), storage access throws — the
-                // catch would swallow the SET silently, then _continue's GET would
-                // also throw silently, and the deep-link would be lost without any
-                // signal. _continue prefers self._embedDeepLink when it's set, so
-                // the embed deep-link is null-origin-safe.
-                if (parsed.deepLink) {
-                    self._embedDeepLink = parsed.deepLink;
+                    self._showLoading('Opening vault…');
+                    self._initWithKey(parsed.key, null).catch(function (err) {
+                        console.error('[app-shell] embed init failed:', err);
+                        self._showError('Vault open failed: ' + (err && err.message || err));
+                        // Tell the parent — its mount() handles vault-error; without
+                        // this the only signal is its generic 14s handshake timeout.
+                        // Null-guard: disconnectedCallback may have torn the receiver
+                        // down while the open was in flight.
+                        if (self._embedReceiver) self._embedReceiver.notifyError((err && err.message) || err);
+                    });
                 }
-
-                self._showLoading('Opening vault…');
-                self._initWithKey(parsed.key, null).catch(function (err) {
-                    console.error('[app-shell] embed init failed:', err);
-                    self._showError('Vault open failed: ' + (err && err.message || err));
-                });
-            };
-            window.addEventListener('message', this._embedOpenHandler);
+            });
 
             // Forward 'app-shell:ready' to the parent. This fires AFTER _initWithKey
             // resolves and the app is mounted, so the parent knows the vault is live.
@@ -246,13 +253,11 @@
                         fileCount = self._dataSource.getFileList().length;
                     }
                 } catch (_) {}
-                try {
-                    window.parent.postMessage(EmbedProtocol.vaultReadyMessage({
-                        vaultName: detail.vaultName,
-                        fileCount: fileCount,
-                        hasApp:    !!self._appJson
-                    }), targetOrigin);
-                } catch (_) {}
+                self._embedReceiver.notifyReady({
+                    vaultName: detail.vaultName,
+                    fileCount: fileCount,
+                    hasApp:    !!self._appJson
+                });
             };
             this.addEventListener('app-shell:ready', this._embedReadyHandler);
         }
@@ -337,6 +342,11 @@
 
         async _initWithKey(key, presetAccessKey, expectedVaultId) {
             this._t.start = performance.now();
+            // Strip the sgit CLI's canonical key prefixes (sgit_vk1_/sgit_rk1_) — the
+            // value after the prefix is byte-identical to the legacy key. Users paste
+            // prefixed keys from new CLI output; deriving from the prefixed string
+            // would produce garbage keys.
+            key = SGVaultCrypto.stripKeyPrefix(key);
             this._vaultKey = key;
 
             var endpoint = (window.SG_ENDPOINT
@@ -344,7 +354,13 @@
                 || 'https://dev.send.sgraph.ai').replace(/\/$/, '');
             var sgSend   = new SGSend({ endpoint: endpoint });
 
-            this._emitVaultEvent('open-start', { label: 'Opening vault', key: this._maskKey(key), isRO: key.startsWith('ro-') });
+            // Read-key credential (formats 6 and 4): SHARED matcher in SGVaultCrypto
+            // — same acceptance as the vault surface's loader. Checked BEFORE the
+            // generic SGVault.open branch — a 64-hex head parsed as a passphrase
+            // would PBKDF2 into garbage. Same routing rule as the sgit CLI.
+            var readKeyCred = SGVaultCrypto.parseReadOnlyCredential(key);
+
+            this._emitVaultEvent('open-start', { label: 'Opening vault', key: this._maskKey(key), isRO: key.startsWith('ro-') || !!readKeyCred });
             var vault, isRO = false;
             this._setStatus('Opening vault…');
 
@@ -352,6 +368,12 @@
                 var creds = await this._resolveROToken(sgSend, key);
                 vault     = await SGVault.openReadOnly(sgSend, creds.vaultId, creds.readKeyB64, creds.refFileId);
                 isRO      = true;
+            } else if (readKeyCred) {
+                // Same capability triple as the ro-token path, derived locally from the
+                // read key (one HMAC — no transfer download, no passphrase involved).
+                var rkCreds = await SGVaultCrypto.deriveReadOnlyCreds(readKeyCred.vaultId, readKeyCred.readKeyHex);
+                vault       = await SGVault.openReadOnly(sgSend, rkCreds.vaultId, rkCreds.readKeyB64, rkCreds.refFileId);
+                isRO        = true;
             } else {
                 vault = await SGVault.open(sgSend, key);
                 // App Mode is a viewer. SGVault.open() loads the tree from this browser's
@@ -980,8 +1002,12 @@
             keyInput.addEventListener('input', function () {
                 var v = keyInput.value.trim();
                 if (!v || !modeEl) { if (modeEl) modeEl.innerHTML = ''; return; }
+                var isReadKey = (typeof SGVaultCrypto !== 'undefined' && SGVaultCrypto.parseReadOnlyCredential)
+                    ? !!SGVaultCrypto.parseReadOnlyCredential(v) : false;
                 if (v.startsWith('ro-')) {
                     modeEl.innerHTML = '<span class="ef-mode-badge ef-mode-ro">&#128065; Read-only token</span>';
+                } else if (isReadKey) {
+                    modeEl.innerHTML = '<span class="ef-mode-badge ef-mode-ro">&#128065; Read-only key</span>';
                 } else if (v.indexOf('-') > 0 || (v.indexOf(':') > 0 && !/\s/.test(v))) {
                     modeEl.innerHTML = '<span class="ef-mode-badge ef-mode-full">&#128273; Full vault key</span>';
                 } else {
@@ -2804,52 +2830,23 @@
         }
 
         // Source for sg.vault.embed(), injected into the app bridge. The pure src-building
-        // and sandbox-sanitisation come from the unit-tested SgEmbed module (injected verbatim
-        // via Function.toString — the shipped code IS the tested code). The handshake glue is
-        // the thin wrapper below. SECURITY: sandbox defaults to allow-scripts only; SgEmbed
-        // refuses allow-same-origin and allow-popups-to-escape-sandbox even if asked.
+        // and sandbox-sanitisation come from the unit-tested SgEmbed module, and the
+        // handshake glue comes from the VENDORABLE SgVaultEmbed._mountImpl
+        // (lib/sg-embed/sg-vault-embed.js) — all injected verbatim via Function.toString,
+        // so the code vault apps run is byte-identical to the code a third-party website
+        // vendors with one script tag. One implementation, no drifting copies.
+        // SECURITY: sandbox defaults to allow-scripts only; SgEmbed refuses
+        // allow-same-origin and allow-popups-to-escape-sandbox even if asked.
         _embedHelperSrc() {
-            if (typeof SgEmbed === 'undefined' || !SgEmbed.sanitizeSandbox || !SgEmbed.buildEmbedSrc) {
-                return 'function _embedVault(){return Promise.reject(new Error("sg.vault.embed unavailable (sg-embed-helpers.js not loaded)"));}';
+            if (typeof SgEmbed === 'undefined' || !SgEmbed.sanitizeSandbox || !SgEmbed.buildEmbedSrc
+                || typeof SgVaultEmbed === 'undefined' || !SgVaultEmbed._mountImpl) {
+                return 'function _embedVault(){return Promise.reject(new Error("sg.vault.embed unavailable (sg-embed-helpers.js / sg-vault-embed.js not loaded)"));}';
             }
             return ''
-                + 'var _sanitizeSandbox=' + SgEmbed.sanitizeSandbox.toString() + ';'
-                + 'var _buildEmbedSrc='   + SgEmbed.buildEmbedSrc.toString()   + ';'
-                + 'function _embedVault(mount,key,opts){'
-                +   'opts=opts||{};'
-                +   'if(!mount||!key)return Promise.reject(new Error("sg.vault.embed: a mount element and a vault key are required"));'
-                +   'var nullOrigin=(location.origin==="null");'
-                +   'var host=opts.host||(location.protocol+"//"+location.host);'
-                +   'var src=_buildEmbedSrc(host,nullOrigin,{surface:opts.surface,parentOrigin:location.origin});'
-                +   'var sandbox=_sanitizeSandbox(opts.sandbox);'
-                +   'var expectedFrom;try{expectedFrom=new URL(host).origin;}catch(_){expectedFrom=host;}'
-                +   'return new Promise(function(resolve,reject){'
-                +     'var iframe=document.createElement("iframe");'
-                +     'iframe.src=src;'
-                +     'iframe.setAttribute("sandbox",sandbox);'
-                +     'iframe.style.cssText=opts.style||"width:100%;height:100%;border:0;display:block";'
-                +     'if(opts.allow)iframe.setAttribute("allow",opts.allow);'
-                +     'mount.appendChild(iframe);'
-                +     'var sent=false;'
-                +     'var timer=setTimeout(function(){cleanup();reject(new Error("sg.vault.embed: handshake timed out"));},opts.timeoutMs||14000);'
-                +     'function cleanup(){clearTimeout(timer);window.removeEventListener("message",onMsg);}'
-                +     'function onMsg(e){'
-                +       'if(e.source!==iframe.contentWindow)return;'                        // pin to THIS frame
-                +       'if(e.origin!==expectedFrom&&e.origin!=="null")return;'             // host or opaque only
-                +       'var d=e.data;if(!d||typeof d!=="object")return;'
-                +       'if(d.sg==="vault-embed-ready"&&!sent){'
-                +         'sent=true;'
-                +         'var to=(e.origin&&e.origin!=="null")?e.origin:"*";'              // concrete, else "*" to this one window
-                +         'iframe.contentWindow.postMessage({sg:"vault-open",key:key,mode:opts.mode||"auto",deepLink:opts.deepLink||""},to);'
-                +       '}else if(d.sg==="vault-ready"){'
-                +         'cleanup();resolve({vaultName:d.vaultName||"",fileCount:d.fileCount|0,hasApp:!!d.hasApp,iframe:iframe});'
-                +       '}else if(d.sg==="vault-error"){'
-                +         'cleanup();reject(new Error(d.message||"vault error"));'
-                +       '}'
-                +     '}'
-                +     'window.addEventListener("message",onMsg);'
-                +   '});'
-                + '}';
+                + 'var _sanitizeSandbox=' + SgEmbed.sanitizeSandbox.toString()   + ';'
+                + 'var _buildEmbedSrc='   + SgEmbed.buildEmbedSrc.toString()     + ';'
+                + 'var _mountImpl='       + SgVaultEmbed._mountImpl.toString()   + ';'
+                + 'function _embedVault(mount,key,opts){return _mountImpl(_sanitizeSandbox,_buildEmbedSrc,mount,key,opts);}';
         }
 
         _buildVfsBridgeScript(currentPath) {
