@@ -18,6 +18,7 @@ node tests/unit/vault_ui/loader/test__ro_record_derivation.js
 node tests/unit/vault_ui/loader/test__read_key_creds.js
 node tests/unit/vault_ui/loader/test__vault_loader_open_readonly.js
 node tests/unit/vault_ui/loader/test__vault_settings_readonly.js
+node tests/unit/vault_ui/loader/test__vault_settings_file_listing.js
 node tests/unit/vault_ui/loader/test__sgsend_access_token.js
 node tests/unit/vault_ui/loader/test__sgsend_static_mode.js
 node tests/unit/vault_ui/loader/test__sg_releases.js

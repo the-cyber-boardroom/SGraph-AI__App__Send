@@ -479,6 +479,11 @@
             // Update page title
             var appTitle  = appJson && appJson.title  ? appJson.title  : '';
             var vaultName = vault.name || '';
+            // Never-named vault (settings defaulted to the 'Untitled Vault' placeholder)
+            // running an app with a title: the app title IS the identity — suppress the
+            // placeholder chip rather than showing 'Untitled Vault' next to the real name.
+            // Explicit === false: older/stub vault objects without the getter keep the name.
+            if (appTitle && vault.hasCustomName === false) vaultName = '';
             if (appTitle) document.title = appTitle + ' — SG/App';
             else if (vaultName) document.title = vaultName + ' — SG/App';
 
