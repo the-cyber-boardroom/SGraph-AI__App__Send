@@ -7,6 +7,22 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-08-17
+
+20 new human briefs processed (7 × 08/09: graphing text + risk register; 13 × 08/14: sgit hub + WhatsApp bridge + briefing packs). Cumulative docs 936 → 956. Six substantive code commits from 08/15–16 documented (read-key open, sg.llm hardening P0-P4, vault-settings.json listing, RO settings panel, vault subtree expansion). Test count ~2970+ → ~3100+ (+146 net new). Version v0.33.57 → v0.33.61 (4 CI bumps). Seven new key decisions added from 08/09 and 08/14 briefs.
+
+Files changed:
+- `reality/index.md` — Version v0.33.57 → v0.33.61; Last updated → 2026-08-17; Quick Stats date → 2026-08-17; tests ~2970+ → ~3100+; docs 936 → 956; 7 new key decisions added (permissions=key topology, read/write keys, component-not-plugin, lost write key=frozen, browser=app layer, decompilation, WhatsApp vault-per-conversation)
+- `reality/ui/index.md` — Two new EXISTS sections: `.vault-settings.json` synthetic listing (commit `36eb6c2b`, 9 tests) and read-only settings panel credential display (commit `06dca6e4`, 14 tests)
+- `reality/changelog.md` — 2026-08-17 entry added (this entry)
+- `team/roles/librarian/DAILY_RUN.md` — session added to COMPLETED
+
+Session: 20 new briefs | New EXISTS items: 2 (vault-settings listing, RO settings panel) | New PROPOSED items: 0 (all 08/09 + 08/14 PROPOSED items already logged in master index today) | Test count +146 | Cumulative docs: 956
+Master index (08/17): `team/roles/librarian/reviews/08/17/v0.33.61__master-index__briefs-09-14-aug-2026.md`
+Debrief (08/17): `team/humans/dinis_cruz/debriefs/08/17/v0.33.61__debrief__briefs-processing-09-14-aug-2026.md`
+
+---
+
 ## 2026-08-16
 
 No new human briefs. No new code commits on `origin/dev` since 2026-08-13 (Phase A/B/C1 deployment, already documented). Quiet daily hold.
