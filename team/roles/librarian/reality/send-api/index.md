@@ -99,13 +99,15 @@ Behavioural parity on S3 is verified structurally (method-override assertions in
 but not exercised end-to-end via LocalStack. This is not urgent — the memory backend faithfully
 exercises all service logic — but should be done before production launch.
 
-### Room Join (`/join/*`) — 3 endpoints
+### Room Join (`/join/*`) — 0 live endpoints (orphaned code)
 
-| Method | Path | What It Does | Tested |
-|--------|------|-------------|--------|
-| GET | `/join/validate/{invite_code}` | Validate room invite (no consumption) | Yes |
-| POST | `/join/accept/{invite_code}` | Accept invite, join room, get session | Yes |
-| GET | `/join/session-validate` | Validate room session token | Yes |
+**Code-verified 2026-08-17:** `Routes__Join.py` exists on disk but is NOT registered in
+`Fast_API__SGraph__App__Send__User.setup_routes()` — no `/join/*` path appears in the live
+OpenAPI spec, and no other file references the class. The three endpoints previously listed
+here (`/join/validate/{invite_code}`, `/join/accept/{invite_code}`, `/join/session-validate`)
+do not exist on the deployed API. The file also imports 4 classes from `lambda__admin`
+(the only user→admin source coupling) and is a recorded deletion candidate — see
+`library/sgraph-send/dev_packs/v0.33.59__sgit-api-extraction/05__deletion-candidates.md`.
 
 ### Other — 2 endpoints
 

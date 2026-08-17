@@ -8,8 +8,10 @@ from unittest                                                                   
 from fastapi                                                                     import FastAPI
 from memory_fs.storage_fs.providers.Storage_FS__Memory                          import Storage_FS__Memory
 from starlette.testclient                                                        import TestClient
+from osbot_utils.utils.Env                                                       import get_env, set_env
 from sgraph_ai_app_send.lambda__user.fast_api.Fast_API__SGraph__App__Send__User import Fast_API__SGraph__App__Send__User
 from sgraph_ai_app_send.lambda__user.service.Service__Vault__Pointer            import Service__Vault__Pointer
+from sgraph_ai_app_send.lambda__user.user__config                               import ENV_VAR__SGRAPH_SEND__ACCESS_TOKEN
 
 VAULT_ID  = 'pub1c0de'
 FILE_ID   = 'bare/refs/main'
@@ -30,8 +32,14 @@ def _make_client_with_public_vault():
 class test_Routes__Vault__Public(TestCase):
 
     @classmethod
-    def setUpClass(cls):
+    def setUpClass(cls):                                                          # Clear access-token env so these tests run in open local-dev mode regardless of suite order
+        cls._saved_access_token = get_env(ENV_VAR__SGRAPH_SEND__ACCESS_TOKEN, '')
+        set_env(ENV_VAR__SGRAPH_SEND__ACCESS_TOKEN, '')
         cls.client, cls.private_svc, cls.public_svc = _make_client_with_public_vault()
+
+    @classmethod
+    def tearDownClass(cls):
+        set_env(ENV_VAR__SGRAPH_SEND__ACCESS_TOKEN, cls._saved_access_token)
 
     def _write_public(self, vault_id=VAULT_ID, file_id=FILE_ID, write_key=WRITE_KEY,
                       read_key=READ_KEY, payload=b'encrypted-data'):

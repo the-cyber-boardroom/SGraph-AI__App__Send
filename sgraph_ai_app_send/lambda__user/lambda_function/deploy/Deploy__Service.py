@@ -1,6 +1,9 @@
 from mgraph_ai_service_cache_client.schemas.consts.const__Fast_API import ENV_VAR__CACHE__SERVICE__BUCKET_NAME
 
-import sgraph_ai_app_send__ui__user
+try:                                                                          # UI tree is optional — absent once the API is extracted into its own repo (sgit-api)
+    import sgraph_ai_app_send__ui__user
+except ImportError:
+    sgraph_ai_app_send__ui__user = None
 from osbot_aws.AWS_Config                                                    import aws_config
 from osbot_fast_api_serverless.deploy.Deploy__Serverless__Fast_API          import Deploy__Serverless__Fast_API
 from osbot_utils.utils.Env                                                  import get_env
@@ -25,7 +28,8 @@ class Deploy__Service(Deploy__Serverless__Fast_API):
         s3_bucket         = f'{account_id}--{SEND__S3_BUCKET__INFIX}--{region}'
         public_vault_bucket = f'{account_id}--{SEND__PUBLIC_VAULT__S3_BUCKET__INFIX}--{region}'
         with super().deploy_lambda() as _:
-            _.add_folder(sgraph_ai_app_send__ui__user.path)
+            if sgraph_ai_app_send__ui__user is not None:                      # Bundle only when the UI package is present (deletion candidate — no static routes serve it)
+                _.add_folder(sgraph_ai_app_send__ui__user.path)
             _.set_env_variable(ENV_VAR__SGRAPH_SEND__ADMIN__BASE_URL      , get_env(ENV_VAR__SGRAPH_SEND__ADMIN__BASE_URL      ))
             _.set_env_variable(ENV_VAR__SGRAPH_SEND__ADMIN__API_KEY__NAME , get_env(ENV_VAR__SGRAPH_SEND__ADMIN__API_KEY__NAME  ))
             _.set_env_variable(ENV_VAR__SGRAPH_SEND__ADMIN__API_KEY__VALUE, get_env(ENV_VAR__SGRAPH_SEND__ADMIN__API_KEY__VALUE ))

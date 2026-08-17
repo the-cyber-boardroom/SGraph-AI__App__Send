@@ -33,6 +33,10 @@ class test_Fast_API__SGraph__App__Send__User(TestCase):
             assert self.fast_api            == _.fast_api
             assert self.client              == _.fast_api__client
 
+    def test__api_docs_served(self):                                              # docs moved under /api/ so CloudFront routes them to Lambda
+        assert self.client.get('/api/docs'        ).status_code == 200
+        assert self.client.get('/api/openapi.json').status_code == 200
+
     def test__cors_allows_transfer_delete(self):                                  # regression: DELETE preflight (x-sgraph-transfer-delete-auth) must pass CORS
         cors = [m for m in self.fast_api.app().user_middleware if 'CORS' in str(m.cls)]
         assert cors, 'CORS middleware must be configured'
