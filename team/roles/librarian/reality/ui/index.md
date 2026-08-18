@@ -1,6 +1,6 @@
 # ui — Reality Index
 
-**Domain:** `ui/` | **Last updated:** 2026-08-12 | **Maintained by:** Librarian (daily run)
+**Domain:** `ui/` | **Last updated:** 2026-08-18 | **Maintained by:** Librarian (daily run)
 
 As of v0.4.0 (May 2026), the sender and receiver UIs are split into separate packages
 (`sgraph_ai_app_send__ui__share/` and `sgraph_ai_app_send__ui__open/`). The v0.3.x user
@@ -664,6 +664,15 @@ transcript — one take, one result.
   relay `sg.llm.*`.
 - Per-app limit overrides are read (`limitsFor(policy, appId)`) but no UI writes them.
 - `permissions.network` is parsed but still unused.
+
+### Vault Settings File — Synthetic Tree Entry + App-Title Fallback (2026-08-16)
+
+`feat(vault)`: commit `36eb6c2`. Fixes two live-testing gaps in the vault web UI.
+
+| Behaviour | Status | Evidence |
+|-----------|--------|---------|
+| **`.vault-settings.json` synthetic entry** — `VaultDataSource.getTree`/`getFileList` now lists `.vault-settings.json` synthetically (the file lives in `vault._settings`, parsed out at load time, never in `root.children`). Reads and writes round-trip through existing special-case hooks. Delete/rename are refused with descriptive errors. A legacy real tree entry produces no duplicate. Previously this was the ONLY file hidden from the vault UI's own tree (`.vault/**` is an app-bridge floor, not a UI filter; `*.link.json` entries are transformed into mounts). | **EXISTS** | `vault-data-source.js`; `test__vault_settings_file_listing.js` (9 assertions) |
+| **App-title fallback for unnamed vaults** — `SGVault.hasCustomName` tracks whether the vault name was synthesized as 'Untitled Vault' (placeholder) vs set by the user. In App UI mode, if the vault has no custom name, the app-shell adopts the running app's title from `app.json` instead of showing 'Untitled Vault'. Named vaults unchanged. | **EXISTS** | `sg-vault.js` `hasCustomName`; `app-shell.js` `_applyAppJson` |
 
 ### sg.llm.* P4 — spend surfacing + six re-review fixes (2026-08-16)
 

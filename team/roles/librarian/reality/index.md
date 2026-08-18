@@ -1,6 +1,6 @@
 # Reality — Master Index
 
-**Version:** v0.33.57 | **Last updated:** 2026-08-16 | **Maintained by:** Librarian (daily run)
+**Version:** v0.33.61 | **Last updated:** 2026-08-18 | **Maintained by:** Librarian (daily run)
 **Structure:** Domain tree — each domain has its own directory with `index.md` and `proposed/`
 
 This file is the entry point. Read it to find the right domain, then go to that domain's
@@ -31,21 +31,21 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 
 ---
 
-## Quick Stats (as of 2026-08-14)
+## Quick Stats (as of 2026-08-18)
 
 | Metric | Count |
 |--------|-------|
 | User Lambda API endpoints | 32 unique (40 route paths) + `/api/info/sgraph` (Routes__Info__SGraph.py) |
 | Admin Lambda API endpoints | 51 unique (61 route paths) |
 | Total API endpoints | **83+** |
-| Unit tests passing | **~2970+** (977 Python + ~157 vault-UI JS + ~930+ ViV loader suite (373+ base + ~557 from LLM/voice/releases/send-browse-split/image/sync sessions 08/02–08/04: sg_releases 47, pinned_data_source 27, vault_releases_editor 44, sg_llm_config 53, sg_llm 40, sg_llm_vault 17, sg_voice 86, base64_chunk_guard 88, send_browse_split 97, vault_llm_log 35, vault_llm_chat 122, vault_shell_llm_panels 28, app_page_llm_panels 46, vault_llm_requests 29, vault_browse_edit__add_to_chat 13, app_shell_llm_bridge 96, sg_vision 62, no_auto_reload 27) + ~78 app-shell JS + 37 embed-protocol + ~334 inbox/write-batch/owner-secrets suite; browser integration: 8 tests; +10 app-shell-nav-helpers; +19 from Phase A/B/C1: container-app 9→16, auth 7→8, +3 port, +8 deploy-smoke) |
+| Unit tests passing | **~3100+** (977 Python + ~157 vault-UI JS + ~1060+ ViV loader suite (+42 sg.llm hardening 08/15, +49 vault read-key/embed 08/15, +32 sg.llm P4 08/16, +9 vault settings listing 08/16, base ~930+) + ~78 app-shell JS + 37 embed-protocol + ~334 inbox/write-batch/owner-secrets suite; browser integration: 8 tests; +10 app-shell-nav-helpers; +19 from Phase A/B/C1) — updated 2026-08-18 |
 | Deployment targets | **4 working** (Lambda, Docker Hub, local container, CLI) + **8 PROPOSED** (P-405–P-412: Fargate, AMI, Terraform, one-click deploy, full-cycle CI, publish pipeline, memory-mode licensing, static vault hosting) — DevOps review 2026-08-11 |
 | Website pages | 21 |
 | Browser UIs | **7** (share v0.4, open v0.4, admin, workspace, vault browser, vault app /en-gb/app; user v0.3.x legacy) |
 | Active tools (tools.sgraph.ai) | 4 |
 | sgit CLI commands | 20+ |
 | Open PROPOSED items (across all domains) | ~1051+ (+11 net-new from 02-06 Aug: P-ACT-014–024 across vault/, ai-agents/, cli/; previously ~1040+; processed 2026-08-11) |
-| Total documents catalogued | 936 (+26 from 02-06 Aug: 10 from 02 Aug v0.33.55 + 16 from 06 Aug v0.33.56; processed 08/11) |
+| Total documents catalogued | 954 (+18 from 09-14 Aug: 6 from 09 Aug v0.33.57 + 12 from 14 Aug v0.33.58; processed 08/18) |
 | **Key decision** | **Risk Mandate.ai** adopted as product name (resolves OQ-company-name-1, 2026-06-25) |
 | **Key decision** | **Grounded alarm** adopted as the Risk Mandate communication strategy term (replaces FUD framing, 2026-07-05) |
 | **Key decision** | **The grant is the mandate** — authorization is the union of what the agent can already do; "never-in-line" (2026-07-23) |

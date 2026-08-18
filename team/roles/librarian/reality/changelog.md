@@ -7,6 +7,23 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-08-18
+
+18 new human briefs processed (6 from 08/09 v0.33.57, 12 from 08/14 v0.33.58). Post-08/16 code commits documented (vault read-key open, sg.llm hardening, sg.llm P4, vault settings file listing). Version: v0.33.61.
+
+Files changed:
+- `reality/index.md` — Last updated → 2026-08-18; version v0.33.57→v0.33.61; doc count 936→954; test count ~2970+→~3100+
+- `reality/ui/index.md` — Added vault settings file listing section (commit 36eb6c2); last-updated → 2026-08-18
+- `reality/qa/index.md` — Updated test count ~2970+→~3100+; last-updated → 2026-08-18
+- `reality/changelog.md` — 2026-08-18 entry added (this entry)
+- `team/roles/librarian/DAILY_RUN.md` — 2026-08-18 session row added
+
+Session: 18 new briefs | New EXISTS items: 1 (vault settings file listing) | New PROPOSED items: 11 | Test count: ~2970+→~3100+ | Cumulative docs: 936→954
+Master index (08/18): `team/roles/librarian/reviews/08/18/v0.33.61__master-index__briefs-09-14-aug-2026.md`
+Debrief (08/18): `team/humans/dinis_cruz/debriefs/08/18/v0.33.61__debrief__briefs-processing-09-14-aug-2026.md`
+
+---
+
 ## 2026-08-16
 
 No new human briefs. No new code commits on `origin/dev` since 2026-08-13 (Phase A/B/C1 deployment, already documented). Quiet daily hold.
