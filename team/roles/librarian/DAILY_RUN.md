@@ -163,6 +163,11 @@ send agents to an archived 237KB monolith instead of the current 13-domain tree.
 **Note:** This file governs all Explorer sessions. A Conductor check is appropriate before
 changing the priorities section. Date references and reality path are safe to update.
 
+### B-014 · Audit document count discrepancy (954 vs 956)
+**Status:** PENDING
+**What:** The 08/18 master index file (`reviews/08/18/v0.33.61__master-index__briefs-09-14-aug-2026.md`) states "Cumulative document count: 954 (+18 from this session; previous 936)". The reality/index.md and DAILY_RUN COMPLETED rows for 08/17 and 08/18 both record 956 (+20 from the same 08/09+08/14 batch). The true count (as reflected in reality/index.md) is 956. Audit: count the actual brief files in `briefs/08/09/` and `briefs/08/14/` to confirm the correct total, then annotate the 08/18 master index with a correction note.
+**Why:** The master index is a permanent record. A wrong cumulative count will cascade into future indices. The correct count should be settled once and recorded.
+
 ### B-013 · Cross-reference vault publication guides in reality domain files
 **Status:** DONE (2026-08-14)
 **What:** Two new vault-html guides arrived in Aug 2026 that are not cross-linked from the reality
@@ -269,6 +274,10 @@ None currently active.
 | 2026-08-06 | No new briefs; addendum to 08/05 session with deeper commit-level detail | 7 EXISTS items detailed (image paste, SGVision, sg.llm.imagePart, ledger fix, auto-sync data-loss fix, claude-sonnet-5 default, picker notice); index.md last-updated + Black Hat note updated; changelog 08/06 + 08/05 merged; master index + debrief produced |
 | 2026-08-09 | No new briefs; no new commits; B-012 completed — explorer/CLAUDE.md stale references fixed | reality path → index.md; 3 stale debrief/index pointers updated; index.md + qa/index.md → 2026-08-09; master index + debrief produced |
 | 2026-08-08 | No new briefs; no new commits; date/last-updated brought current; B-012 added | index.md + qa/index.md updated to 2026-08-08; master index + debrief produced |
+| 2026-08-20 | 18 new briefs (09 Aug: 6, 14 Aug: 12); addendum vault embed fixes + sg.llm P0-P4 to vault/ai-agents reality; updated ai-agents last-updated date | Master index (08/20), Architect review (08/20), Dev review (08/20), debrief (08/20) produced; vault/index.md + ai-agents/index.md updated; cumulative docs 956 |
+| 2026-08-19 | No new briefs; no new commits; quiet daily hold; B-014 added (doc count discrepancy audit) | Master index, 2 reality files updated (index.md, changelog), DAILY_RUN, debrief produced |
+| 2026-08-18 | 18 new briefs (08/09 + 08/14) — second pass; merge of 08/17 session; doc count reconciled to 956; 11 new PROPOSED items | Master index, Architect review, Dev review, 3 reality files updated (ui, qa, index), changelog, DAILY_RUN, debrief produced |
+| 2026-08-17 | 20 new briefs (08/09 + 08/14); 6 code commits documented (read-key open, sg.llm P0-P4, vault-settings listing, RO settings panel, vault subtree fix); docs 936→956; tests ~2970+→~3100+; v0.33.57→v0.33.61 | Master index, Architect review, Dev review, 3 reality files updated (index.md, ui/index.md, changelog.md), DAILY_RUN, debrief produced |
 | 2026-08-16 | No new briefs; no new code commits since 08/13; quiet daily hold | Master index, reality/index.md date, changelog, DAILY_RUN, debrief produced |
 | 2026-08-15 | No new briefs; test count corrections from Phase A/B/C1 (+19: container-app 9→16, auth 7→8, +3 port, +8 deploy smoke); total ~2950+→~2970+ | Master index, 2 reality files updated (index.md, qa/index.md), changelog, DAILY_RUN, debrief produced |
 | 2026-08-14 | No new briefs; Phase A/B/C1 multi-target deployment documented (missed by 08/13 concurrent session); CI bump v0.33.56 → v0.33.57; B-013 completed | Master index, 4 reality files updated (index.md, infra, cli, vault), changelog, DAILY_RUN, debrief produced |

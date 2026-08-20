@@ -1,6 +1,6 @@
 # AI Agents — Reality Index
 
-**Domain:** ai-agents/ | **Last updated:** 2026-07-29 | **Maintained by:** Librarian (daily run)
+**Domain:** ai-agents/ | **Last updated:** 2026-08-20 | **Maintained by:** Librarian (daily run)
 
 This domain covers agentic workflows, LLM components, Claude integration with vaults, MCP (Model Context Protocol), and the vault-as-communication-channel primitives. The SG/Send architecture is explicitly designed for agents as first-class users alongside humans.
 
@@ -68,6 +68,18 @@ The `sgit-ai` CLI (PyPI) is the primary way agents interact with vaults. Full co
 - `team/comms/` structure EXISTS — changelog, QA briefs, questions, plans
 - Comms operating model EXISTS — agent-to-agent change classification
 - Vault PKI keys for agent identity: `sgit keygen`, `sgit sign`, `sgit verify` — all working
+
+### sg.llm In-Vault LLM Component Suite (P0–P4, 2026-08-20)
+
+The sg.llm component family is shipped as in-vault LLM functionality (ViV loader suite).
+Tests verified: `sg_llm_config` (53), `sg_llm` (40), `sg_llm_vault` (17), `sg_llm_chat` (122),
+`sg_llm_requests` (29), `sg_llm_vault_log` (35) — ~296 tests in the ViV loader suite.
+
+| Component | Status | Evidence |
+|-----------|--------|---------|
+| **sg.llm P0-P3 hardening** — egress CSP (content-security policy for LLM requests), consent floors (minimum consent before LLM access), per-app budget (spending ceiling declared before execution), tool scope (capability grant controls on LLM tools) | **EXISTS** | `4999faf`; ViV loader suite tests |
+| **sg.llm P4: Spend surfacing** — visible per-session and per-request cost display for in-vault LLM usage; all six re-review defects fixed in P4 | **EXISTS** | `a0caee0`, `15a1c4c`; ViV loader suite |
+| **Vault AI chat user guide** — documentation for the in-vault AI chat feature | **EXISTS** | `8c79e8a` |
 
 ### Known Constraints
 
