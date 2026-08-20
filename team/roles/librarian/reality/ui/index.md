@@ -1,6 +1,6 @@
 # ui — Reality Index
 
-**Domain:** `ui/` | **Last updated:** 2026-08-12 | **Maintained by:** Librarian (daily run)
+**Domain:** `ui/` | **Last updated:** 2026-08-18 | **Maintained by:** Librarian (daily run)
 
 As of v0.4.0 (May 2026), the sender and receiver UIs are split into separate packages
 (`sgraph_ai_app_send__ui__share/` and `sgraph_ai_app_send__ui__open/`). The v0.3.x user
@@ -665,6 +665,15 @@ transcript — one take, one result.
 - Per-app limit overrides are read (`limitsFor(policy, appId)`) but no UI writes them.
 - `permissions.network` is parsed but still unused.
 
+### Vault Settings File — Synthetic Tree Entry + App-Title Fallback (2026-08-16)
+
+`feat(vault)`: commit `36eb6c2`. Fixes two live-testing gaps in the vault web UI.
+
+| Behaviour | Status | Evidence |
+|-----------|--------|---------|
+| **`.vault-settings.json` synthetic entry** — `VaultDataSource.getTree`/`getFileList` now lists `.vault-settings.json` synthetically (the file lives in `vault._settings`, parsed out at load time, never in `root.children`). Reads and writes round-trip through existing special-case hooks. Delete/rename are refused with descriptive errors. A legacy real tree entry produces no duplicate. Previously this was the ONLY file hidden from the vault UI's own tree (`.vault/**` is an app-bridge floor, not a UI filter; `*.link.json` entries are transformed into mounts). | **EXISTS** | `vault-data-source.js`; `test__vault_settings_file_listing.js` (9 assertions) |
+| **App-title fallback for unnamed vaults** — `SGVault.hasCustomName` tracks whether the vault name was synthesized as 'Untitled Vault' (placeholder) vs set by the user. In App UI mode, if the vault has no custom name, the app-shell adopts the running app's title from `app.json` instead of showing 'Untitled Vault'. Named vaults unchanged. | **EXISTS** | `sg-vault.js` `hasCustomName`; `app-shell.js` `_applyAppJson` |
+
 ### sg.llm.* P4 — spend surfacing + six re-review fixes (2026-08-16)
 
 Implements `team/comms/briefs/08/16/v0.33.47__brief__sg-llm-P4-surfacing-and-review-findings.md`
@@ -677,6 +686,26 @@ allowed-paths editor for `files.read` (closing the P3 ENOSCOPE UX gap) with reve
 context budget drops files past 16 with an explicit model-facing NOTE; mid-turn budget re-check in
 `_chatOnce` bounds tool-turn overshoot to one call. Tests: `test__llm_p4.js` (32).
 User guide `library/guides/content/v0.33.47__guide__vault-ai-chat.md` updated in lockstep.
+
+### .vault-settings.json Synthetic Listing (2026-08-15, commit `36eb6c2b`)
+
+`.vault-settings.json` exists logically (parsed from a property, not a real child node in `root.children`) but was previously invisible to the file browser. This commit surfaces it as a synthetic entry at the adapter level, refused for delete/rename, so users can open vault settings from the file listing. The `hasCustomName` flag is added for unnamed vaults, using the app title as a fallback display name in embed contexts.
+
+| Capability | Status | Evidence |
+|-----------|--------|---------|
+| Synthetic `.vault-settings.json` entry in vault file listings | **EXISTS** | vault adapter; `test__vault_settings_listing.js` (9 tests) |
+| Delete/rename refused at adapter level for the synthetic entry | **EXISTS** | adapter guard |
+| `hasCustomName` flag — unnamed vaults fall back to app title in embed display | **EXISTS** | `vault-settings.js` |
+
+### Settings Panel Credential Display in Read-Only Sessions (2026-08-15, commit `06dca6e4`)
+
+In a read-only vault session the `CryptoKey` object is non-extractable (Web Crypto API constraint), so the settings panel previously showed nothing for the credential. This commit recovers the hex from the `vaultKey` string via `parseReadOnlyCredential` and displays it correctly. The Save button is disabled in RO sessions; the credential label is relabelled to "Read-only key".
+
+| Capability | Status | Evidence |
+|-----------|--------|---------|
+| Settings panel shows hex read key in read-only sessions (via `parseReadOnlyCredential`) | **EXISTS** | `vault-settings.js`; `test__ro_settings_panel.js` (14 tests) |
+| Save button disabled in read-only sessions | **EXISTS** | `vault-settings.js` |
+| Credential label relabelled to "Read-only key" in RO mode | **EXISTS** | `vault-settings.js` |
 
 ### sg.llm.* hardening — egress CSP, consent floors, per-app budget, tool scope (2026-08-13)
 

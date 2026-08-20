@@ -31,21 +31,21 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 
 ---
 
-## Quick Stats (as of 2026-08-14)
+## Quick Stats (as of 2026-08-19)
 
 | Metric | Count |
 |--------|-------|
 | User Lambda API endpoints | 32 unique (40 route paths) + `/api/info/sgraph` (Routes__Info__SGraph.py) |
 | Admin Lambda API endpoints | 51 unique (61 route paths) |
 | Total API endpoints | **83+** |
-| Unit tests passing | **~2970+** (977 Python + ~157 vault-UI JS + ~930+ ViV loader suite (373+ base + ~557 from LLM/voice/releases/send-browse-split/image/sync sessions 08/02–08/04: sg_releases 47, pinned_data_source 27, vault_releases_editor 44, sg_llm_config 53, sg_llm 40, sg_llm_vault 17, sg_voice 86, base64_chunk_guard 88, send_browse_split 97, vault_llm_log 35, vault_llm_chat 122, vault_shell_llm_panels 28, app_page_llm_panels 46, vault_llm_requests 29, vault_browse_edit__add_to_chat 13, app_shell_llm_bridge 96, sg_vision 62, no_auto_reload 27) + ~78 app-shell JS + 37 embed-protocol + ~334 inbox/write-batch/owner-secrets suite; browser integration: 8 tests; +10 app-shell-nav-helpers; +19 from Phase A/B/C1: container-app 9→16, auth 7→8, +3 port, +8 deploy-smoke) |
+| Unit tests passing | **~3100+** (977 Python + ~157 vault-UI JS + ~930+ ViV loader suite (373+ base + ~557 from LLM/voice/releases/send-browse-split/image/sync sessions 08/02–08/04: sg_releases 47, pinned_data_source 27, vault_releases_editor 44, sg_llm_config 53, sg_llm 40, sg_llm_vault 17, sg_voice 86, base64_chunk_guard 88, send_browse_split 97, vault_llm_log 35, vault_llm_chat 122, vault_shell_llm_panels 28, app_page_llm_panels 46, vault_llm_requests 29, vault_browse_edit__add_to_chat 13, app_shell_llm_bridge 96, sg_vision 62, no_auto_reload 27) + ~78 app-shell JS + 37 embed-protocol + ~334 inbox/write-batch/owner-secrets suite; browser integration: 8 tests; +10 app-shell-nav-helpers; +19 from Phase A/B/C1: container-app 9→16, auth 7→8, +3 port, +8 deploy-smoke; +146 from 08/15–16 commits: read-key-open +49, sg.llm-harden-P0-P3 +42, sg.llm-P4 +32, vault-settings-listing +9, RO-settings-panel +14) — updated 2026-08-18 |
 | Deployment targets | **4 working** (Lambda, Docker Hub, local container, CLI) + **8 PROPOSED** (P-405–P-412: Fargate, AMI, Terraform, one-click deploy, full-cycle CI, publish pipeline, memory-mode licensing, static vault hosting) — DevOps review 2026-08-11 |
 | Website pages | 21 |
 | Browser UIs | **7** (share v0.4, open v0.4, admin, workspace, vault browser, vault app /en-gb/app; user v0.3.x legacy) |
 | Active tools (tools.sgraph.ai) | 4 |
 | sgit CLI commands | 20+ |
 | Open PROPOSED items (across all domains) | ~1051+ (+11 net-new from 02-06 Aug: P-ACT-014–024 across vault/, ai-agents/, cli/; previously ~1040+; processed 2026-08-11) |
-| Total documents catalogued | 954 (+18 from 09-14 Aug: 6 from 09 Aug v0.33.57 + 12 from 14 Aug v0.33.58; processed 08/20) |
+| Total documents catalogued | 956 (+20 from 09-14 Aug: 7 × 08/09 graphing-text + risk-register + 13 × 08/14 sgit-hub + WhatsApp-bridge + briefing-packs; processed 08/17–08/20; prev: 936) |
 | **Key decision** | **Risk Mandate.ai** adopted as product name (resolves OQ-company-name-1, 2026-06-25) |
 | **Key decision** | **Grounded alarm** adopted as the Risk Mandate communication strategy term (replaces FUD framing, 2026-07-05) |
 | **Key decision** | **The grant is the mandate** — authorization is the union of what the agent can already do; "never-in-line" (2026-07-23) |
@@ -78,6 +78,12 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | **Key decision** | **Budget is a containment control** — a per-step spending ceiling declared before execution makes maximum workflow cost knowable before it runs; generalises to any bounded resource (money, time, calls, bytes) (2026-08-06) |
 | **Key fact** | **OpenRouter resale prohibited** — OpenRouter's terms prohibit reselling or distributing the service and prohibit access for the purpose of reselling API access; enforcement already visible; this invalidates the 2026-07-27 funded-key commercialisation mechanism (2026-08-06) |
 | **Key fact** | **Hyperscaler shipped per-agent budget ceilings** (May 2026) — validates the outbound maturity model claim that budget ceilings are cheapest containment controls; removes metering as a differentiator; the ledger, provenance record and register link remain as differentiators (2026-08-06) |
+| **Key decision** | **Permissions = key topology** — in sgit hub, authorization is determined by vault key shape, not server ACL; a missing key IS the denied permission; no code path exists for "read without the key"; write key grants authorship (unbounded blast radius), read key bounds exposure to vault content at time of exposure plus all history (sgit hub architecture, 2026-08-14) |
+| **Key decision** | **Read keys publishable, write keys never** — publishable read key enables read-only sharing without revealing authorship capability; lost write key = frozen vault (no recovery path); escrow-before-publish is required (sgit hub security boundary, 2026-08-14) |
+| **Key decision** | **Component, not plugin** — sgit hub feature set delivered as component to avoid collision with the permission-grant model where "plugin" = capability grant; naming matters for the security boundary (sgit hub taxonomy, 2026-08-14) |
+| **Key decision** | **Browser IS the application layer for sgit hub** — object storage is the server; browser is the runtime; all rendering, search, and indexing features must run client-side because the server cannot read plaintext; consequence: server-side features require the server to hold keys, which contradicts zero-knowledge (sgit hub architecture, 2026-08-14) |
+| **Key decision** | **Meaning extraction is decompilation** — text-to-semantic-graph produces many valid readings from one source (ambiguous), not one output from one source (compilation); no automated pipeline to a single canonical graph is possible without violating this claim; human author remains a necessary node in the write path; corrections propagate with supersede semantics (graphing text architecture, 2026-08-09) |
+| **Key decision** | **WhatsApp bridge: one vault per conversation** — the bridge provides structured storage and portability for extracted conversation records; this is a portability design, not a zero-knowledge design (WhatsApp sees messages); derivation removes the customer index (WhatsApp bridge architecture, 2026-08-14) |
 
 ---
 
