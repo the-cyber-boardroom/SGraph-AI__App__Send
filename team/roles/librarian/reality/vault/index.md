@@ -1,6 +1,6 @@
 # vault — Reality Index
 
-**Domain:** `vault/` | **Last updated:** 2026-08-15 | **Maintained by:** Librarian (daily run)
+**Domain:** `vault/` | **Last updated:** 2026-08-20 | **Maintained by:** Librarian (daily run)
 
 The vault/SGit cryptographic storage system. This domain covers the encryption layer, the
 object storage model, the browser JS client, PKI, and the sgit CLI as it relates to vault
@@ -283,6 +283,24 @@ raw read key on BOTH surfaces, and both surfaces are embeddable via the shared h
 Security posture unchanged: read keys cannot escalate to write (independent PBKDF2);
 `SGVault.openReadOnly` fails closed; a published read key exposes FULL history (structure-key
 split still inert) — publish only from dedicated publish-vaults.
+
+### Read-Key Open + Embed: Post-Review Fixes (2026-08-20)
+
+Round-1 and Round-2 review findings addressed after the initial surface landed:
+
+| Fix | Commits | Status |
+|-----|---------|--------|
+| **7 round-1 review findings** — error signalling on bad key, fail-closed behaviour on partial load, teardown on unmount, embed gate hardening | `5b468de` | **EXISTS** |
+| **Round-2 review findings** — dep-free embed gates (embed loads even if external deps fail), `sg-vault-embed` lifecycle corrections, doc version prefixes | `3582a32` | **EXISTS** |
+
+### Vault Browser UI: .vault-settings.json + App-Title Fallback (2026-08-20)
+
+| Capability | Status | Evidence |
+|------------|--------|---------|
+| **`.vault-settings.json` in file tree** — the vault's own settings file is now visible in the vault browser file tree (was previously hidden); allows direct in-browser inspection and editing of vault settings | **EXISTS** | `36eb6c2` (feat(vault): show .vault-settings.json in the file tree) |
+| **App-title fallback for unnamed vaults** — when a vault has no explicit title, the browser UI falls back to a generated display name instead of blank | **EXISTS** | `36eb6c2` |
+| **Settings panel credential display in read-only sessions** — the settings panel no longer shows write-key credential fields when the vault is opened in a read-only session | **EXISTS** | `06dca6e` |
+| **Walk every segment when expanding .vault subtree** — the `.vault` subtree expansion now walks every path segment, fixing cases where nested `.vault/` paths did not expand correctly | **EXISTS** | `e1fecad` |
 
 ---
 

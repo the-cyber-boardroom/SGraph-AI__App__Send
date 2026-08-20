@@ -7,6 +7,23 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-08-20
+
+18 new human briefs (6 from 09 Aug, 12 from 14 Aug). 18 code commits since 2026-08-16, of which 9 substantive (vault UI fixes, sg.llm P0-P4, new brief files).
+
+Files changed:
+- `reality/vault/index.md` — 3 new EXISTS items: embed post-review fixes, .vault-settings.json in file tree + app-title fallback, Settings panel read-only fix + .vault subtree walk
+- `reality/ai-agents/index.md` — 1 new EXISTS section: sg.llm P0-P4 (egress CSP, consent floors, per-app budget, spend surfacing)
+- `reality/index.md` — Last updated → 2026-08-20 (date maintenance; Quick Stats note about 18 new briefs)
+- `reality/changelog.md` — 2026-08-20 entry added (this entry)
+- `team/roles/librarian/DAILY_RUN.md` — session added to COMPLETED
+
+Session: 18 new briefs | New EXISTS items: 4 | New PROPOSED items: ~10 (graphing-text, risk register, sgit hub/forge, WhatsApp bridge) | Test count: ~2970+ (unchanged) | Cumulative docs: 954 (+18)
+Master index (08/20): `team/roles/librarian/reviews/08/20/v0.33.61__master-index__briefs-09-14-aug-2026.md`
+Debrief (08/20): `team/humans/dinis_cruz/debriefs/08/20/v0.33.61__debrief__briefs-processing-09-14-aug-2026.md`
+
+---
+
 ## 2026-08-16
 
 No new human briefs. No new code commits on `origin/dev` since 2026-08-13 (Phase A/B/C1 deployment, already documented). Quiet daily hold.
