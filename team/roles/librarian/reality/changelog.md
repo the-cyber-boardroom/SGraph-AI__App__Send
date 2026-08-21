@@ -7,6 +7,24 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-08-21
+
+6 new human briefs (5 from 19 Aug + 1 reference) — agent identity and mandate thread.
+Three new PROPOSED architecture patterns registered. Reality index updated with 4 new key
+decisions from the 19 Aug corpus. No new EXISTS items (the append lane was already correct
+in the reality document).
+
+Files changed:
+- `reality/ai-agents/proposed/agent-communication.md` — 4 new PROPOSED items: P-ENR-001 (agent enrolment), P-ENR-002 (service twin broker), P-ENR-003 (identity+mandate registry), P-ENR-004 (client-side lane addressing)
+- `reality/index.md` — Last updated → 2026-08-21; doc count → 962; PROPOSED count → ~1055+; 4 new key decisions added
+- `reality/changelog.md` — 2026-08-21 entry added (this entry)
+
+Session: 6 new briefs | New EXISTS items: 0 | New PROPOSED items: 4 (P-ENR-001–004) | Cumulative docs: 962
+Master index (08/21): `team/roles/librarian/reviews/08/21/v0.33.62__master-index__briefs-19-aug-2026.md`
+Debrief (08/21): `team/humans/dinis_cruz/debriefs/08/21/v0.33.62__debrief__briefs-processing-19-aug-2026.md`
+
+---
+
 ## 2026-08-20
 
 18 new human briefs (6 from 09 Aug, 12 from 14 Aug) — addendum session (08/17–08/18 had already processed the same briefs). Fresh role reviews and debrief produced. vault/index.md and ai-agents/index.md updated with sg.llm P0-P4 section and embed post-review fix sections.

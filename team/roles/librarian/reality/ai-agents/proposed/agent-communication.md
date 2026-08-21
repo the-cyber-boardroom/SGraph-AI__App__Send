@@ -1,6 +1,6 @@
 # AI Agents — Proposed: Agent Communication, MCP, and Security Tools
 
-**Domain:** ai-agents/proposed/agent-communication | **Last updated:** 2026-08-11 | **Maintained by:** Librarian (B-003)
+**Domain:** ai-agents/proposed/agent-communication | **Last updated:** 2026-08-21 | **Maintained by:** Librarian (B-003)
 **Parent index:** [`index.md`](index.md)
 
 All items below are PROPOSED. None have been code-verified. Do not describe any of these as existing features.
@@ -74,6 +74,21 @@ All items below are PROPOSED — does not exist yet.
 | P-312 | Three-Agent Comms Demo Vault | Browser harness proving vault-to-vault messaging: 3 agents each with iframe inboxes; internal JS API (ping, send, receive, markReceived); step-by-step validation harness; manual round-trip proof first, then agentic via OpenRouter; key design principle: agents only share what they explicitly message (no full vault access); scale path 3 → 5 → 100s → 1000s; accountant experiment as first real use case. Depends on vault inbox (NOW EXISTS). | 06/03 dev-brief |
 | P-315 | Skills Library as Platform Feature | A vault holding skills from multiple sources (Tessl, Anthropic, Pi, platform own). Library management: provenance tracking, sync from source, applicability scoring, evidence (screenshots, test results). Sharp insight: how-to-deploy-and-run knowledge fills a real gap (Claude couldn't run an Anthropic legal skill from a URL alone — deployment context was missing). Differentiator: talk-to-skill (on-demand vault instance), per-skill budgets, per-skill billing. Foundation for skills marketplace (P-297). | 06/03 strategy-brief |
 | P-316 | SG/Vault as Platform of Primitives — Positioning | SG/Vault is a hyperscaler for shared state, not a category product. Dissolves the protocol/harness/workflow question by sitting beneath all three (noun, not verbs). Three-layer model: bottom (vault primitives), middle (heterogeneous agents/workflows/manual), top (bespoke UX). Two views: invisible-vault (users never see it) and builder-platform (developers see the structure). Restrict-to-unleash flywheel (tight primitive scope → safe, wide autonomy for builders). Superpower: builders are users of the same platform (tight feedback loop, features driven by real use). | 06/03 strategy-brief |
+
+---
+
+## Agent Enrolment and Mandate Architecture (19 Aug 2026, v0.33.60)
+
+All items below are PROPOSED — does not exist yet. The append lane transport that underpins
+P-ENR-001 is EXISTS (server-side: four-tier gate, blind write, account-less write — see
+`vault/index.md`). The client-side addressing derivation (P-ENR-004) is PROPOSED.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-ENR-001 | Agent enrolment architecture | An agent starts from nothing but a keypair, signs a canonical enrolment request, delivers it through the append lane (account-less narrow-door ingress), and a trusted processor reads the lane, applies policy, and issues a certificate; identity and mandate are separate signed statements, issued and revoked independently; blocking items: trust roots for fractal registries must be declared, nonce and canonical serialisation must be specified | doc 958 (v0.33.60) |
+| P-ENR-002 | Service twin / execution broker | Agent presents a signed mandate + specific action request; the broker holds service credentials the agent never sees; broker verifies mandate, executes only the permitted operation, returns a signed receipt; closes the "authorised party misusing legitimately held authority" boundary that capability grants, state machines, and per-agent keys cannot close; concentration risk: broker is highest-value target (inverts catastrophic-failure property); naming collision with "twin" (existing corpus term) must be resolved before publication | doc 960 (v0.33.60) |
+| P-ENR-003 | Agent identity + mandate registry (fractal) | A registry that records both identity (whose key) and mandate (what the key may do), with registries recognising other registries; fractal structure requires each registry to declare which trust roots it accepts — without declared roots the trust graph is unevaluable; also records exercise (signed receipts) as the third corner missing from current pki.sgit.ai | docs 958, 961 (v0.33.60) |
+| P-ENR-004 | Client-side lane addressing (hash of recipient public key) | A lane's address is the hash of the recipient's public key, so an agent with a keypair already knows its own lane address without a directory lookup; marked as client-side PROPOSED by the code-verified audit; no shipped command currently emits it; token is agreed out of band today; do not code against this derivation until it ships | doc 959 (v0.33.60) |
 
 ---
 
