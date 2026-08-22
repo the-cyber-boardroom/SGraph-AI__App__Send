@@ -7,6 +7,25 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-08-22
+
+6 new human briefs (+ 1 day index) from 19 Aug 2026 — docs 955–961. These were added to the repo on 2026-08-21 (commit `b3d05ea`), after the 08/20 daily run, so were not processed then. Three major architectures introduced: agent enrolment, mandate execution broker, and PKI registry. Five corrections to earlier briefs (append lane was already shipped; PKI key type is RSA-OAEP 4096 + ECDSA P-256, not X25519). Three role reviews produced (Architect, Dev, AppSec).
+
+Files changed:
+- `reality/identity/proposed/agent-enrolment.md` — NEW: P-ENR-001 (bootstrap trap), P-ENR-002 (agent enrolment architecture), P-ENR-003 (PKI registry — missing half of shipped PKI)
+- `reality/identity/proposed/index.md` — agent-enrolment.md added to topic files table; P-ENR-001, P-ENR-002, P-ENR-003 added to P-number inventory; last updated → 2026-08-22
+- `reality/ai-agents/proposed/agent-communication.md` — P-MEB-001 (mandate execution broker) appended; last updated → 2026-08-22
+- `reality/ai-agents/proposed/index.md` — agent-communication.md row updated to include P-MEB-001; P-MEB-001 added to quick P-number lookup; last updated → 2026-08-22
+- `reality/index.md` — Last updated → 2026-08-22; Quick Stats date → 2026-08-22; PROPOSED count ~1051+ → ~1055+; total docs 956 → 961 (+7: docs 955–961)
+- `reality/changelog.md` — 2026-08-22 entry added (this entry)
+- `team/roles/librarian/DAILY_RUN.md` — 2026-08-22 session row added to COMPLETED
+
+Session: 7 new documents (6 briefs + 1 day index) | New EXISTS items: 0 | New PROPOSED items: 4 (P-ENR-001, P-ENR-002, P-ENR-003, P-MEB-001) | Corrections: 5 (append lane shipped; PKI key type; audit pack error; sender anchor; caching contract) | Cumulative docs: 961 | Version: v0.33.61
+Master index (08/22): `team/roles/librarian/reviews/08/22/v0.33.61__master-index__briefs-19-aug-2026.md`
+Debrief (08/22): `team/humans/dinis_cruz/debriefs/08/22/v0.33.61__debrief__briefs-processing-19-aug-2026.md`
+
+---
+
 ## 2026-08-20
 
 18 new human briefs (6 from 09 Aug, 12 from 14 Aug) — addendum session (08/17–08/18 had already processed the same briefs). Fresh role reviews and debrief produced. vault/index.md and ai-agents/index.md updated with sg.llm P0-P4 section and embed post-review fix sections.

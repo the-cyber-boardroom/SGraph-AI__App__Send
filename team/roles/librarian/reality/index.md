@@ -1,6 +1,6 @@
 # Reality — Master Index
 
-**Version:** v0.33.61 | **Last updated:** 2026-08-20 | **Maintained by:** Librarian (daily run)
+**Version:** v0.33.61 | **Last updated:** 2026-08-22 | **Maintained by:** Librarian (daily run)
 **Structure:** Domain tree — each domain has its own directory with `index.md` and `proposed/`
 
 This file is the entry point. Read it to find the right domain, then go to that domain's
@@ -31,7 +31,7 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 
 ---
 
-## Quick Stats (as of 2026-08-19)
+## Quick Stats (as of 2026-08-22)
 
 | Metric | Count |
 |--------|-------|
@@ -44,8 +44,8 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | Browser UIs | **7** (share v0.4, open v0.4, admin, workspace, vault browser, vault app /en-gb/app; user v0.3.x legacy) |
 | Active tools (tools.sgraph.ai) | 4 |
 | sgit CLI commands | 20+ |
-| Open PROPOSED items (across all domains) | ~1051+ (+11 net-new from 02-06 Aug: P-ACT-014–024 across vault/, ai-agents/, cli/; previously ~1040+; processed 2026-08-11) |
-| Total documents catalogued | 956 (+20 from 09-14 Aug: 7 × 08/09 graphing-text + risk-register + 13 × 08/14 sgit-hub + WhatsApp-bridge + briefing-packs; processed 08/17–08/20; prev: 936) |
+| Open PROPOSED items (across all domains) | ~1055+ (+4 net-new from 19 Aug: P-ENR-001, P-ENR-002, P-ENR-003 in identity/proposed/agent-enrolment.md; P-MEB-001 in ai-agents/proposed/agent-communication.md; previously ~1051+; processed 2026-08-22) |
+| Total documents catalogued | 961 (+7 from 19 Aug: docs 955–961 — bootstrap trap, agent enrolment, append lane correction, mandate execution broker, PKI site review, market research, day index; processed 2026-08-22; prev: 954) |
 | **Key decision** | **Risk Mandate.ai** adopted as product name (resolves OQ-company-name-1, 2026-06-25) |
 | **Key decision** | **Grounded alarm** adopted as the Risk Mandate communication strategy term (replaces FUD framing, 2026-07-05) |
 | **Key decision** | **The grant is the mandate** — authorization is the union of what the agent can already do; "never-in-line" (2026-07-23) |
