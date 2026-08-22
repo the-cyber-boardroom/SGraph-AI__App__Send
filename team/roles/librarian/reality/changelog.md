@@ -9,20 +9,43 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ## 2026-08-22
 
-6 new human briefs (+ 1 day index) from 19 Aug 2026 — docs 955–961. These were added to the repo on 2026-08-21 (commit `b3d05ea`), after the 08/20 daily run, so were not processed then. Three major architectures introduced: agent enrolment, mandate execution broker, and PKI registry. Five corrections to earlier briefs (append lane was already shipped; PKI key type is RSA-OAEP 4096 + ECDSA P-256, not X25519). Three role reviews produced (Architect, Dev, AppSec).
+Supplementary session: additional role reviews (Architect, Dev, AppSec) and a detailed
+debrief produced for the 19 Aug 2026 briefs (already processed by the 2026-08-21 session).
+Added P-MEB-001 (mandate execution broker, distinct P-series from P-ENR items) to
+agent-communication.md. Added identity/proposed/agent-enrolment.md as a detailed
+architecture reference cross-referencing the P-ENR items. Five corrections to earlier
+briefs documented in the role reviews.
 
 Files changed:
-- `reality/identity/proposed/agent-enrolment.md` — NEW: P-ENR-001 (bootstrap trap), P-ENR-002 (agent enrolment architecture), P-ENR-003 (PKI registry — missing half of shipped PKI)
-- `reality/identity/proposed/index.md` — agent-enrolment.md added to topic files table; P-ENR-001, P-ENR-002, P-ENR-003 added to P-number inventory; last updated → 2026-08-22
-- `reality/ai-agents/proposed/agent-communication.md` — P-MEB-001 (mandate execution broker) appended; last updated → 2026-08-22
-- `reality/ai-agents/proposed/index.md` — agent-communication.md row updated to include P-MEB-001; P-MEB-001 added to quick P-number lookup; last updated → 2026-08-22
-- `reality/index.md` — Last updated → 2026-08-22; Quick Stats date → 2026-08-22; PROPOSED count ~1051+ → ~1055+; total docs 956 → 961 (+7: docs 955–961)
+- `reality/identity/proposed/agent-enrolment.md` — NEW: detailed architecture reference for agent enrolment (cross-references P-ENR-001–004 from agent-communication.md)
+- `reality/identity/proposed/index.md` — agent-enrolment.md added to topic files table; P-ENR reference entries added; last updated → 2026-08-22
+- `reality/ai-agents/proposed/agent-communication.md` — P-MEB-001 (mandate execution broker — separate series from P-ENR) appended; last updated → 2026-08-22
+- `reality/ai-agents/proposed/index.md` — P-MEB-001 added to quick lookup; last updated → 2026-08-22
+- `reality/index.md` — Last updated → 2026-08-22; version → v0.33.62
 - `reality/changelog.md` — 2026-08-22 entry added (this entry)
 - `team/roles/librarian/DAILY_RUN.md` — 2026-08-22 session row added to COMPLETED
 
-Session: 7 new documents (6 briefs + 1 day index) | New EXISTS items: 0 | New PROPOSED items: 4 (P-ENR-001, P-ENR-002, P-ENR-003, P-MEB-001) | Corrections: 5 (append lane shipped; PKI key type; audit pack error; sender anchor; caching contract) | Cumulative docs: 961 | Version: v0.33.61
+Session: supplementary reviews | New EXISTS items: 0 | Net-new PROPOSED: P-MEB-001 | Cumulative docs: 962 (unchanged) | Version: v0.33.62
 Master index (08/22): `team/roles/librarian/reviews/08/22/v0.33.61__master-index__briefs-19-aug-2026.md`
 Debrief (08/22): `team/humans/dinis_cruz/debriefs/08/22/v0.33.61__debrief__briefs-processing-19-aug-2026.md`
+
+---
+
+## 2026-08-21
+
+6 new human briefs (5 from 19 Aug + 1 reference) — agent identity and mandate thread.
+Three new PROPOSED architecture patterns registered. Reality index updated with 4 new key
+decisions from the 19 Aug corpus. No new EXISTS items (the append lane was already correct
+in the reality document).
+
+Files changed:
+- `reality/ai-agents/proposed/agent-communication.md` — 4 new PROPOSED items: P-ENR-001 (agent enrolment), P-ENR-002 (service twin broker), P-ENR-003 (identity+mandate registry), P-ENR-004 (client-side lane addressing)
+- `reality/index.md` — Last updated → 2026-08-21; doc count → 962; PROPOSED count → ~1055+; 4 new key decisions added
+- `reality/changelog.md` — 2026-08-21 entry added (this entry)
+
+Session: 6 new briefs | New EXISTS items: 0 | New PROPOSED items: 4 (P-ENR-001–004) | Cumulative docs: 962
+Master index (08/21): `team/roles/librarian/reviews/08/21/v0.33.62__master-index__briefs-19-aug-2026.md`
+Debrief (08/21): `team/humans/dinis_cruz/debriefs/08/21/v0.33.62__debrief__briefs-processing-19-aug-2026.md`
 
 ---
 

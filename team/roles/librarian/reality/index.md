@@ -1,6 +1,6 @@
 # Reality — Master Index
 
-**Version:** v0.33.61 | **Last updated:** 2026-08-22 | **Maintained by:** Librarian (daily run)
+**Version:** v0.33.62 | **Last updated:** 2026-08-22 | **Maintained by:** Librarian (daily run)
 **Structure:** Domain tree — each domain has its own directory with `index.md` and `proposed/`
 
 This file is the entry point. Read it to find the right domain, then go to that domain's
@@ -44,8 +44,8 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | Browser UIs | **7** (share v0.4, open v0.4, admin, workspace, vault browser, vault app /en-gb/app; user v0.3.x legacy) |
 | Active tools (tools.sgraph.ai) | 4 |
 | sgit CLI commands | 20+ |
-| Open PROPOSED items (across all domains) | ~1055+ (+4 net-new from 19 Aug: P-ENR-001, P-ENR-002, P-ENR-003 in identity/proposed/agent-enrolment.md; P-MEB-001 in ai-agents/proposed/agent-communication.md; previously ~1051+; processed 2026-08-22) |
-| Total documents catalogued | 961 (+7 from 19 Aug: docs 955–961 — bootstrap trap, agent enrolment, append lane correction, mandate execution broker, PKI site review, market research, day index; processed 2026-08-22; prev: 954) |
+| Open PROPOSED items (across all domains) | ~1055+ (+4 net-new from 19 Aug: P-ENR-001–004 in ai-agents/proposed/agent-communication.md + P-MEB-001 added 08/22; previously ~1051+; processed 2026-08-21 and 2026-08-22) |
+| Total documents catalogued | 962 (+6 from 19 Aug: 5 × agent-identity/mandate/service-twin + 1 reference; processed 08/21; supplementary reviews and reality updates added 08/22) |
 | **Key decision** | **Risk Mandate.ai** adopted as product name (resolves OQ-company-name-1, 2026-06-25) |
 | **Key decision** | **Grounded alarm** adopted as the Risk Mandate communication strategy term (replaces FUD framing, 2026-07-05) |
 | **Key decision** | **The grant is the mandate** — authorization is the union of what the agent can already do; "never-in-line" (2026-07-23) |
@@ -84,6 +84,10 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | **Key decision** | **Browser IS the application layer for sgit hub** — object storage is the server; browser is the runtime; all rendering, search, and indexing features must run client-side because the server cannot read plaintext; consequence: server-side features require the server to hold keys, which contradicts zero-knowledge (sgit hub architecture, 2026-08-14) |
 | **Key decision** | **Meaning extraction is decompilation** — text-to-semantic-graph produces many valid readings from one source (ambiguous), not one output from one source (compilation); no automated pipeline to a single canonical graph is possible without violating this claim; human author remains a necessary node in the write path; corrections propagate with supersede semantics (graphing text architecture, 2026-08-09) |
 | **Key decision** | **WhatsApp bridge: one vault per conversation** — the bridge provides structured storage and portability for extracted conversation records; this is a portability design, not a zero-knowledge design (WhatsApp sees messages); derivation removes the customer index (WhatsApp bridge architecture, 2026-08-14) |
+| **Key decision** | **The bootstrap trap is a loop, not a gap** — an agent must present an identity to reach a trusted authority, but gaining that identity requires the authority; every workaround trades a small identity problem for a larger one (platform credentials, repository write access, shared bot tokens, etc.); the fix is a transport narrow enough to require nothing (agent identity architecture, 2026-08-19) |
+| **Key decision** | **Identity and mandate are separate signed statements** — identity answers "who is this agent"; mandate answers "what is this agent permitted to do"; they are issued, revoked and reasoned about independently; a certificate proves possession of a key, not authorisation to act (agent enrolment architecture, 2026-08-19) |
+| **Key decision** | **Blind acknowledgement is a stronger write-only property** — the append lane write path returns a blind acknowledgement: the sender learns only that the write succeeded and cannot probe what is in the lane; this is enforced in the response, not only in the permission model (append lane audit, 2026-08-19) |
+| **Key decision** | **Unit of delegation moves from credential to authorised action** — a service twin / execution broker holds service credentials the agent never sees; agent presents a mandate + signed request; broker executes only the permitted operation; closes the "authorised party misusing legitimately held authority" boundary that capability grants, state machines, and per-agent keys cannot close (service twin architecture, 2026-08-19) |
 
 ---
 
