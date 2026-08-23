@@ -31,7 +31,7 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 
 ---
 
-## Quick Stats (as of 2026-08-19)
+## Quick Stats (as of 2026-08-22)
 
 | Metric | Count |
 |--------|-------|
@@ -89,6 +89,10 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | **Key decision** | **Rename "service twin" → "execution broker"** — "twin" already means graph-meets-reality in the risk mandate architecture; naming collision is the third in this corpus; rename before any schema, code, or documentation uses the current name (2026-08-19) |
 | **Key decision** | **Meaning extraction is decompilation** — text-to-semantic-graph produces many valid readings from one source (ambiguous), not one output from one source (compilation); no automated pipeline to a single canonical graph is possible without violating this claim; human author remains a necessary node in the write path; corrections propagate with supersede semantics (graphing text architecture, 2026-08-09) |
 | **Key decision** | **WhatsApp bridge: one vault per conversation** — the bridge provides structured storage and portability for extracted conversation records; this is a portability design, not a zero-knowledge design (WhatsApp sees messages); derivation removes the customer index (WhatsApp bridge architecture, 2026-08-14) |
+| **Key decision** | **The bootstrap trap is a loop, not a gap** — an agent must present an identity to reach a trusted authority, but gaining that identity requires the authority; every workaround trades a small identity problem for a larger one (platform credentials, repository write access, shared bot tokens, etc.); the fix is a transport narrow enough to require nothing (agent identity architecture, 2026-08-19) |
+| **Key decision** | **Identity and mandate are separate signed statements** — identity answers "who is this agent"; mandate answers "what is this agent permitted to do"; they are issued, revoked and reasoned about independently; a certificate proves possession of a key, not authorisation to act (agent enrolment architecture, 2026-08-19) |
+| **Key decision** | **Blind acknowledgement is a stronger write-only property** — the append lane write path returns a blind acknowledgement: the sender learns only that the write succeeded and cannot probe what is in the lane; this is enforced in the response, not only in the permission model (append lane audit, 2026-08-19) |
+| **Key decision** | **Unit of delegation moves from credential to authorised action** — a service twin / execution broker holds service credentials the agent never sees; agent presents a mandate + signed request; broker executes only the permitted operation; closes the "authorised party misusing legitimately held authority" boundary that capability grants, state machines, and per-agent keys cannot close (service twin architecture, 2026-08-19) |
 
 ---
 
