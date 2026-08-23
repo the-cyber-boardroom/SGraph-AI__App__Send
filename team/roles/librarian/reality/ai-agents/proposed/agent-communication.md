@@ -1,6 +1,6 @@
 # AI Agents — Proposed: Agent Communication, MCP, and Security Tools
 
-**Domain:** ai-agents/proposed/agent-communication | **Last updated:** 2026-08-11 | **Maintained by:** Librarian (B-003)
+**Domain:** ai-agents/proposed/agent-communication | **Last updated:** 2026-08-23 | **Maintained by:** Librarian (B-003)
 **Parent index:** [`index.md`](index.md)
 
 All items below are PROPOSED. None have been code-verified. Do not describe any of these as existing features.
@@ -74,6 +74,40 @@ All items below are PROPOSED — does not exist yet.
 | P-312 | Three-Agent Comms Demo Vault | Browser harness proving vault-to-vault messaging: 3 agents each with iframe inboxes; internal JS API (ping, send, receive, markReceived); step-by-step validation harness; manual round-trip proof first, then agentic via OpenRouter; key design principle: agents only share what they explicitly message (no full vault access); scale path 3 → 5 → 100s → 1000s; accountant experiment as first real use case. Depends on vault inbox (NOW EXISTS). | 06/03 dev-brief |
 | P-315 | Skills Library as Platform Feature | A vault holding skills from multiple sources (Tessl, Anthropic, Pi, platform own). Library management: provenance tracking, sync from source, applicability scoring, evidence (screenshots, test results). Sharp insight: how-to-deploy-and-run knowledge fills a real gap (Claude couldn't run an Anthropic legal skill from a URL alone — deployment context was missing). Differentiator: talk-to-skill (on-demand vault instance), per-skill budgets, per-skill billing. Foundation for skills marketplace (P-297). | 06/03 strategy-brief |
 | P-316 | SG/Vault as Platform of Primitives — Positioning | SG/Vault is a hyperscaler for shared state, not a category product. Dissolves the protocol/harness/workflow question by sitting beneath all three (noun, not verbs). Three-layer model: bottom (vault primitives), middle (heterogeneous agents/workflows/manual), top (bespoke UX). Two views: invisible-vault (users never see it) and builder-platform (developers see the structure). Restrict-to-unleash flywheel (tight primitive scope → safe, wide autonomy for builders). Superpower: builders are users of the same platform (tight feedback loop, features driven by real use). | 06/03 strategy-brief |
+
+---
+
+## Agent Enrolment Architecture (19 Aug 2026, v0.33.60)
+
+**PROPOSED — does not exist yet.** All items below are architecture proposals from doc 957 (enrolment arch-brief) and doc 958 (bootstrap trap strategy-brief). The append lane transport they require EXISTS; all other components are proposed. Do not describe these as shipped.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-ENR-001 | Canonical enrolment object | Signed canonical request: type/version, project, subject public key + fingerprint, optional identity label + agent type, optional requested mandate (role/scope), created_at + nonce, proof of possession (signature over canonical request). Serialisation format not yet specified — blocking implementation. | docs 957, 958 (v0.33.60) |
+| P-ENR-002 | Enrolment client | Agent-side: generates keypair, builds canonical enrolment request, posts to vault append lane. Starting state: computation + randomness + own private key, nothing else. | doc 957 (v0.33.60) |
+| P-ENR-003 | Trusted processor | Reads enrolment inbox (append lane), verifies proof of possession, applies issuer policy, invokes CA to issue identity certificate. Holds read access to inbox; issues to registry. CA key is highest-risk key in architecture — storage must be specified before this component is built. | doc 957 (v0.33.60) |
+| P-ENR-004 | Identity registry | Records what has been recognised: this key is this agent. Enforces three rules from 2019 keyserver failure: owner writes own record only; revocation is a signed append (not deletion); records are size-bounded. Separate from the mandate registry. | doc 957 (v0.33.60) |
+| P-ENR-005 | Mandate as separate signed statement | Identity and mandate are distinct objects: identity says "this key is this agent" (revoked when key is compromised); mandate says "this agent may do these things, until this date, on whose authority" (revoked when permission changes). They revoke independently; mandate is third-party checkable without asking the issuer. | docs 957, 960, 961 (v0.33.60) |
+| P-ENR-006 | Mandate registry | Records issued mandates. Separable from identity registry — different revocation conditions, different issuers. | doc 957 (v0.33.60) |
+| P-ENR-007 | Fractal registry (registries recognising registries) | Each registry can vouch for keys recognised by another registry. Requires each registry to declare which trust roots it accepts — without declared roots the chain is unevaluable. Who may be a trust root is a privileged decision needing a stated answer. | doc 957 (v0.33.60) |
+| P-ENR-008 | Client-side sealing layer | Browser/client flow: generate recipient keypair (RSA-OAEP 4096 + ECDSA P-256, per shipped PKI), seal payload to recipient public key, derive vault lane address from hash of recipient public key. **The append lane server side is SHIPPED. This client sealing layer is PROPOSED.** The command-line tool ships recipient encryption but the in-browser end-to-end sealing flow is unverified. Do not document as shipped until code audit confirms. | docs 959, 961 (v0.33.60) |
+| P-ENR-009 | Lane address derivation from recipient public key hash | An agent's vault lane address = hash of its public key. Self-addressing: an agent that has generated a keypair already knows its own lane address without asking anybody. **PROPOSED — no shipped command emits this derivation.** | doc 959 (v0.33.60) |
+
+---
+
+## Execution Broker / Mandate Broker (19 Aug 2026, v0.33.60)
+
+**PROPOSED — does not exist yet.** All items below are architecture proposals from doc 960 (service twin arch-brief) and confirmed by market research in doc 962. Naming: "service twin" collides with "digital twin" (graph-meets-reality in risk mandate architecture); rename to "execution broker" or "mandate broker" before any schema, code, or documentation uses the current name.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-BRK-001 | Execution broker (mandate broker) | Agent presents signed mandate + action; broker verifies, performs the action using broker-held credentials, returns signed receipt. The agent never holds the credential. Closes the authorised-misuse boundary that capability grants, vault kernel plan-then-execute, and relay pattern per-agent keys each named as their own limit. | doc 960 (v0.33.60) |
+| P-BRK-002 | Mandate object with constraints | Subject, issuer, service/instance, capability, resource, constraints (allowed paths, file count, branch), workflow/stage, environment, validity window, usage limit, signature. Enforcing constraints requires interpreting the request per provider per capability — not proxying. | doc 960 (v0.33.60) |
+| P-BRK-003 | Signed execution receipt | Broker-signed: named broker executed named action for named agent under named mandate at named time. Creates an evidence chain independent of mutable platform audit logs. Receipt can feed later workflow stages directly. | doc 960 (v0.33.60) |
+| P-BRK-004 | Provider adapter (per-provider, per-capability) | Maps abstract action name to provider-specific request format, implements constraint enforcement in provider terms. Each provider and each capability is a separate maintenance commitment. First capability must go all the way through (identity → mandate → constraint enforcement → execution → receipt) before any breadth. | doc 960 (v0.33.60) |
+| P-BRK-005 | Broker identity (enrolled agent) | The broker itself must be enrolled using the same architecture as any other agent. An agent must be able to verify which broker it is talking to and refuse to send a mandate to an unrecognised one. | doc 960 (v0.33.60) |
+| P-BRK-006 | Credential store (per-tenant, isolated) | The broker holds service credentials for every service and every tenant. This inverts the catastrophic-failure property of the rest of the architecture: total compromise yields every credential usable immediately. Self-hosting is the mitigation. Credential storage boundary is the highest-priority security design task. | doc 960 (v0.33.60) |
+| P-BRK-007 | Per-execution billing via settlement rail | A per-execution charge using the settlement protocol (sub-cent transactions, no account required, price-unknown-in-advance scheme). Receipt is the billable record — same artefact serves audit and billing. | doc 960 (v0.33.60) |
 
 ---
 
