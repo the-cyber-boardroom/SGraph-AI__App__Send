@@ -20,10 +20,11 @@
    The passphrase may itself contain colons (e.g. "pass:with:colons:vault_id") — the
    vault_id is always the segment after the LAST colon, matching SGVaultCrypto.parseVaultKey.
 
-   Prefixed keys: the sgit CLI's canonical prefixes (sgit_vk1_ / sgit_rk1_) are
+   Prefixed keys: the sgit CLI's self-identifying prefixes (sgit_private_vault_,
+   sgit_private_read_, sgit_public_read_, and legacy sgit_vk1_ / sgit_rk1_) are
    stripped before detection — the value after the prefix is byte-identical to the
-   legacy key, so `sgit_rk1_{64hex}:{id}` detects as format 6 and
-   `sgit_vk1_{pass}:{id}` as format 2/3.
+   bare key, so `sgit_public_read_{64hex}:{id}` detects as format 6 and
+   `sgit_private_vault_{pass}:{id}` as format 2/3.
 
    Load order: no dependencies (pure regex, no globalThis reads).
    ================================================================================= */
@@ -38,12 +39,17 @@
     var RE_RO_TOKEN     = /^ro-([a-z]+-[a-z]+-\d{4})$/;
     var RE_READ_KEY     = /^([a-f0-9]{64}):([a-z0-9]{4,24})$/;
 
-    // Inline twin of SGVaultCrypto.stripKeyPrefix — this module is pure/dep-free by
-    // contract (loaded before the crypto lib on some pages), so it cannot call it.
-    // Guarded against drift by test__format_detection.js.
+    // Inline twin of SGVaultCrypto.stripKeyPrefix (sgit-ai KEY_PREFIXES, naming
+    // revised 08/17) — this module is pure/dep-free by contract (loaded before the
+    // crypto lib on some pages), so it cannot call it. Kept in the SAME order as the
+    // crypto list and guarded against drift by test__format_detection.js.
+    var KEY_PREFIXES = ['sgit_private_vault_', 'sgit_private_read_', 'sgit_public_read_',
+                        'sgit_vk1_', 'sgit_rk1_'];
+
     function _stripKeyPrefix(s) {
-        if (s.indexOf('sgit_vk1_') === 0) return s.slice(9);
-        if (s.indexOf('sgit_rk1_') === 0) return s.slice(9);
+        for (var i = 0; i < KEY_PREFIXES.length; i++) {
+            if (s.indexOf(KEY_PREFIXES[i]) === 0) return s.slice(KEY_PREFIXES[i].length);
+        }
         return s;
     }
 

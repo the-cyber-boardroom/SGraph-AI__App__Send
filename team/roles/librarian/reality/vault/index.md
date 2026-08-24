@@ -1,6 +1,6 @@
 # vault — Reality Index
 
-**Domain:** `vault/` | **Last updated:** 2026-08-15 | **Maintained by:** Librarian (daily run)
+**Domain:** `vault/` | **Last updated:** 2026-08-24 | **Maintained by:** Librarian (daily run)
 
 The vault/SGit cryptographic storage system. This domain covers the encryption layer, the
 object storage model, the browser JS client, PKI, and the sgit CLI as it relates to vault
@@ -273,7 +273,8 @@ raw read key on BOTH surfaces, and both surfaces are embeddable via the shared h
 |-----------|--------|---------|
 | **Format 6 credential** — `<64-hex read_key>:<vault_id>` (bare and `sgit_rk1_`-prefixed) detected BEFORE formats 2/3; sgit CLI read-only-clone parity (CLI verified this shape empirically 08/14) | **EXISTS** | `vault-loader-format.js`; `test__format_detection.js` (format 6 suite) |
 | **`SGVaultCrypto.deriveReadOnlyCreds(vaultId, readKeyHex)`** — derives `refFileId` + `branchIndexFileId` from the read key alone (one HMAC each; no passphrase). Invariant vs `deriveKeys` unit-tested for standard AND simple-token vaults | **EXISTS** | `sg-vault-crypto.js`; `test__read_key_creds.js` |
-| **`SGVaultCrypto.stripKeyPrefix`** — strips the CLI's canonical `sgit_vk1_`/`sgit_rk1_` prefixes on every key-input path (loader detectFormat + app-shell `_initWithKey`) | **EXISTS** | `sg-vault-crypto.js`; `test__read_key_creds.js` |
+| **`SGVaultCrypto.stripKeyPrefix` + `KEY_PREFIXES`** — strips every sgit self-identifying prefix on each key-input path (`sgit_private_vault_`, `sgit_private_read_`, `sgit_public_read_`, legacy `sgit_vk1_`/`sgit_rk1_`; whole-prefix match — the two `sgit_private_*` share a stem and partial stripping derives a DIFFERENT vault). Matches sgit-ai 0.16.0 (naming revised 08/17); pinned by a known-answer test against literal `sgit vault derive-keys` output. `classifyKey()` reports declared intent (vault / read-private / read-public / unknown). | **EXISTS** | `sg-vault-crypto.js`; `test__sgit_key_prefixes.js`, `test__read_key_creds.js` |
+| **CLI → browser interop verified end-to-end** — `sgit-ai 0.16.0` `init/commit/push` → opened by this repo's browser stack against `Send__User_Lambda__Http_Server`: same `bare/` layout, bit-identical ref/index derivation, content read_key-encrypted in both (`bare/keys/` = PKI signing keys, not a content-key wrap). | **VERIFIED** | response brief `team/comms/briefs/08/24/v0.33.57__response__sgit-cli-browser-vault-format-interop.md` |
 | **`VaultLoader.openReadOnly` (was a throwing stub)** — formats 4 + 6 → derive creds → `SGVault.openReadOnly`; emits `VAULT_OPENED {readOnly:true}`; `opts.noPersist` keeps the credential out of storage (embed) | **EXISTS** | `vault-loader.js`; `test__vault_loader_open_readonly.js` (incl. storage-throws simulation) |
 | **App UI read-key open** — `_initWithKey` format-6 branch (same `deriveReadOnlyCreds`), RO handling identical to the ro-token path; entry-form badge shows "Read-only key" | **EXISTS** | `app-shell.js` |
 | **Shared embed receiver** — `embed-receiver.js` (one-shot, source/origin-validated handshake child side) consumed by BOTH `app-shell._initEmbed` (refactored, no behaviour change) and the NEW `vault-shell._initEmbed` | **EXISTS** | `embed-receiver.js`; `test__embed_receiver.js` |

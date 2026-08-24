@@ -16,6 +16,7 @@ node tests/unit/vault_ui/loader/test__storage_pertab.js
 node tests/unit/vault_ui/loader/test__vault_history.js
 node tests/unit/vault_ui/loader/test__ro_record_derivation.js
 node tests/unit/vault_ui/loader/test__read_key_creds.js
+node tests/unit/vault_ui/loader/test__sgit_key_prefixes.js
 node tests/unit/vault_ui/loader/test__vault_loader_open_readonly.js
 node tests/unit/vault_ui/loader/test__vault_settings_readonly.js
 node tests/unit/vault_ui/loader/test__vault_settings_file_listing.js
