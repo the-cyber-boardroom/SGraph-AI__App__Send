@@ -741,9 +741,19 @@
                 // 'Untitled Vault' placeholder) hosting an app WITH a title should wear
                 // the app's title, not the placeholder. Explicit === false so older
                 // vault objects without the getter keep the current behaviour.
-                if (config.title && this._vault && this._vault.hasCustomName === false
-                    && header && typeof header.setVaultName === 'function') {
-                    header.setVaultName(config.title);
+                if (config.title && this._vault && this._vault.hasCustomName === false) {
+                    if (header && typeof header.setVaultName === 'function') {
+                        header.setVaultName(config.title);
+                    }
+                    // ...and carry the same fallback into the recent-vaults list on the
+                    // home page (/en-gb/), which otherwise shows a wall of "Untitled
+                    // Vault" rows. The list is written at open time (vault-loader),
+                    // BEFORE app.json is read, so the name is corrected here — the entry
+                    // is keyed by vaultKey, so add() updates the existing row in place.
+                    // Skipped in embed mode: that session is deliberately non-persisting.
+                    if (!this._embedMode && this._vaultKey && typeof VaultLoaderRecent !== 'undefined') {
+                        try { VaultLoaderRecent.add(this._vaultKey, config.title); } catch (_) {}
+                    }
                 }
 
                 // Resource injection for vault HTML preview.

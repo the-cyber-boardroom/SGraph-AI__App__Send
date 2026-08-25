@@ -342,10 +342,11 @@
 
         async _initWithKey(key, presetAccessKey, expectedVaultId) {
             this._t.start = performance.now();
-            // Strip the sgit CLI's canonical key prefixes (sgit_vk1_/sgit_rk1_) — the
-            // value after the prefix is byte-identical to the legacy key. Users paste
-            // prefixed keys from new CLI output; deriving from the prefixed string
-            // would produce garbage keys.
+            // Strip the sgit CLI's self-identifying key prefixes (sgit_private_vault_,
+            // sgit_private_read_, sgit_public_read_, legacy sgit_vk1_/sgit_rk1_ — the
+            // authoritative list lives in SGVaultCrypto.KEY_PREFIXES). The value after
+            // the prefix is byte-identical to the bare key; deriving from the prefixed
+            // string produces garbage keys and a vault that cannot be found.
             key = SGVaultCrypto.stripKeyPrefix(key);
             this._vaultKey = key;
 

@@ -28,24 +28,46 @@ class SGVaultCrypto {
     static FILE_ID_LENGTH = 12                                                 // 12 hex chars = 6 bytes
 
     // --- Key input normalisation --------------------------------------------------
-    // The sgit CLI ships canonical key prefixes (design contract 08/14, SGit-AI__CLI):
-    //   sgit_vk1_{passphrase}:{vault_id}   — vault key
-    //   sgit_rk1_{64-hex}[:{vault_id}]     — read key
-    // The value after the prefix is byte-identical to the legacy key. Every web
-    // key-INPUT path strips the prefix before format detection, so keys pasted from
-    // new CLI output work everywhere. Pure string op — no crypto.
+    // The sgit CLI ships self-identifying key prefixes (design contract 08/14,
+    // naming revised 08/17 — sgit-ai 0.16.0 `Vault__Crypto.KEY_PREFIXES`):
+    //   sgit_private_vault_{passphrase}:{vault_id}  — vault key (read AND write)
+    //   sgit_private_read_{64-hex}[:{vault_id}]     — read key, keep secret
+    //   sgit_public_read_{64-hex}[:{vault_id}]      — read key, deliberately published
+    //   sgit_vk1_ / sgit_rk1_                       — legacy (v0.15.5), input-only
+    // The value AFTER the prefix is byte-identical to the bare key, so derivation and
+    // every stored artifact are unchanged; the prefix exists so scanners and humans
+    // recognise a key AND its intent on sight. Stripping is the single normalisation
+    // point for key INPUT — a key pasted from CLI output must reach the derivation
+    // bare, or PBKDF2 runs over the prefix and the vault cannot be found
+    // ("Vault not found: HEAD ref missing"). Pure string op — no crypto.
+    static KEY_PREFIXES = ['sgit_private_vault_', 'sgit_private_read_', 'sgit_public_read_',
+                           'sgit_vk1_', 'sgit_rk1_']
+
     static stripKeyPrefix(input) {
         const s = String(input || '').trim()
-        if (s.startsWith('sgit_vk1_')) return s.slice(9)
-        if (s.startsWith('sgit_rk1_')) return s.slice(9)
+        for (const prefix of this.KEY_PREFIXES) {
+            if (s.startsWith(prefix)) return s.slice(prefix.length)
+        }
         return s
+    }
+
+    // What does this credential DECLARE itself to be? Classification is by
+    // declaration, never by shape — mirrors sgit's `classify_key`. Lets a
+    // read-only surface refuse write capability instead of inferring intent.
+    // Bare/legacy keys are 'unknown' and resolved by context (format detection).
+    static classifyKey(input) {
+        const s = String(input || '').trim()
+        if (s.startsWith('sgit_public_read_'))                                  return 'read-public'
+        if (s.startsWith('sgit_private_read_') || s.startsWith('sgit_rk1_'))    return 'read-private'
+        if (s.startsWith('sgit_private_vault_') || s.startsWith('sgit_vk1_'))   return 'vault'
+        return 'unknown'
     }
 
     // --- Read-only credential parsing ---------------------------------------------
     // ONE matcher for read-key credentials, shared by every dispatch site that can't
     // use vault-loader-format.js (app-shell loads no loader scripts; the loader module
     // itself stays dep-free and keeps its own regex, drift-guarded by tests).
-    // Accepts, after sgit_vk1_/sgit_rk1_ prefix stripping:
+    // Accepts, after key-prefix stripping (see KEY_PREFIXES):
     //   format 6:  <64-hex read_key>:<vault_id>     (colon — sgit CLI clone parity)
     //   format 4:  <vault_id> <64-hex read_key>     (space — legacy web form)
     // Returns { vaultId, readKeyHex } or null (never throws — callers fall through
