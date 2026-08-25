@@ -2,7 +2,6 @@ import sgraph_ai_app_send__ui__user
 from unittest                                                                   import TestCase
 from osbot_utils.utils.Files                                                    import path_combine, file_contents, file_exists
 from sgraph_ai_app_send.lambda__user.user__config                               import APP_SEND__UI__USER__MAJOR__VERSION, APP_SEND__UI__USER__LATEST__VERSION, APP_SEND__UI__USER__START_PAGE, APP_SEND__UI__USER__LOCALE
-from tests.unit.lambda__user.Fast_API__Test_Objs__SGraph__App__Send__User       import setup__fast_api__user__test_objs
 
 
 class test__App_Send__UI__User__static_pages(TestCase):
@@ -11,18 +10,12 @@ class test__App_Send__UI__User__static_pages(TestCase):
     The FastAPI app no longer serves static files (CloudFront handles that in
     production, and user__run-locally.sh provides a pure static server for
     local dev). These tests verify the UI package contains the expected files.
+    API-serving assertions live in tests/unit/lambda__user (test__api_docs_served).
     """
 
     @classmethod
     def setUpClass(cls):
         cls.ui_root = sgraph_ai_app_send__ui__user.path
-        with setup__fast_api__user__test_objs() as _:
-            cls.service_fast_api_test_objs = _
-            cls.client                     = cls.service_fast_api_test_objs.fast_api__client
-
-    def test__api_docs_still_served(self):
-        assert self.client.get('/api/docs'        ).status_code == 200
-        assert self.client.get('/api/openapi.json').status_code == 200
 
     def test__upload_page_exists(self):
         path = path_combine(self.ui_root,

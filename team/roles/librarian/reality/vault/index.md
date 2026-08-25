@@ -285,6 +285,24 @@ Security posture unchanged: read keys cannot escalate to write (independent PBKD
 `SGVault.openReadOnly` fails closed; a published read key exposes FULL history (structure-key
 split still inert) — publish only from dedicated publish-vaults.
 
+### Read-Key Open + Embed: Post-Review Fixes (2026-08-20)
+
+Round-1 and Round-2 review findings addressed after the initial surface landed:
+
+| Fix | Commits | Status |
+|-----|---------|--------|
+| **7 round-1 review findings** — error signalling on bad key, fail-closed behaviour on partial load, teardown on unmount, embed gate hardening | `5b468de` | **EXISTS** |
+| **Round-2 review findings** — dep-free embed gates (embed loads even if external deps fail), `sg-vault-embed` lifecycle corrections, doc version prefixes | `3582a32` | **EXISTS** |
+
+### Vault Browser UI: .vault-settings.json + App-Title Fallback (2026-08-20)
+
+| Capability | Status | Evidence |
+|------------|--------|---------|
+| **`.vault-settings.json` in file tree** — the vault's own settings file is now visible in the vault browser file tree (was previously hidden); allows direct in-browser inspection and editing of vault settings | **EXISTS** | `36eb6c2` (feat(vault): show .vault-settings.json in the file tree) |
+| **App-title fallback for unnamed vaults** — when a vault has no explicit title, the browser UI falls back to a generated display name instead of blank | **EXISTS** | `36eb6c2` |
+| **Settings panel credential display in read-only sessions** — the settings panel no longer shows write-key credential fields when the vault is opened in a read-only session | **EXISTS** | `06dca6e` |
+| **Walk every segment when expanding .vault subtree** — the `.vault` subtree expansion now walks every path segment, fixing cases where nested `.vault/` paths did not expand correctly | **EXISTS** | `e1fecad` |
+
 ---
 
 ## DOES NOT EXIST (Commonly Confused)
@@ -320,6 +338,23 @@ Key proposals for this domain. Full details: see sub-files in `proposed/`.
 - **PKI Public Key Registry** — PROPOSED: a vault that stores public keys + trust relationships (graph database); two-level trust (downward explicit: A trusts B; upward self-declared: B says A should trust it); clues not storage; federation across registries; caller-side resolver with graded partial results. Replaces a prior FastAPI prototype. Source: `briefs/06/05/v0.32.4__dev-brief__sg-send-pki-public-key-registry-on-vaults.md`.
 - **Large-File Chunked Vault Upload** — PROPOSED: 100% vault upload workflow for large files (live case: 15 GB); `file.slice()` streaming chunks; SHA-256 per chunk; existence check via deterministic value index; resumable upload; recipient loads vault structure without downloading data; selective chunk download; video slices (FFmpeg) + first-frame thumbnails. Source: `briefs/06/07/v0.32.7__dev-brief__sg-send-large-file-sharing-chunked-upload-ui.md`.
 - **Central Key Management / OpenRouter Distribution** — PROPOSED: parent vault manages OpenRouter key centrally; distributes to child vaults via vault-to-vault comms inbox; children use key for in-vault LLM capabilities (infographics, chat); return results to parent over comms. Per-child billing + credit allocation. Source: `briefs/06/07/v0.32.7__dev-brief__sg-send-central-key-management-openrouter-keys-to-child-vaults.md`.
+
+---
+
+## Guides
+
+Operational guides for vault workflows (located at `library/guides/vault-html/`). See also the
+inline cross-reference on the static-host mode section above (HOSTING-ON-STATIC-STORAGE.md).
+
+| Guide | What It Covers |
+|-------|---------------|
+| [`AUTHORING.md`](../../../../../library/guides/vault-html/AUTHORING.md) | Vault content authoring workflow; file layout; update and commit cycle |
+| [`SUB-VAULTS-AND-LINKS.md`](../../../../../library/guides/vault-html/SUB-VAULTS-AND-LINKS.md) | Sub-vault architecture, `.link.json` convention, read-only link cards, owner link management |
+| [`EXTRACT-AND-EMBED-A-SUB-VAULT.md`](../../../../../library/guides/vault-html/EXTRACT-AND-EMBED-A-SUB-VAULT.md) | Extract and embed a sub-vault into a parent vault; sub-vault link convention; CLI round-trip (added Aug 2026) |
+| [`PUBLISHING-SGIT-VAULT-TO-GITHUB.md`](../../../../../library/guides/vault-html/PUBLISHING-SGIT-VAULT-TO-GITHUB.md) | Use a git remote as a second untrusted server for vault distribution; five-step workflow; GitHub Actions secret pattern (added Aug 2026) |
+| [`HOSTING-ON-STATIC-STORAGE.md`](../../../../../library/guides/vault-html/HOSTING-ON-STATIC-STORAGE.md) | GitHub Pages / S3 static hosting for vault apps; `window.SG_STATIC` / `SG_ENDPOINT`; path-mirroring |
+| [`MIGRATING-TO-THE-PERMISSION-MODEL.md`](../../../../../library/guides/vault-html/MIGRATING-TO-THE-PERMISSION-MODEL.md) | Migrating vault apps to the per-verb consent permission model |
+| [`PLAYWRIGHT-VAULT-APP-ACCESS.md`](../../../../../library/guides/vault-html/PLAYWRIGHT-VAULT-APP-ACCESS.md) | Accessing vault apps from Playwright tests; authentication; iframe interaction |
 
 ---
 

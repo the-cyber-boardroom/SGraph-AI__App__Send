@@ -1411,8 +1411,14 @@
         // Session accounting comes from the SHARED ledger, so an app's spend and the vault
         // UI's own chat spend are one number — the budget means nothing if each surface
         // counts only itself.
-        _llmTotals() {
-            if (globalThis.VaultLlmLog) return VaultLlmLog.totals();
+        // Session tally. Pass an appId to scope it to one spender — budget enforcement must,
+        // because per-app caps compared against a session-global counter are not caps: the
+        // owner's own chat spend would trip an app's EBUDGET and two apps would eat each
+        // other's allowance. Call with no argument for the display figure (one bill/session).
+        _llmTotals(app) {
+            if (globalThis.VaultLlmLog) {
+                return (arguments.length === 0) ? VaultLlmLog.totals() : VaultLlmLog.totals(app);
+            }
             return { calls: 0, totalCost: 0, billedCost: 0, estimatedCost: 0, promptTokens: 0, completionTokens: 0 };
         }
 
@@ -1557,12 +1563,21 @@
         // the HUD (host chrome, §3.5) — the sandboxed app cannot satisfy it. Serialised so two
         // concurrent requests don't collide on the single HUD slot (A10).
         async _consent(verb, path) {
-            // Effective policy: app.json permissions.consent[verb] overrides the per-verb default.
+            // Effective policy: app.json permissions.consent[verb] adjusts the per-verb default.
             //   default 'always' for key-return / destroy; 'once' for the rest.
             //   'auto' → no prompt (the app.json author opted into trusting the grant alone).
+            //
+            // BUT app.json is authored by the APP (untrusted — it declares intent, it does not
+            // grant capability). For verbs with a consent FLOOR the manifest may therefore only
+            // make consent STRICTER, never weaker: without this, an app could ship
+            // `"consent": {"llm.chat": "auto"}` and switch off the gate on a capability that
+            // spends the vault owner's money, and `llm.listen` (a MICROPHONE) could be granted
+            // once and cached forever.
+            var floor = AppShell.CONSENT_FLOOR[verb] || null;
             var policy = (this._perm && this._perm.consent && this._perm.consent[verb]) || null;
-            var defaultAlways = (verb === 'vault.delete' || verb === 'vault.createKey');
+            var defaultAlways = (verb === 'vault.delete' || verb === 'vault.createKey' || floor === 'always');
             var mode = policy || (defaultAlways ? 'always' : 'once');
+            if (floor) mode = AppShell.strictestConsent(mode, floor);
             if (mode === 'auto') return true;                              // pre-granted in app.json — no prompt
             var ckey = this._consentCacheKey(verb);
             if (mode === 'once') { try { if (localStorage.getItem(ckey) === '1') return true; } catch (_) {} }
@@ -2868,7 +2883,28 @@
             // APP rather than reading as a fault in the vault itself — see _onAppError.
             this._appPath = currentPath;
 
-            return '<script>(function(){' +
+            // ── Frame egress containment ────────────────────────────────────────────────
+            // The bridge script is injected as the FIRST child of <head> by
+            // AppFrameBootstrap._injectHead, on all four srcdoc paths (app / page-layout /
+            // html / markdown), so prefixing the CSP meta here governs the whole document
+            // and needs no change at the four call sites.
+            //
+            // WHY: moving the LLM key into the kernel is pointless if the frame can still
+            // fetch() anywhere — the app legitimately holds decrypted vault content, and
+            // an unrestricted frame can post it to any host. With `connect-src` locked
+            // down the postMessage bridge is the only way out, and everything that leaves
+            // is permission-checked.
+            //
+            // WHY blob:/data: AND NOT 'none': the print RPC fetches blob: URLs to inline
+            // images and stylesheets into the print document (see the __sgPrintReq handler);
+            // 'none' would break printing silently. Neither scheme can reach the network.
+            // img.src and dynamic import() are governed by img-src / script-src, so vault
+            // images and CDN component imports are unaffected by this directive.
+            var csp = (this._perm && this._perm.network)
+                ? ''                                   // explicit escape hatch — see permissions.network
+                : '<meta http-equiv="Content-Security-Policy" content="connect-src blob: data:">';
+
+            return csp + '<script>(function(){' +
 
                 // App-error surfacing (ViV Phase 4 re-spec). Under null-origin app frames
                 // the parent can no longer reach in to inject window.onerror; instead the
@@ -3769,7 +3805,9 @@
 
                             if (lAct === 'usage') {
                                 var ul = SGLlmConfig.limitsFor(s.policy, self._appId || null);
-                                var ut = self._llmTotals();
+                                // Scoped: an app asking "how much have I spent / how much is
+                                // left" must be answered about ITS OWN budget, not the session's.
+                                var ut = self._llmTotals(self._appId || null);
                                 cmdReply(true, {
                                     calls: ut.calls, promptTokens: ut.promptTokens, completionTokens: ut.completionTokens,
                                     cost: ut.totalCost, billed: ut.billedCost, estimated: ut.estimatedCost,
@@ -3792,7 +3830,9 @@
                                     return;
                                 }
                                 var limits = SGLlmConfig.limitsFor(s.policy, self._appId || null);
-                                var tot    = self._llmTotals();
+                                // Scoped to THIS app: a per-app cap must be measured against
+                                // that app's own spend, not the whole session's.
+                                var tot    = self._llmTotals(self._appId || null);
                                 // Budget enforced HERE — the panel enforcing caps on itself does
                                 // nothing for an app calling through the bridge.
                                 if (limits.maxCallsPerSession && tot.calls >= limits.maxCallsPerSession) {
@@ -3858,6 +3898,10 @@
 
                                 var rec = (globalThis.VaultLlmLog || null) && VaultLlmLog.add({
                                     model: model, files: [], status: 'pending',
+                                    // Attribution: who is spending. null here would mean the
+                                    // host's own chat — an app call must never be recorded as
+                                    // the owner's, or per-app caps and the audit trail lie.
+                                    app: self._appId || null,
                                     images: vCount.images,
                                     // Counted through SGVision: the old `typeof content ===
                                     // 'string'` test scored an image-bearing message as ZERO,
@@ -4458,6 +4502,23 @@
         }
 
     }
+
+    // ── Consent floors ───────────────────────────────────────────────────────────────
+    // The MINIMUM consent strength for a verb. app.json may raise a verb above its floor
+    // but never below it, because app.json is authored by the app (untrusted: it declares
+    // intent, it does not grant capability). Verbs absent from this map keep the legacy
+    // behaviour — the manifest can still set 'auto' on them.
+    //   llm.chat   → 'once'   spends the vault owner's money; 'auto' must not be possible
+    //   llm.listen → 'always' a microphone is not a capability to grant once and forget
+    AppShell.CONSENT_FLOOR = { 'llm.chat': 'once', 'llm.listen': 'always' };
+
+    // Strictness order: auto < once < always. Returns the stricter of the two.
+    AppShell.strictestConsent = function (a, b) {
+        var rank = { auto: 0, once: 1, always: 2 };
+        var ra = (a in rank) ? rank[a] : 1;          // unknown/malformed → treat as 'once'
+        var rb = (b in rank) ? rank[b] : 1;
+        return (ra >= rb) ? (a in rank ? a : 'once') : (b in rank ? b : 'once');
+    };
 
     customElements.define('app-shell', AppShell);
 })();

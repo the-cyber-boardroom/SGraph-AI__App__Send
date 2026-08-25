@@ -152,11 +152,13 @@ console.log('\n[suite] consent gate — declining stops the call');
     ok('nothing was billed', Log.totals().calls === 0);
 }
 
-console.log('\n[suite] budget is enforced HOST-side, across surfaces');
+console.log('\n[suite] budget is enforced HOST-side, and attributed PER APP');
 {
+    // CHANGED 2026-08-13 (F3): spend used to be counted from a session-GLOBAL ledger, so
+    // the vault owner's own chat could trip an app's cap and two apps ate each other's
+    // allowance. Caps are now measured against the calling app's OWN spend.
     Log.clear();
-    // Spend recorded by ANY surface (here: the vault UI's own chat) counts against the app.
-    const a = Log.add({ model: 'm' });
+    const a = Log.add({ model: 'm', app: 'appid' });          // THIS app's earlier spend
     Log.update(a.key, { status: 'ok', cost: 5.0, estimated: false });
 
     const frame = makeFrame();
@@ -166,13 +168,39 @@ console.log('\n[suite] budget is enforced HOST-side, across surfaces');
     el._llmSess.client.chat = async () => { called++; return { content: '', usage: {} }; };
     setup(el, frame);
     const r = await send(frame, { __sgCmdType: 'llm', action: 'chat', messages: [] });
-    ok('over-budget call is refused', r.ok === false && r.code === 'EBUDGET', 'code=' + r.code);
+    ok('an app over ITS OWN cap is refused', r.ok === false && r.code === 'EBUDGET', 'code=' + r.code);
     ok('the upstream client was never invoked', called === 0);
-    ok('the cap counts the OTHER surface\'s spend', true);
 
     const u = await send(frame, { __sgCmdType: 'llm', action: 'usage' });
-    ok('usage() reports the shared spend', u.ok === true && u.result.cost === 5.0);
+    ok('usage() reports the APP\'s spend', u.ok === true && u.result.cost === 5.0);
     ok('usage() reports remaining as clamped at zero', u.result.remaining.cost === 0);
+}
+
+console.log('\n[suite] one spender cannot exhaust another\'s budget');
+{
+    Log.clear();
+    // The owner's own chat (app:null) spends past the cap...
+    const h = Log.add({ model: 'm' });
+    Log.update(h.key, { status: 'ok', cost: 5.0, estimated: false });
+    // ...and a DIFFERENT app spends too.
+    const o = Log.add({ model: 'm', app: 'other-app' });
+    Log.update(o.key, { status: 'ok', cost: 5.0, estimated: false });
+
+    const frame = makeFrame();
+    const el = makeShell({ config: { models: { allow: ['*'], default: 'anthropic/claude-sonnet-4' },
+                                     limits: { maxCostPerSession: 1, maxCallsPerSession: 200, maxTokensPerCall: 4000 } } });
+    let called = 0;
+    el._llmSess.client.chat = async () => { called++; return { content: 'ok', usage: {}, model: 'm' }; };
+    setup(el, frame);
+    const r = await send(frame, { __sgCmdType: 'llm', action: 'chat', messages: [] });
+    ok('this app is NOT blocked by the owner\'s or another app\'s spend', r.ok === true, 'code=' + r.code);
+    ok('…and the call actually ran', called === 1);
+
+    const u = await send(frame, { __sgCmdType: 'llm', action: 'usage' });
+    ok('usage() excludes other spenders', u.result.cost === 0 || u.result.calls === 1);
+    ok('the session ledger still holds every spender', Log.totals().calls >= 3);
+    ok('this app\'s own entry is attributed to it',
+        Log.list().some((e) => e.app === 'appid'));
 }
 
 console.log('\n[suite] model allow-list and token clamping are the policy\'s call, not the app\'s');

@@ -1,6 +1,6 @@
 # send-api — Reality Index
 
-**Domain:** `send-api/` | **Last updated:** 2026-05-12 | **Maintained by:** Librarian (daily run)
+**Domain:** `send-api/` | **Last updated:** 2026-08-25 | **Maintained by:** Librarian (daily run)
 
 The User Lambda: the public-facing API at `send.sgraph.ai`. Handles encrypted file transfers,
 multipart uploads, vault blob storage (pointer model), vault append-only storage,
@@ -99,13 +99,27 @@ Behavioural parity on S3 is verified structurally (method-override assertions in
 but not exercised end-to-end via LocalStack. This is not urgent — the memory backend faithfully
 exercises all service logic — but should be done before production launch.
 
-### Room Join (`/join/*`) — 3 endpoints
+### Vault Zip (`/vault/zip/*`) — 1 endpoint
 
 | Method | Path | What It Does | Tested |
 |--------|------|-------------|--------|
-| GET | `/join/validate/{invite_code}` | Validate room invite (no consumption) | Yes |
-| POST | `/join/accept/{invite_code}` | Accept invite, join room, get session | Yes |
-| GET | `/join/session-validate` | Validate room session token | Yes |
+| GET | `/vault/zip/{vault_id}` | Download vault as ZIP archive (content-addressable cached) | Yes (19 tests) |
+
+Route registered at `Routes__Vault__Pointer.py:234`. `Service__Vault__Zip` is injected by
+`Fast_API__SGraph__App__Send__User` and reuses the vault storage backend for cache.
+**Corrected 2026-08-25:** Previously marked PROPOSED (OQ-2); code-verified as EXISTS.
+
+---
+
+### Room Join (`/join/*`) — 0 live endpoints (orphaned code)
+
+**Code-verified 2026-08-17:** `Routes__Join.py` exists on disk but is NOT registered in
+`Fast_API__SGraph__App__Send__User.setup_routes()` — no `/join/*` path appears in the live
+OpenAPI spec, and no other file references the class. The three endpoints previously listed
+here (`/join/validate/{invite_code}`, `/join/accept/{invite_code}`, `/join/session-validate`)
+do not exist on the deployed API. The file also imports 4 classes from `lambda__admin`
+(the only user→admin source coupling) and is a recorded deletion candidate — see
+`library/sgraph-send/dev_packs/v0.33.59__sgit-api-extraction/05__deletion-candidates.md`.
 
 ### Other — 2 endpoints
 
@@ -139,7 +153,7 @@ in browser (Milestone M-007).
 | Claimed | Reality |
 |---------|---------|
 | `GET /api/vault/bundle/{vault_id}/{bundle_file_id}` | PROPOSED — single-call vault clone, no code |
-| `GET /api/vault/zip/{vault_id}` (optional read-only snapshot) | PROPOSED — open question OQ-2 from 04/28 architect review |
+| `GET /api/vault/zip/{vault_id}` (optional read-only snapshot) | **EXISTS** — corrected 2026-08-25; see Vault Zip section above |
 | MCP `secrets_create` / `rooms_create` / `rooms_add_user` tools | PROPOSED — rooms API exists but not MCP-exposed |
 | Stripe webhook → auto-token creation | PROPOSED — manual token creation still required |
 | One-Time Secret Links (`/secret`) | No code |
@@ -155,7 +169,7 @@ Selected key proposals for this domain. Full list: [proposed/index.md](proposed/
 - **Large blob client phases 2–4** — client-side `large: bool` routing (Phase 1 server endpoints EXIST; client routing PROPOSED)
 - **WhatsApp share mode** — share-via-WhatsApp integration (doc 259)
 - **Four collaborative upload modes** — individual, room, vault-push, vault-merge (doc 231)
-- **`/api/vault/zip` read-only access** — accept structure_key for vault snapshot pull (OQ-2)
+- ~~**`/api/vault/zip` read-only access**~~ — **EXISTS** (corrected 2026-08-25; see Vault Zip section)
 - **Clone Pack endpoints** — `GET /vaults/{vault_id}/packs/{commit_id}/{flavour}` + `POST /vaults/{vault_id}/objects/missing` (doc 348 / brief 08b). Binary `SGPK` pack format. 40–100× clone speedup. PackBuilder + PackCache + pre-warming hook on push. Zero-knowledge preserved (ciphertext only). Requires 5 architect decisions before implementation.
 - **PackBuilder** — server-side binary pack assembler. Walks commit graph for `full`/`head`/`bare-full`/`bare-head` flavours, assembles sorted ciphertext into `SGPK` format. (doc 348)
 - **PackCache** — LRU on-disk cache under `packs/` storage namespace. Configurable budget: 100 packs OR 5 GB per vault. Eviction protects latest-3 packs per commit. (doc 348)

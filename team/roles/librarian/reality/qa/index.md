@@ -1,6 +1,6 @@
 # QA — Reality Index
 
-**Domain:** qa/ | **Last updated:** 2026-08-12 | **Maintained by:** Librarian (daily run)
+**Domain:** qa/ | **Last updated:** 2026-08-18 | **Maintained by:** Librarian (daily run)
 
 This domain covers the test suite, QA infrastructure (browser automation, Playwright), and test strategy. SGraph Send uses an all-real-implementations philosophy: no mocks, no patches. The full stack starts in-memory in ~100ms.
 
@@ -8,13 +8,13 @@ This domain covers the test suite, QA infrastructure (browser automation, Playwr
 
 ## EXISTS (Code-Verified)
 
-### Test Suite: ~2950+ Tests, All Passing
+### Test Suite: ~3100+ Tests, All Passing
 
 **Strategy:** No mocks, no patches. In-memory Memory-FS stack. ~100ms startup.
 
 **Python unit tests: 977 (confirmed via commit `66ce528`, 2026-06-29 — poetry.lock update to osbot-fast-api 0.39.0 + FastAPI 0.138.1).** Up from 957 (2026-06-05). The increase reflects new tests added with the `_IncludedRouter` fix and osbot-utils 3.74.0 additions.
 
-**Total ~2950+** = 977 Python + ~157 vault-UI JS (sub-vaults/public-previews/app-perms/VaultSubvaultsView) + ~930+ ViV loader suite (373+ base + ~400 from LLM/voice/releases/send-browse-split sessions 08/02–08/03 + ~150 from vision/sync-safety/model-default sessions 08/04–08/07; see table below) + ~78 app-shell JS + 37 embed-protocol + ~334 inbox/write-batch/owner-secrets suite + browser integration: 8 tests + 10 app-shell-nav-helpers inbox/folder-app.json tests.
+**Total ~3100+** = 977 Python + ~157 vault-UI JS (sub-vaults/public-previews/app-perms/VaultSubvaultsView) + ~1060+ ViV loader suite (373+ base + ~400 from LLM/voice/releases/send-browse-split sessions 08/02–08/03 + ~150 from vision/sync-safety/model-default sessions 08/04–08/07 + ~42 sg.llm hardening `test__llm_hardening.js` 08/15 + ~49 net vault read-key open/embed 08/15 + ~32 sg.llm P4 `test__llm_p4.js` 08/16 + ~9 vault settings `test__vault_settings_file_listing.js` 08/16; see table below) + ~78 app-shell JS + 37 embed-protocol + ~334 inbox/write-batch/owner-secrets suite + browser integration: 8 tests + 10 app-shell-nav-helpers inbox/folder-app.json tests + 19 from Phase A/B/C1 container/deploy tests (2026-08-15). Updated 2026-08-18.
 
 
 
@@ -136,8 +136,9 @@ Run with: `bash tests/unit/vault_ui/loader/run-all.sh`
 | Admin client | 10 | Token CRUD via inter-Lambda client |
 | Config | 6 | Storage mode detection |
 | Version | 3 | Version file reading |
-| Container App | 9 | Health, status, root redirect, static UI, transfers, vault, auth cookie form, disk storage |
-| Container App Auth | 7 | Auth enforcement, header token, cookie token, form exclusion |
+| Container App | 16 | Health, status, versions, root redirect, vault landing/clean-url, common assets, non-shadowed API routes, relative vault entry, vault header no-health-call, transfers create, vault write-read, auth cookie form (ADR-12), openapi docs, disk storage mode, disk persist (count corrected 2026-08-15) |
+| Container App Auth | 8 | Auth enforcement, header token, cookie token, form exclusion; +test__4b: branded login page functional (ADR-12, 2026-08-15) |
+| Container Port | 3 | `$PORT` default 8080, env-var override, int coercion (`test_Serve__Port.py`, new 2026-08-15) |
 
 **App-shell extraction (added 2026-05-31, extended 2026-06-01):**
 
@@ -184,6 +185,7 @@ Run: `poetry run pytest tests/integration/vault_ui/browser/ -v` (or CI: `npm run
 **Additional tests (not in unit suite):**
 - 8 deployment tests (Lambda create/update/invoke per stage)
 - 15 integration smoke tests (auth, health, CORS)
+- 8 deploy/target smoke tests (`tests/deploy/targets/test_smoke__deployed_target.py`, added 2026-08-15) — health, versions, vault UI root, openapi docs, key gate (all routes 401 without key), login page accessible without key, vault write/read round-trip, CORS preflight. Requires `SEND_URL` + `SEND_ACCESS_TOKEN` env vars; CI pipeline skips when `AWS_DEPLOY_ROLE_ARN` unset.
 - 4 QA performance tests (mostly disabled)
 
 ### Browser Automation (Playwright)

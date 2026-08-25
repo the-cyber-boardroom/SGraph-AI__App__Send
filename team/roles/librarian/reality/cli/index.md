@@ -76,6 +76,21 @@ no longer maintained. Use `sgit-ai` for all new work.
 
 ---
 
+## Guides
+
+Operational guides for vault and CLI workflows (located at `library/guides/vault-html/`):
+
+| Guide | What It Covers |
+|-------|---------------|
+| [`PUBLISHING-SGIT-VAULT-TO-GITHUB.md`](../../../../../library/guides/vault-html/PUBLISHING-SGIT-VAULT-TO-GITHUB.md) | Use a git remote as a second untrusted server for vault distribution; five-step workflow; GitHub Actions secret pattern for CI vault access (added Aug 2026) |
+| [`EXTRACT-AND-EMBED-A-SUB-VAULT.md`](../../../../../library/guides/vault-html/EXTRACT-AND-EMBED-A-SUB-VAULT.md) | Extract and embed a sub-vault into a parent vault with sgit; sub-vault link convention; CLI round-trip (added Aug 2026) |
+| [`SUB-VAULTS-AND-LINKS.md`](../../../../../library/guides/vault-html/SUB-VAULTS-AND-LINKS.md) | Sub-vault architecture, `.link.json` convention, read-only link cards, owner link management |
+| [`AUTHORING.md`](../../../../../library/guides/vault-html/AUTHORING.md) | Vault content authoring workflow; file layout; update and commit cycle |
+| [`HOSTING-ON-STATIC-STORAGE.md`](../../../../../library/guides/vault-html/HOSTING-ON-STATIC-STORAGE.md) | GitHub Pages / S3 static hosting; `window.SG_STATIC` / `SG_ENDPOINT`; path-mirroring; cache headers |
+| [`MIGRATING-TO-THE-PERMISSION-MODEL.md`](../../../../../library/guides/vault-html/MIGRATING-TO-THE-PERMISSION-MODEL.md) | Migrating vault apps to the per-verb consent permission model |
+
+---
+
 ## PROPOSED
 
 Full list: [proposed/index.md](proposed/index.md)

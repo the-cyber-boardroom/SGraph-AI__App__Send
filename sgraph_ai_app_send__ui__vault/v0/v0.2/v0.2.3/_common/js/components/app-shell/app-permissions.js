@@ -171,11 +171,14 @@
                 listen: llm.listen === true
             },
 
-            // network (bool, default-deny) — the CSP escape hatch. App frames are served
-            // with `connect-src blob: data:` (no network hosts), so the postMessage bridge
-            // is the only way out. TRUE omits that restriction for apps that genuinely
-            // need to call a third-party API directly; the HUD then shows a standing
-            // "direct network access" indicator so it is never silent.
+            // network (bool, default-deny) — the CSP escape hatch. App frames are served with
+            // `<meta http-equiv="Content-Security-Policy" content="connect-src blob: data:">`
+            // (no network hosts reachable), so the postMessage bridge is the only way out and
+            // everything that leaves the frame is permission-checked. TRUE omits that meta for
+            // apps that genuinely need to call a third-party API directly, and the HUD then
+            // shows a standing "direct network access" chip so the exception is never silent.
+            // Enforced in app-shell._buildVfsBridgeScript (the CSP is prefixed to the injected
+            // bridge, which AppFrameBootstrap puts first in <head> on all four srcdoc paths).
             network: (p.network === true)
         };
     }

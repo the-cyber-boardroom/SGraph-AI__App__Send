@@ -29,6 +29,29 @@
             // counts + a recent-ops list, fed by the `app-debug:bridge-call` event the
             // kernel already emits for every vfs/fs op. Pure consumer — no kernel change.
             this._actR = 0; this._actW = 0; this._actErr = 0; this._actRecent = [];
+            this._actA = 0;   // AI calls — their own lane; folding them into R hides them
+
+            // The session cost pill (A1 of the 08/16 brief). Ledger-driven and standing:
+            // "this app is spending money" must be observable at ANY moment, not only in
+            // the six seconds after the first call (the old toast). subscribe() also fires
+            // on reconciliation, so the ~estimate upgrades to the billed figure in place.
+            if (globalThis.VaultLlmLog) {
+                this._llmCostUnsub = VaultLlmLog.subscribe(() => this._renderLlmCost());
+                this._renderLlmCost();
+            }
+        }
+
+        // Whole-session figure by design (one bill per session — the 08/13 decision);
+        // per-app enforcement happens in the kernel against totals(appId).
+        _renderLlmCost() {
+            var el = this.shadowRoot && this.shadowRoot.querySelector('.hud-llm-cost');
+            if (!el || !globalThis.VaultLlmLog) return;
+            var t = VaultLlmLog.totals();
+            if (!t.calls) { el.style.display = 'none'; return; }
+            el.style.display = '';
+            el.textContent = '✨ ' + (t.estimatedCost > 0 ? '~' : '') + '$' + t.totalCost.toFixed(4) +
+                             ' · ' + t.calls + (t.pending ? ' …' : '');
+            el.classList.toggle('hud-llm-cost--busy', t.pending > 0);
         }
 
         connectedCallback() {
@@ -47,6 +70,7 @@
                         <div class="hud-right">
                             <a class="hud-vault-link" data-hud-el="openVault" href="#" style="display:none" title="Open the vault file browser">&#8612; Open Vault</a>
                             <button class="hud-llm-btn" data-hud-el="llm" type="button" title="AI Chat — ask about this vault, by text or voice">&#10024; AI</button>
+                            <button class="hud-llm-cost" data-hud-el="llmCost" type="button" style="display:none" title="AI spend this session, all surfaces — click for the request ledger"></button>
                             <div class="hud-privs-wrap" style="display:none">
                                 <button class="hud-privs-chip" type="button" aria-haspopup="true" aria-expanded="false" title="What this app is allowed to do"></button>
                                 <div class="hud-privs-pop" style="display:none"></div>
@@ -146,6 +170,9 @@
                 if (e.target.closest('.hud-llm-btn')) {
                     return this.dispatchEvent(new CustomEvent('app-hud:llm', { bubbles: true, composed: true }));
                 }
+                if (e.target.closest('.hud-llm-cost')) {
+                    return this.dispatchEvent(new CustomEvent('app-hud:llm-ledger', { bubbles: true, composed: true }));
+                }
                 if (e.target.closest('.hud-more-btn'))     { e.stopPropagation(); return this._toggleMore(); }
                 if (e.target.closest('.hud-privs-chip'))   { e.stopPropagation(); return this._togglePrivsPop(); }
                 if (e.target.closest('.hud-privs-reset'))  { return this._resetConsents(); }
@@ -198,6 +225,7 @@
             if (this._navChangeHandler) document.removeEventListener('app-nav:change', this._navChangeHandler);
             if (this._bridgeCallHandler) document.removeEventListener('app-debug:bridge-call', this._bridgeCallHandler);
             if (this._docClickHandler) document.removeEventListener('click', this._docClickHandler);
+            if (this._llmCostUnsub) { try { this._llmCostUnsub(); } catch (_) {} this._llmCostUnsub = null; }
             clearTimeout(this._actPulseTimer);
         }
 
@@ -376,6 +404,15 @@
             if (granted(fs['delete']))    list.push({ label: 'delete files',   danger: true  });
             if (granted(vault.unlink))    list.push({ label: 'unlink vaults',  danger: true  });
             if (vault['delete'] === true) list.push({ label: 'delete vaults',  danger: true  });
+            // LLM access spends the vault owner's money — surface it as a standing grant,
+            // not just a transient toast on first use.
+            var llm = (perm && perm.llm) || {};
+            if (llm.chat   === true) list.push({ label: 'use AI models (costs money)', danger: false });
+            if (llm.listen === true) list.push({ label: 'use the microphone',          danger: true  });
+            // `network` removes the connect-src CSP from the app frame: this app can reach
+            // any host directly, so decrypted vault content it holds is no longer contained
+            // by the bridge. Flagged danger because it is the one grant that re-opens egress.
+            if (perm && perm.network === true) list.push({ label: 'direct network access (uncontained egress)', danger: true });
             // Destructive grants sort last so the expanded list ends on the ones that matter.
             list.sort(function (a, b) { return (a.danger ? 1 : 0) - (b.danger ? 1 : 0); });
             this._privList = list;
@@ -444,9 +481,13 @@
             if (method === 'vfs.read' || method === 'vfs.list') kind = 'r';
             else if (method === 'vfs.write' || method === 'fs.move'
                   || method === 'fs.delete' || method === 'fs.mkdir') kind = 'w';
-            else return;   // not a file op (vault.*, ui.*, state.* …) — the meter is files-only
+            // AI calls get their own lane (A2 of the 08/16 brief). The old `return` made
+            // the single most consequential bridge call — llm.chat, which spends money and
+            // ships attached content to a third party — the one thing the meter ignored.
+            else if (method.indexOf('llm.') === 0) kind = 'a';
+            else return;   // everything else (vault.*, ui.*, state.* …) stays off the meter
 
-            if (kind === 'r') this._actR++; else this._actW++;
+            if (kind === 'r') this._actR++; else if (kind === 'w') this._actW++; else this._actA++;
             var okFlag = detail.ok !== false;     // ok defaults true unless explicitly false
             if (!okFlag) this._actErr++;
 
@@ -470,6 +511,12 @@
             if (!chip) return;
             if (r) r.textContent = 'R' + this._actR;
             if (w) w.textContent = 'W' + this._actW;
+            // The AI lane appears only once used — zero-cost chrome for apps that never call it.
+            var a = chip.querySelector('.hud-act-a');
+            if (this._actA > 0) {
+                if (!a) { a = document.createElement('span'); a.className = 'hud-act-a'; chip.appendChild(document.createTextNode(' ')); chip.appendChild(a); }
+                a.textContent = 'A' + this._actA;
+            }
             // Error tally only appears once something has failed.
             var e = chip.querySelector('.hud-act-e');
             if (this._actErr > 0) {
@@ -1048,6 +1095,16 @@
             border: 1px solid #2a2a4a; white-space: nowrap;
         }
         .hud-llm-btn:hover { color: #4ECDC4; border-color: #4ECDC4; }
+        /* Session AI spend — money, so it reads as a fact chip, not an action. The ~
+           prefix marks an estimate (same rule as every cost surface); … marks in-flight. */
+        .hud-llm-cost {
+            font-size: 0.72rem; color: #b8a3e8; background: transparent; cursor: pointer;
+            padding: 0.2rem 0.5rem; border-radius: 4px; font-family: var(--font-mono, monospace);
+            border: 1px solid #2a2a4a; white-space: nowrap;
+        }
+        .hud-llm-cost:hover { border-color: #b8a3e8; }
+        .hud-llm-cost--busy { border-color: #b8a3e8; opacity: 0.85; }
+        .hud-act-a { color: #b8a3e8; }
         /* Amber: this is an offer that costs something to accept, not an error and not a
            neutral chip. It has to be seen without reading as "something broke". */
         .hud-update-btn {

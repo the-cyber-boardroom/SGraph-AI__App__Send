@@ -163,8 +163,13 @@ send agents to an archived 237KB monolith instead of the current 13-domain tree.
 **Note:** This file governs all Explorer sessions. A Conductor check is appropriate before
 changing the priorities section. Date references and reality path are safe to update.
 
+### B-014 · Audit document count discrepancy (954 vs 956)
+**Status:** PENDING
+**What:** The 08/18 master index file (`reviews/08/18/v0.33.61__master-index__briefs-09-14-aug-2026.md`) states "Cumulative document count: 954 (+18 from this session; previous 936)". The reality/index.md and DAILY_RUN COMPLETED rows for 08/17 and 08/18 both record 956 (+20 from the same 08/09+08/14 batch). The true count (as reflected in reality/index.md) is 956. Audit: count the actual brief files in `briefs/08/09/` and `briefs/08/14/` to confirm the correct total, then annotate the 08/18 master index with a correction note.
+**Why:** The master index is a permanent record. A wrong cumulative count will cascade into future indices. The correct count should be settled once and recorded.
+
 ### B-013 · Cross-reference vault publication guides in reality domain files
-**Status:** TODO
+**Status:** DONE (2026-08-14)
 **What:** Two new vault-html guides arrived in Aug 2026 that are not cross-linked from the reality
 domain files: `EXTRACT-AND-EMBED-A-SUB-VAULT.md` (Aug 12) and `PUBLISHING-SGIT-VAULT-TO-GITHUB.md`
 (Aug 12, merged post-session). Add "Guides" sections (or a "See Also" block) in `cli/index.md`
@@ -172,6 +177,11 @@ and `vault/index.md` pointing to these documents. Check `library/guides/vault-ht
 other guides that should be cross-linked but aren't.
 **Why:** The reality domain files are the first stop for agents. Guides that exist but are
 invisible to agents checking domain indexes may be re-authored from scratch unnecessarily.
+
+**Outcome:** Added `## Guides` sections to both `cli/index.md` (6 guides) and `vault/index.md`
+(7 guides). All 8 guides in `library/guides/vault-html/` are now cross-linked from at least one
+domain index. The two new Aug 2026 guides (`EXTRACT-AND-EMBED-A-SUB-VAULT.md`,
+`PUBLISHING-SGIT-VAULT-TO-GITHUB.md`) are now visible to agents querying both domain indexes.
 
 ### B-006 · Health scan — Check broken relative links across team/ and library/
 **Status:** DONE (2026-07-17)
@@ -264,6 +274,16 @@ None currently active.
 | 2026-08-06 | No new briefs; addendum to 08/05 session with deeper commit-level detail | 7 EXISTS items detailed (image paste, SGVision, sg.llm.imagePart, ledger fix, auto-sync data-loss fix, claude-sonnet-5 default, picker notice); index.md last-updated + Black Hat note updated; changelog 08/06 + 08/05 merged; master index + debrief produced |
 | 2026-08-09 | No new briefs; no new commits; B-012 completed — explorer/CLAUDE.md stale references fixed | reality path → index.md; 3 stale debrief/index pointers updated; index.md + qa/index.md → 2026-08-09; master index + debrief produced |
 | 2026-08-08 | No new briefs; no new commits; date/last-updated brought current; B-012 added | index.md + qa/index.md updated to 2026-08-08; master index + debrief produced |
+| 2026-08-25 | 6 new briefs (19 Aug: 5 briefs + 1 reference); NHI bootstrap + agent enrolment + service twin + PKI site review; vault/zip corrected PROPOSED→EXISTS (19 tests); 6 new PROPOSED items (P-NHI-001–006) | Master index (08/25), Architect review (08/25), Dev review (08/25), debrief (08/25) produced; send-api/index.md + ai-agents/proposed/agent-communication.md updated; cumulative docs 962 |
+| 2026-08-24 | 6 new items (19 Aug: 5 briefs + 1 reference); three-layer agent authority model; append lane correction; execution broker proposed; pki.sgit.ai site review | Master index (08/24), Architect review (08/24), AppSec review (08/24), debrief (08/24) produced; ai-agents/index.md updated (+6 PROPOSED: P-AGT-001–006); cumulative docs 960 (following 08/20 master index convention: 954 + 6; note B-014 for count discrepancy) |
+| 2026-08-22 | 7 new documents from 19 Aug 2026 (docs 955–961); briefs added to repo 08-21 after the 08-20 run; 3 architectures (agent enrolment, mandate exec broker, PKI registry); 5 corrections (append lane shipped, PKI key type, etc.); 4 new PROPOSED (P-ENR-001–003, P-MEB-001) | Master index (08/22), Architect review (08/22), Dev review (08/22), AppSec review (08/22), debrief (08/22) produced; 4 reality files updated; cumulative docs 956→961 |
+| 2026-08-20 | 18 new briefs (09 Aug: 6, 14 Aug: 12); addendum vault embed fixes + sg.llm P0-P4 to vault/ai-agents reality; updated ai-agents last-updated date | Master index (08/20), Architect review (08/20), Dev review (08/20), debrief (08/20) produced; vault/index.md + ai-agents/index.md updated; cumulative docs 956 |
+| 2026-08-19 | No new briefs; no new commits; quiet daily hold; B-014 added (doc count discrepancy audit) | Master index, 2 reality files updated (index.md, changelog), DAILY_RUN, debrief produced |
+| 2026-08-18 | 18 new briefs (08/09 + 08/14) — second pass; merge of 08/17 session; doc count reconciled to 956; 11 new PROPOSED items | Master index, Architect review, Dev review, 3 reality files updated (ui, qa, index), changelog, DAILY_RUN, debrief produced |
+| 2026-08-17 | 20 new briefs (08/09 + 08/14); 6 code commits documented (read-key open, sg.llm P0-P4, vault-settings listing, RO settings panel, vault subtree fix); docs 936→956; tests ~2970+→~3100+; v0.33.57→v0.33.61 | Master index, Architect review, Dev review, 3 reality files updated (index.md, ui/index.md, changelog.md), DAILY_RUN, debrief produced |
+| 2026-08-16 | No new briefs; no new code commits since 08/13; quiet daily hold | Master index, reality/index.md date, changelog, DAILY_RUN, debrief produced |
+| 2026-08-15 | No new briefs; test count corrections from Phase A/B/C1 (+19: container-app 9→16, auth 7→8, +3 port, +8 deploy smoke); total ~2950+→~2970+ | Master index, 2 reality files updated (index.md, qa/index.md), changelog, DAILY_RUN, debrief produced |
+| 2026-08-14 | No new briefs; Phase A/B/C1 multi-target deployment documented (missed by 08/13 concurrent session); CI bump v0.33.56 → v0.33.57; B-013 completed | Master index, 4 reality files updated (index.md, infra, cli, vault), changelog, DAILY_RUN, debrief produced |
 | 2026-08-13 | No new briefs; PUBLISHING-SGIT-VAULT-TO-GITHUB.md guide documented (missed by 08/12 session); CI bump v0.33.55 → v0.33.56; B-013 added | Master index, 2 reality files updated (index.md, changelog), DAILY_RUN, debrief produced |
 | 2026-08-12 | No new briefs; multi-target deployment plan (P-405–P-412 confirmed); "7 targets" corrected to 4 working + 8 PROPOSED; vault extract-and-embed guide noted; CI bump v0.33.54 → v0.33.55 | Master index, 4 reality files updated (index.md, qa, ui, changelog), DAILY_RUN, debrief produced |
 | 2026-08-11 | 26 new briefs (02 Aug + 06 Aug); 5 new code commits; 1 standing decision corrected; 11 new PROPOSED items | Master index, Dev review, AppSec review, 6 reality files updated, changelog, debrief produced; OpenRouter resale prohibition annotated in index.md |

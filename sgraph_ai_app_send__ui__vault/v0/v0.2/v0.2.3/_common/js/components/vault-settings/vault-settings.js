@@ -411,25 +411,33 @@
         // `.vault` is a LAZY sub-tree after open (every top-level folder starts
         // _loaded:false), so listFolder('/.vault') returns [] until it is expanded —
         // the same trap that made embedded access tokens look absent (vault-shell.js).
-        async _ensureVaultSubtree() {
+        // `loadSubTreeOnDemand` expands exactly ONE level, so expanding `/.vault` leaves
+        // `/.vault/llm` itself unloaded and `listFolder('/.vault/llm')` still returns [] —
+        // which read as "no config" even when one existed. Walk EVERY segment.
+        // (Same bug, same fix as SGLlmVault._ensureSubtree.)
+        async _ensureVaultSubtree(path) {
             const v = this._vault;
             if (!v) return false;
-            try {
-                if (v.needsLoading && v.needsLoading('/.vault')) await v.loadSubTreeOnDemand('/.vault');
-            } catch (_) { /* absent — created on first save */ }
+            const parts = String(path || '/.vault').split('/').filter(Boolean);
+            let walked = '';
+            for (const p of parts) {
+                walked += '/' + p;
+                try {
+                    if (v.needsLoading && v.needsLoading(walked)) await v.loadSubTreeOnDemand(walked);
+                } catch (_) { /* absent — created on first save */ }
+            }
             return true;
         }
 
+        // Single source of truth: SGLlmVault owns the read path (lazy-load walk + parse).
         async _readLlmConfig() {
-            const v = this._vault;
-            if (!v) return null;
-            await this._ensureVaultSubtree();
+            if (!this._vault) return null;
+            if (globalThis.SGLlmVault) return SGLlmVault.readConfig(this._vault);
+            await this._ensureVaultSubtree('/.vault/llm');
             try {
-                const top = v.listFolder('/.vault') || [];
-                if (!top.some((e) => e.name === 'llm' && e.type === 'folder')) return null;
-                const inner = v.listFolder('/.vault/llm') || [];
+                const inner = this._vault.listFolder('/.vault/llm') || [];
                 if (!inner.some((e) => e.name === 'config.json')) return null;
-                const bytes = await v.getFile('/.vault/llm', 'config.json');
+                const bytes = await this._vault.getFile('/.vault/llm', 'config.json');
                 return JSON.parse(new TextDecoder().decode(bytes));
             } catch (_) { return null; }
         }
@@ -438,7 +446,7 @@
             const v = this._vault;
             if (!v) throw new Error('no vault');
             if (!v.writable) throw new Error('Read-only vault — an access key and the vault passphrase are needed to change AI settings');
-            await this._ensureVaultSubtree();
+            await this._ensureVaultSubtree('/.vault/llm');
             if (!v._findNode('/.vault'))     await v.createFolder('/.vault');
             if (!v._findNode('/.vault/llm')) await v.createFolder('/.vault/llm');
             const data    = new TextEncoder().encode(JSON.stringify(obj, null, 2));
@@ -563,7 +571,7 @@
             const btn = this.shadowRoot.querySelector('.vset-llm-clear');
             if (btn) { btn.disabled = true; }
             try {
-                await this._ensureVaultSubtree();
+                await this._ensureVaultSubtree('/.vault/llm');
                 const listed = v.listFolder('/.vault/llm') || [];
                 if (listed.some((e) => e.name === 'config.json')) {
                     await v.removeFile('/.vault/llm', 'config.json');

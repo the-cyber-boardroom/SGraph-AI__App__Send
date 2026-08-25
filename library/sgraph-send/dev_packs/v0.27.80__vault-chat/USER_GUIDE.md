@@ -1,3 +1,8 @@
+> **SUPERSEDED (2026-08-16).** This guide documents the May 2026 mock-harness prototype — a
+> design that did not ship. The vault's ACTUAL AI chat feature is documented in
+> `library/guides/content/v0.33.47__guide__vault-ai-chat.md`; the app-facing API in
+> `library/guides/vault-html/AUTHORING.md` (§sg.llm). Kept as design history.
+
 # USER_GUIDE — Vault Chat (Phases 0–4)
 
 **version** v0.27.80 · **date** 26 May 2026 · **branch** `claude/zen-shannon-226hD`

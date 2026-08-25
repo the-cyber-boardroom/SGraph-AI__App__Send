@@ -1,6 +1,6 @@
 # AI Agents — Reality Index
 
-**Domain:** ai-agents/ | **Last updated:** 2026-07-29 | **Maintained by:** Librarian (daily run)
+**Domain:** ai-agents/ | **Last updated:** 2026-08-24 | **Maintained by:** Librarian (daily run)
 
 This domain covers agentic workflows, LLM components, Claude integration with vaults, MCP (Model Context Protocol), and the vault-as-communication-channel primitives. The SG/Send architecture is explicitly designed for agents as first-class users alongside humans.
 
@@ -68,6 +68,18 @@ The `sgit-ai` CLI (PyPI) is the primary way agents interact with vaults. Full co
 - `team/comms/` structure EXISTS — changelog, QA briefs, questions, plans
 - Comms operating model EXISTS — agent-to-agent change classification
 - Vault PKI keys for agent identity: `sgit keygen`, `sgit sign`, `sgit verify` — all working
+
+### sg.llm In-Vault LLM Component Suite (P0–P4, 2026-08-20)
+
+The sg.llm component family is shipped as in-vault LLM functionality (ViV loader suite).
+Tests verified: `sg_llm_config` (53), `sg_llm` (40), `sg_llm_vault` (17), `sg_llm_chat` (122),
+`sg_llm_requests` (29), `sg_llm_vault_log` (35) — ~296 tests in the ViV loader suite.
+
+| Component | Status | Evidence |
+|-----------|--------|---------|
+| **sg.llm P0-P3 hardening** — egress CSP (content-security policy for LLM requests), consent floors (minimum consent before LLM access), per-app budget (spending ceiling declared before execution), tool scope (capability grant controls on LLM tools) | **EXISTS** | `4999faf`; ViV loader suite tests |
+| **sg.llm P4: Spend surfacing** — visible per-session and per-request cost display for in-vault LLM usage; all six re-review defects fixed in P4 | **EXISTS** | `a0caee0`, `15a1c4c`; ViV loader suite |
+| **Vault AI chat user guide** — documentation for the in-vault AI chat feature | **EXISTS** | `8c79e8a` |
 
 ### Known Constraints
 
@@ -149,6 +161,23 @@ Published 2026-05-06 by `@Email-FS (architect.spec)`. These are protocol specifi
 | P-AOMM-005 | **Inbound and provider-posture variants** — two sibling registers: inbound (can another org's agents reach you?) and provider posture (can providers distinguish a defender from an attacker?); neither is written yet | PROPOSED — named in brief, not developed |
 
 *Note: the AOMM correction to the lethal trifecta (removing untrusted content as a necessary condition) is grounded in the OpenAI/HuggingFace incident, July 2026, from primary sources. Budget + elapsed time are proposed as first-class containment controls at AOMM Level 2.*
+
+### Agent Enrolment Architecture and Execution Broker (19 Aug 2026 — docs 955–959)
+
+**PROPOSED — does not exist yet.** A three-layer agent authority model addressing
+non-human identity for both agents-you-run and agents-you-rent (rented agents running
+inside hosted assistants). The append lane transport that the enrolment architecture uses
+already EXISTS (server-side, `vault/index.md`); the enrolment workflow, certificate
+issuance, mandate objects, and execution broker are all PROPOSED.
+
+| # | Item | Status |
+|---|------|--------|
+| P-AGT-001 | **Bootstrap-minimal agent enrolment** — agent starts with computation, randomness, and its own generated keypair (nothing else); signs a canonical enrolment request (type, project, public key, requested identity/mandate, nonce, proof of possession); delivers via account-less append lane (append token in body, no access token, blind ACK — transport EXISTS); trusted processor verifies, issues certificate; registry publishes; works for rented agents because no attestation or workload control required | PROPOSED |
+| P-AGT-002 | **Identity/mandate separation** — identity (who the key belongs to) and mandate (what the agent may do) as separate signed statements, issued and revoked independently; mandate carries subject, issuer, service, capability, resource, constraints, validity window, usage limit, and signature; a mandate is checkable by a third party (unlike a bearer token); limit: a mandate constrains what an agent may be authorised to do, not what it does within that authority | PROPOSED |
+| P-AGT-003 | **Fractal PKI registry** — registries recognising other registries; each registry must declare trust roots or the trust graph is unevaluable; three structural rules from the 2019 keyserver failure: only owner writes own record, revocation is signed append (not deletion), records are size-bounded | PROPOSED |
+| P-AGT-004 | **Execution broker (mandate broker)** — agent presents signed mandate + requested action; broker verifies mandate, executes only the permitted operation using internally-held credentials the agent never sees, returns signed receipt; closes the "authorised party misuses legitimately-held authority" gap that capability grants (6 Aug), plan-then-execute (6 Aug), and per-agent keys (16 Aug) each named as their limit; NOT to be named "Service Twin" (collides with "digital twin" = the point where a graph meets reality, established throughout the risk mandate corpus); preferred names: execution broker, mandate broker | PROPOSED |
+| P-AGT-005 | **Broker credential concentration mitigation** — execution broker holds all credentials for all tenants; total broker compromise = all credentials usable immediately; self-hosting must be a first-class deployment option (not an enterprise upsell); agent must be able to verify broker identity and refuse unrecognised brokers; credential storage is the product's most critical engineering | PROPOSED |
+| P-AGT-006 | **Mandate receipts as evidence chain** — every broker operation produces a signed receipt: agent identity, mandate reference, action performed, timestamp; creates an evidence chain not reliant on mutable platform audit logs; receipts can feed downstream workflow stages directly | PROPOSED |
 
 *Full proposed items: [proposed/index.md](proposed/index.md)*
 

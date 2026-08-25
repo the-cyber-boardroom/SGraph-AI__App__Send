@@ -7,6 +7,177 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-08-25
+
+6 new human briefs (19 Aug: 5 briefs + 1 reference) — NHI bootstrap architecture, agent enrolment via append lane, service twin execution broker, PKI site review. One reality document correction: vault/zip moved from PROPOSED to EXISTS. 6 new PROPOSED items (P-NHI-001 through P-NHI-006).
+
+Files changed:
+- `reality/send-api/index.md` — Vault Zip section added (EXISTS, 19 tests); DOES NOT EXIST and PROPOSED entries corrected; Last updated → 2026-08-25
+- `reality/ai-agents/proposed/agent-communication.md` — New section: Agent Enrolment and NHI Architecture (P-NHI-001–P-NHI-006); Last updated → 2026-08-25
+- `reality/index.md` — User Lambda API count 32→33 (vault/zip correction); cumulative docs 956→962; Last updated → 2026-08-25
+- `reality/changelog.md` — 2026-08-25 entry added (this entry)
+- `team/roles/librarian/DAILY_RUN.md` — session added to COMPLETED
+
+Session: 6 new briefs (5 + 1 reference) | New EXISTS items: 1 (vault/zip) | New PROPOSED items: 6 (P-NHI-001–006) | Test count: ~3100+ (unchanged) | Cumulative docs: 962 (was 956)
+Master index (08/25): `team/roles/librarian/reviews/08/25/v0.33.62__master-index__briefs-19-aug-2026.md`
+Debrief (08/25): `team/humans/dinis_cruz/debriefs/08/25/v0.33.62__debrief__briefs-processing-19-aug-2026.md`
+
+---
+
+## 2026-08-22
+
+Supplementary session: additional role reviews (Architect, Dev, AppSec) and a detailed
+debrief produced for the 19 Aug 2026 briefs (already processed by the 2026-08-21 session).
+Added P-MEB-001 (mandate execution broker, distinct P-series from P-ENR items) to
+agent-communication.md. Added identity/proposed/agent-enrolment.md as a detailed
+architecture reference cross-referencing the P-ENR items. Five corrections to earlier
+briefs documented in the role reviews.
+
+Files changed:
+- `reality/identity/proposed/agent-enrolment.md` — NEW: detailed architecture reference for agent enrolment (cross-references P-ENR-001–004 from agent-communication.md)
+- `reality/identity/proposed/index.md` — agent-enrolment.md added to topic files table; P-ENR reference entries added; last updated → 2026-08-22
+- `reality/ai-agents/proposed/agent-communication.md` — P-MEB-001 (mandate execution broker — separate series from P-ENR) appended; last updated → 2026-08-22
+- `reality/ai-agents/proposed/index.md` — P-MEB-001 added to quick lookup; last updated → 2026-08-22
+- `reality/index.md` — Last updated → 2026-08-22; version → v0.33.62
+- `reality/changelog.md` — 2026-08-22 entry added (this entry)
+- `team/roles/librarian/DAILY_RUN.md` — 2026-08-22 session row added to COMPLETED
+
+Session: supplementary reviews | New EXISTS items: 0 | Net-new PROPOSED: P-MEB-001 | Cumulative docs: 962 (unchanged) | Version: v0.33.62
+Master index (08/22): `team/roles/librarian/reviews/08/22/v0.33.61__master-index__briefs-19-aug-2026.md`
+Debrief (08/22): `team/humans/dinis_cruz/debriefs/08/22/v0.33.61__debrief__briefs-processing-19-aug-2026.md`
+
+---
+
+## 2026-08-21
+
+6 new human briefs (5 from 19 Aug + 1 reference) — agent identity and mandate thread.
+Three new PROPOSED architecture patterns registered. Reality index updated with 4 new key
+decisions from the 19 Aug corpus. No new EXISTS items (the append lane was already correct
+in the reality document).
+
+Files changed:
+- `reality/ai-agents/proposed/agent-communication.md` — 4 new PROPOSED items: P-ENR-001 (agent enrolment), P-ENR-002 (service twin broker), P-ENR-003 (identity+mandate registry), P-ENR-004 (client-side lane addressing)
+- `reality/index.md` — Last updated → 2026-08-21; doc count → 962; PROPOSED count → ~1055+; 4 new key decisions added
+- `reality/changelog.md` — 2026-08-21 entry added (this entry)
+
+Session: 6 new briefs | New EXISTS items: 0 | New PROPOSED items: 4 (P-ENR-001–004) | Cumulative docs: 962
+Master index (08/21): `team/roles/librarian/reviews/08/21/v0.33.62__master-index__briefs-19-aug-2026.md`
+Debrief (08/21): `team/humans/dinis_cruz/debriefs/08/21/v0.33.62__debrief__briefs-processing-19-aug-2026.md`
+
+---
+
+## 2026-08-20
+
+18 new human briefs (6 from 09 Aug, 12 from 14 Aug) — addendum session (08/17–08/18 had already processed the same briefs). Fresh role reviews and debrief produced. vault/index.md and ai-agents/index.md updated with sg.llm P0-P4 section and embed post-review fix sections.
+
+Files changed:
+- `reality/vault/index.md` — 3 new EXISTS items: embed post-review fixes, .vault-settings.json in file tree + app-title fallback, Settings panel read-only fix + .vault subtree walk
+- `reality/ai-agents/index.md` — 1 new EXISTS section: sg.llm P0-P4 (egress CSP, consent floors, per-app budget, spend surfacing)
+- `reality/index.md` — Last updated → 2026-08-20 (date maintenance)
+- `reality/changelog.md` — 2026-08-20 entry added (this entry)
+- `team/roles/librarian/DAILY_RUN.md` — session added to COMPLETED
+
+Session: 18 new briefs (addendum) | New EXISTS items: 4 | New PROPOSED items: ~10 (graphing-text, risk register, sgit hub/forge, WhatsApp bridge) | Test count: ~3100+ (unchanged) | Cumulative docs: 956 (unchanged from 08/17–18)
+Master index (08/20): `team/roles/librarian/reviews/08/20/v0.33.61__master-index__briefs-09-14-aug-2026.md`
+Debrief (08/20): `team/humans/dinis_cruz/debriefs/08/20/v0.33.61__debrief__briefs-processing-09-14-aug-2026.md`
+
+---
+
+## 2026-08-19
+
+Quiet daily hold. No new briefs. No new commits on origin/dev since `9a62c50d` (documented 08/17–08/18). All backlog items done. B-014 added (document count discrepancy audit). Date maintenance only: reality/index.md "Last updated" → 2026-08-19.
+
+- `reality/index.md` — Last updated → 2026-08-19; Quick Stats date → 2026-08-19
+- `reality/changelog.md` — 2026-08-19 entry added (this entry)
+
+Master index: `team/roles/librarian/reviews/08/19/v0.33.61__master-index__no-new-briefs-19-aug-2026.md`
+
+Session: 0 new briefs | 0 new EXISTS items | Doc count: 956 (unchanged) | Version: v0.33.61
+
+---
+
+## 2026-08-18
+
+18 new human briefs processed (6 from 08/09 v0.33.57, 12 from 08/14 v0.33.58) — second pass, producing 08/18 review outputs. Merge of 08/17 session: doc count reconciled to 956 (08/17 session counted 20 docs). Version: v0.33.61.
+
+Files changed:
+- `reality/index.md` — Last updated → 2026-08-18; doc count reconciled to 956; test count description updated to include RO-settings-panel +14
+- `reality/ui/index.md` — vault settings file listing section confirmed (commit 36eb6c2); last-updated → 2026-08-18
+- `reality/qa/index.md` — test count ~2970+→~3100+; last-updated → 2026-08-18
+- `reality/changelog.md` — 2026-08-18 + 2026-08-17 entries merged (this entry)
+- `team/roles/librarian/DAILY_RUN.md` — 2026-08-18 session row added alongside 08/17 row
+
+Session: 18 new briefs (second pass) | Merge of 08/17 session output | Cumulative docs: 956
+Master index (08/18): `team/roles/librarian/reviews/08/18/v0.33.61__master-index__briefs-09-14-aug-2026.md`
+Debrief (08/18): `team/humans/dinis_cruz/debriefs/08/18/v0.33.61__debrief__briefs-processing-09-14-aug-2026.md`
+
+---
+
+## 2026-08-17
+
+20 new human briefs processed (7 × 08/09: graphing text + risk register; 13 × 08/14: sgit hub + WhatsApp bridge + briefing packs). Cumulative docs 936 → 956. Six substantive code commits from 08/15–16 documented (read-key open, sg.llm hardening P0-P4, vault-settings.json listing, RO settings panel, vault subtree expansion). Test count ~2970+ → ~3100+ (+146 net new). Version v0.33.57 → v0.33.61 (4 CI bumps). Seven new key decisions added from 08/09 and 08/14 briefs.
+
+Files changed:
+- `reality/index.md` — Version v0.33.57 → v0.33.61; Last updated → 2026-08-17; Quick Stats date → 2026-08-17; tests ~2970+ → ~3100+; docs 936 → 956; 7 new key decisions added (permissions=key topology, read/write keys, component-not-plugin, lost write key=frozen, browser=app layer, decompilation, WhatsApp vault-per-conversation)
+- `reality/ui/index.md` — Two new EXISTS sections: `.vault-settings.json` synthetic listing (commit `36eb6c2b`, 9 tests) and read-only settings panel credential display (commit `06dca6e4`, 14 tests)
+- `reality/changelog.md` — 2026-08-17 entry added (this entry)
+- `team/roles/librarian/DAILY_RUN.md` — session added to COMPLETED
+
+Session: 20 new briefs | New EXISTS items: 2 (vault-settings listing, RO settings panel) | New PROPOSED items: 0 (all 08/09 + 08/14 PROPOSED items already logged in master index today) | Test count +146 | Cumulative docs: 956
+Master index (08/17): `team/roles/librarian/reviews/08/17/v0.33.61__master-index__briefs-09-14-aug-2026.md`
+Debrief (08/17): `team/humans/dinis_cruz/debriefs/08/17/v0.33.61__debrief__briefs-processing-09-14-aug-2026.md`
+
+---
+
+## 2026-08-16
+
+No new human briefs. No new code commits on `origin/dev` since 2026-08-13 (Phase A/B/C1 deployment, already documented). Quiet daily hold.
+
+Files changed:
+- `reality/index.md` — Last updated → 2026-08-16 (date maintenance)
+- `reality/changelog.md` — 2026-08-16 entry added (this entry)
+- `team/roles/librarian/DAILY_RUN.md` — session added to COMPLETED
+
+Session: 0 new briefs | New EXISTS items: 0 | New PROPOSED items: 0 | Test count: ~2970+ (unchanged) | Cumulative docs: 936 (unchanged)
+Master index (08/16): `team/roles/librarian/reviews/08/16/v0.33.57__master-index__daily-check-16-aug-2026.md`
+Debrief (08/16): `team/humans/dinis_cruz/debriefs/08/16/v0.33.57__debrief__daily-check-16-aug-2026.md`
+
+---
+
+## 2026-08-15
+
+No new human briefs. Test count corrections from Phase A/B/C1 deployment code (merged 08/13, not counted in 08/14 session): Container App 9→16, Container App Auth 7→8 (+1 ADR-12 login test), +3 port tests (new file), +8 deploy/target smoke tests (new file). Total ~2950+ → ~2970+.
+
+Files changed:
+- `reality/index.md` — Last updated → 2026-08-15; test count ~2950+ → ~2970+
+- `reality/qa/index.md` — Container App 9→16, Auth 7→8, +3 port, +8 deploy smoke; Last updated → 2026-08-15
+- `reality/changelog.md` — 2026-08-15 entry added (this entry)
+- `team/roles/librarian/DAILY_RUN.md` — session added to COMPLETED
+
+Session: 0 new briefs | New EXISTS items: 0 | New PROPOSED items: 0 | Test count +19 | Cumulative docs: 936 (unchanged)
+Master index (08/15): `team/roles/librarian/reviews/08/15/v0.33.57__master-index__daily-check-15-aug-2026.md`
+Debrief (08/15): `team/humans/dinis_cruz/debriefs/08/15/v0.33.57__debrief__daily-check-15-aug-2026.md`
+
+---
+
+## 2026-08-14
+
+No new human briefs. Key code activity from 08/13 not captured in that session's master index: Multi-Target Deployment Phase A/B/C1 merged to dev (`f117034`) — Phase A (universal container image + login page), Phase B (4 AWS CFN templates: lambda, ec2, ecs-fargate, ami-pipeline), Phase C1 (full-cycle deploy/destroy pipeline + OIDC + Heroku contract). CI version bump v0.33.56 → v0.33.57. Backlog task B-013 completed: cross-reference vault-html guides added to `cli/index.md` and `vault/index.md`.
+
+Files changed:
+- `reality/index.md` — Version v0.33.56 → v0.33.57; Last updated → 2026-08-14; Quick Stats date → 2026-08-14
+- `reality/infra/index.md` — ECS/Fargate deployment targets table: corrected to reflect CFN template exists (Phase B)
+- `reality/cli/index.md` — Guides section added (6 vault-html guides cross-linked)
+- `reality/vault/index.md` — Guides section added (7 vault-html guides cross-linked)
+- `reality/changelog.md` — 2026-08-14 entry added (this entry)
+- `team/roles/librarian/DAILY_RUN.md` — B-013 marked DONE; session added to COMPLETED
+
+Session: 0 new briefs | New EXISTS items: 0 | New PROPOSED items: 0 | Guides cross-linked: 13 pointers | Cumulative docs: 936 (unchanged)
+Master index (08/14): `team/roles/librarian/reviews/08/14/v0.33.57__master-index__daily-check-14-aug-2026.md`
+Debrief (08/14): `team/humans/dinis_cruz/debriefs/08/14/v0.33.57__debrief__daily-check-14-aug-2026.md`
+
+---
+
 ## 2026-08-13
 
 No new human briefs. One library guide added after the 08/12 session: `PUBLISHING-SGIT-VAULT-TO-GITHUB.md` (272 lines) — git-as-backup/distribution for sgit vaults, security rationale (bare/ is ciphertext-safe), five-step workflow, GitHub Actions secret pattern. CI version bump v0.33.55 → v0.33.56.

@@ -1,6 +1,6 @@
 # ui — Reality Index
 
-**Domain:** `ui/` | **Last updated:** 2026-08-12 | **Maintained by:** Librarian (daily run)
+**Domain:** `ui/` | **Last updated:** 2026-08-18 | **Maintained by:** Librarian (daily run)
 
 As of v0.4.0 (May 2026), the sender and receiver UIs are split into separate packages
 (`sgraph_ai_app_send__ui__share/` and `sgraph_ai_app_send__ui__open/`). The v0.3.x user
@@ -664,6 +664,61 @@ transcript — one take, one result.
   relay `sg.llm.*`.
 - Per-app limit overrides are read (`limitsFor(policy, appId)`) but no UI writes them.
 - `permissions.network` is parsed but still unused.
+
+### Vault Settings File — Synthetic Tree Entry + App-Title Fallback (2026-08-16)
+
+`feat(vault)`: commit `36eb6c2`. Fixes two live-testing gaps in the vault web UI.
+
+| Behaviour | Status | Evidence |
+|-----------|--------|---------|
+| **`.vault-settings.json` synthetic entry** — `VaultDataSource.getTree`/`getFileList` now lists `.vault-settings.json` synthetically (the file lives in `vault._settings`, parsed out at load time, never in `root.children`). Reads and writes round-trip through existing special-case hooks. Delete/rename are refused with descriptive errors. A legacy real tree entry produces no duplicate. Previously this was the ONLY file hidden from the vault UI's own tree (`.vault/**` is an app-bridge floor, not a UI filter; `*.link.json` entries are transformed into mounts). | **EXISTS** | `vault-data-source.js`; `test__vault_settings_file_listing.js` (9 assertions) |
+| **App-title fallback for unnamed vaults** — `SGVault.hasCustomName` tracks whether the vault name was synthesized as 'Untitled Vault' (placeholder) vs set by the user. In App UI mode, if the vault has no custom name, the app-shell adopts the running app's title from `app.json` instead of showing 'Untitled Vault'. Named vaults unchanged. | **EXISTS** | `sg-vault.js` `hasCustomName`; `app-shell.js` `_applyAppJson` |
+
+### sg.llm.* P4 — spend surfacing + six re-review fixes (2026-08-16)
+
+Implements `team/comms/briefs/08/16/v0.33.47__brief__sg-llm-P4-surfacing-and-review-findings.md`
+(same-day). Highlights: standing HUD session-cost pill (`.hud-llm-cost`, VaultLlmLog.subscribe-
+driven, `~` estimate → billed upgrade in place, click → requests ledger via `app-hud:llm-ledger`);
+activity meter gains an `A` lane for `llm.*` (previously filtered out entirely); host-chat budget
+now gated on `VaultLlmLog.totals(null)` so caps survive panel remounts; pasted images are swapped
+to a text note in history after their turn (no silent re-billing); the 🔧 bar gained an
+allowed-paths editor for `files.read` (closing the P3 ENOSCOPE UX gap) with revert-on-failed-save;
+context budget drops files past 16 with an explicit model-facing NOTE; mid-turn budget re-check in
+`_chatOnce` bounds tool-turn overshoot to one call. Tests: `test__llm_p4.js` (32).
+User guide `library/guides/content/v0.33.47__guide__vault-ai-chat.md` updated in lockstep.
+
+### .vault-settings.json Synthetic Listing (2026-08-15, commit `36eb6c2b`)
+
+`.vault-settings.json` exists logically (parsed from a property, not a real child node in `root.children`) but was previously invisible to the file browser. This commit surfaces it as a synthetic entry at the adapter level, refused for delete/rename, so users can open vault settings from the file listing. The `hasCustomName` flag is added for unnamed vaults, using the app title as a fallback display name in embed contexts.
+
+| Capability | Status | Evidence |
+|-----------|--------|---------|
+| Synthetic `.vault-settings.json` entry in vault file listings | **EXISTS** | vault adapter; `test__vault_settings_listing.js` (9 tests) |
+| Delete/rename refused at adapter level for the synthetic entry | **EXISTS** | adapter guard |
+| `hasCustomName` flag — unnamed vaults fall back to app title in embed display | **EXISTS** | `vault-settings.js` |
+
+### Settings Panel Credential Display in Read-Only Sessions (2026-08-15, commit `06dca6e4`)
+
+In a read-only vault session the `CryptoKey` object is non-extractable (Web Crypto API constraint), so the settings panel previously showed nothing for the credential. This commit recovers the hex from the `vaultKey` string via `parseReadOnlyCredential` and displays it correctly. The Save button is disabled in RO sessions; the credential label is relabelled to "Read-only key".
+
+| Capability | Status | Evidence |
+|-----------|--------|---------|
+| Settings panel shows hex read key in read-only sessions (via `parseReadOnlyCredential`) | **EXISTS** | `vault-settings.js`; `test__ro_settings_panel.js` (14 tests) |
+| Save button disabled in read-only sessions | **EXISTS** | `vault-settings.js` |
+| Credential label relabelled to "Read-only key" in RO mode | **EXISTS** | `vault-settings.js` |
+
+### sg.llm.* hardening — egress CSP, consent floors, per-app budget, tool scope (2026-08-13)
+
+Implements F1-F5 of `team/roles/architect/reviews/08/13/v0.33.47__architect-review__sg-llm-as-built-and-next-steps.md`.
+
+| Component | Status | Evidence |
+|-----------|--------|---------|
+| **Frame egress CSP** — `_buildVfsBridgeScript` prefixes `<meta http-equiv="Content-Security-Policy" content="connect-src blob: data:">`, injected first in `<head>` by `AppFrameBootstrap._injectHead`, so it governs all five bridge-build call sites. `blob:`/`data:` are required (the print RPC fetches blob: URLs); `'none'` would break printing. `img-src`/`script-src` are untouched, so vault images and CDN imports still work | **EXISTS** | `app-shell.js` `_buildVfsBridgeScript`; `test__llm_hardening.js`, `test__app_shell_bridge_build.js` |
+| **`permissions.network`** — now genuinely enforced: it is the only way to omit the CSP and re-open direct egress. Previously parsed and read by nothing (`true`/`false` were identical) | **EXISTS** | `app-permissions.js`; `test__llm_hardening.js` |
+| **Consent floors** — `AppShell.CONSENT_FLOOR` (`llm.chat`→`once`, `llm.listen`→`always`) + `strictestConsent`. `app.json` may only make consent STRICTER, never weaker: an app can no longer set `"consent":{"llm.chat":"auto"}` to disable the gate on a capability that spends the owner's money, and a microphone grant is never cached | **EXISTS** | `app-shell.js` `_consent`; `test__llm_hardening.js` |
+| **HUD standing grants** — `setPrivileges` lists `use AI models (costs money)`, `use the microphone` (danger), `direct network access (uncontained egress)` (danger). Previously LLM use surfaced only as a 6s transient toast | **EXISTS** | `app-hud.js` |
+| **Per-app spend attribution** — `VaultLlmLog` entries carry `app` (null = host chat); `totals(app)` scopes the tally; budget checks and `sg.llm.usage` are scoped to the caller. Per-app caps were previously compared against a session-GLOBAL counter, so the owner's own chat could trip an app's EBUDGET and two apps cannibalised each other. Argument-less `totals()` is unchanged, so the displayed one-bill-per-session figure is unaffected | **EXISTS** | `vault-llm-log.js`, `app-shell.js` `_llmTotals`; `test__llm_hardening.js`, `test__app_shell_llm_bridge.js` |
+| **Tool scope must be explicit** — for path-scoped groups (`files.read`) an empty `allow` now grants NOTHING (`ENOSCOPE`) instead of the whole vault minus the floor; the root-listing exemption narrowed to `ESCOPE` only, so an unscoped group cannot list the root either; `compileTools` states the absent scope to the model | **EXISTS** | `sg-llm-tools.js` `pathAllowed`/`PATH_SCOPED`; `test__llm_hardening.js`, `test__sg_llm_tools.js` |
 
 ### Vault Settings — AI (OpenRouter) config + read-only share block (2026-08-02)
 

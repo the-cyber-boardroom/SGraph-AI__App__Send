@@ -1,6 +1,6 @@
 # Identity — Proposed Items Index (TOC)
 
-**Domain:** identity/proposed/ | **Last updated:** 2026-07-21 | **Maintained by:** Librarian (daily run)
+**Domain:** identity/proposed/ | **Last updated:** 2026-08-22 | **Maintained by:** Librarian (daily run)
 
 All items below are PROPOSED. None have been code-verified. Do not describe any of these as existing features.
 
@@ -12,6 +12,7 @@ This is a table-of-contents index. Topic files hold the full content.
 
 | File | What It Covers | P-numbers |
 |------|---------------|-----------|
+| [`agent-enrolment.md`](agent-enrolment.md) | Bootstrap trap (P-ENR-001), Agent enrolment architecture (P-ENR-002), PKI registry / missing half of shipped PKI (P-ENR-003) | P-ENR-001, P-ENR-002, P-ENR-003 |
 | [`google-oauth.md`](google-oauth.md) | OAuth + Social Login, Secrets Management, PKI Identity Envelopes (P-314), NHI 2.0 Agent Identity Platform (P-322–P-336) | P-314, P-322–P-336 |
 | [`billing-credits.md`](billing-credits.md) | Per-User Vaults + Credits, Billing Automation, Free Tier Identity, Pre-Auth + Micropayments, Dynamic Credential Delivery, USDC + Agentic Commerce | (no P-numbers — doc refs) |
 | [`openrouter.md`](openrouter.md) | LLM API Billing Broker (P-299), OpenRouter Platform Expansion (P-385, P-386, P-388) | P-299, P-385, P-386, P-388 |
@@ -24,6 +25,9 @@ This is a table-of-contents index. Topic files hold the full content.
 
 | P-number | Feature | Topic File |
 |----------|---------|-----------|
+| P-ENR-001 | Bootstrap trap — agent identity bootstrap loop | `agent-enrolment.md` |
+| P-ENR-002 | Agent enrolment architecture (keypair → append lane → registry) | `agent-enrolment.md` |
+| P-ENR-003 | PKI registry (revocation + directory; missing half of shipped PKI) | `agent-enrolment.md` |
 | P-165 | SG Mail email client core | `email.md` |
 | P-166 | AWS SES connectors v1 | `email.md` |
 | P-167 | Cloudflare Email Service connector v2 | `email.md` |
