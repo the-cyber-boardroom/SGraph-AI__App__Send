@@ -1,6 +1,6 @@
 # AI Agents — Proposed: Agent Communication, MCP, and Security Tools
 
-**Domain:** ai-agents/proposed/agent-communication | **Last updated:** 2026-08-11 | **Maintained by:** Librarian (B-003)
+**Domain:** ai-agents/proposed/agent-communication | **Last updated:** 2026-08-25 | **Maintained by:** Librarian (B-003)
 **Parent index:** [`index.md`](index.md)
 
 All items below are PROPOSED. None have been code-verified. Do not describe any of these as existing features.
@@ -84,3 +84,22 @@ All items below are PROPOSED — does not exist yet. Vault primitives (append, t
 | # | Feature | One-Line Description | Source |
 |---|---------|---------------------|--------|
 | P-ACT-023 | Vault-as-substrate asynchronous agent collaboration | Agents with distinct responsibility, capability and focus collaborate via encrypted vault folders; no direct addressing — agents write where they may, read when they choose; blackboard architecture; authorisation, audit and confidentiality answered by the medium rather than the application; significantly outperforms controller-assigned arrangements (13-57% relative improvement per literature) | doc 915 (v0.33.55) |
+
+---
+
+## Agent Enrolment and NHI Architecture (19 August 2026, v0.33.60)
+
+All items below are PROPOSED — does not exist yet.
+
+**Note on existing infrastructure:** The append lane (write, configure, list, fetch, mark-processed,
+purge) is EXISTS — see `send-api/index.md` and `vault/index.md`. The four-tier capability model
+is EXISTS. The items below are proposed USES of that infrastructure, not proposals to build it.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-NHI-001 | Agent enrolment via append lane | Agent starts with only a keypair; constructs signed enrolment request (proof of possession, not trustworthiness); delivers to inbox via account-less append write; trusted processor applies policy and issues certificate; no borrowed authority required at bootstrap | doc 958 (v0.33.60, 19 Aug) |
+| P-NHI-002 | Trusted processor + CA + registry pipeline | Separate components: enrolment inbox (receive only), trusted processor (read inbox + apply policy), certificate authority (hold issuing key), registry (publish issued identities + mandates); authority never exposed to untrusted side | doc 958 (v0.33.60, 19 Aug) |
+| P-NHI-003 | Service twin / execution broker | Agent sends mandate + signed request; broker verifies identity, mandate, and context; executes ONLY the permitted operation using credentials held inside its own boundary; agent never receives the credential; closes the authorised-misuse boundary capability grants / plan-then-execute / per-agent keys each named as their limit | doc 960 (v0.33.60, 19 Aug) |
+| P-NHI-004 | Identity / mandate separation | Identity and mandate are separate signed statements; they are issued, revoked, and reasoned about independently; a valid identity does not imply permission; a mandate change does not require a new identity; checkable by third parties without asking the issuer | docs 958, 961 (v0.33.60, 19 Aug) |
+| P-NHI-005 | Fractal registries with declared trust roots | Registries recognise other registries; each must declare which roots it accepts, or the trust chain cannot be evaluated; required before any multi-registry federation scenario | doc 958 (v0.33.60, 19 Aug) |
+| P-NHI-006 | Lane addressing by pubkey hash (client-side derivation) | `append_token = H(pubkey)` addresses a lane by the recipient's key; agent knows its own lane address without a directory lookup; **client-side derivation only, not yet shipped server-side** — do not code against this until the server-side derivation ships | doc 959 (v0.33.60, 19 Aug) |

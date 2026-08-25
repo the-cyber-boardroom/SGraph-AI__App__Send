@@ -1,6 +1,6 @@
 # Reality — Master Index
 
-**Version:** v0.33.61 | **Last updated:** 2026-08-20 | **Maintained by:** Librarian (daily run)
+**Version:** v0.33.62 | **Last updated:** 2026-08-25 | **Maintained by:** Librarian (daily run)
 **Structure:** Domain tree — each domain has its own directory with `index.md` and `proposed/`
 
 This file is the entry point. Read it to find the right domain, then go to that domain's
@@ -35,7 +35,7 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 
 | Metric | Count |
 |--------|-------|
-| User Lambda API endpoints | 32 unique (40 route paths) + `/api/info/sgraph` (Routes__Info__SGraph.py) |
+| User Lambda API endpoints | 33 unique (41 route paths) — vault/zip corrected from PROPOSED to EXISTS (2026-08-25) + `/api/info/sgraph` (Routes__Info__SGraph.py) |
 | Admin Lambda API endpoints | 51 unique (61 route paths) |
 | Total API endpoints | **83+** |
 | Unit tests passing | **~3100+** (977 Python + ~157 vault-UI JS + ~930+ ViV loader suite (373+ base + ~557 from LLM/voice/releases/send-browse-split/image/sync sessions 08/02–08/04: sg_releases 47, pinned_data_source 27, vault_releases_editor 44, sg_llm_config 53, sg_llm 40, sg_llm_vault 17, sg_voice 86, base64_chunk_guard 88, send_browse_split 97, vault_llm_log 35, vault_llm_chat 122, vault_shell_llm_panels 28, app_page_llm_panels 46, vault_llm_requests 29, vault_browse_edit__add_to_chat 13, app_shell_llm_bridge 96, sg_vision 62, no_auto_reload 27) + ~78 app-shell JS + 37 embed-protocol + ~334 inbox/write-batch/owner-secrets suite; browser integration: 8 tests; +10 app-shell-nav-helpers; +19 from Phase A/B/C1: container-app 9→16, auth 7→8, +3 port, +8 deploy-smoke; +146 from 08/15–16 commits: read-key-open +49, sg.llm-harden-P0-P3 +42, sg.llm-P4 +32, vault-settings-listing +9, RO-settings-panel +14) — updated 2026-08-18 |
@@ -45,7 +45,7 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | Active tools (tools.sgraph.ai) | 4 |
 | sgit CLI commands | 20+ |
 | Open PROPOSED items (across all domains) | ~1051+ (+11 net-new from 02-06 Aug: P-ACT-014–024 across vault/, ai-agents/, cli/; previously ~1040+; processed 2026-08-11) |
-| Total documents catalogued | 956 (+20 from 09-14 Aug: 7 × 08/09 graphing-text + risk-register + 13 × 08/14 sgit-hub + WhatsApp-bridge + briefing-packs; processed 08/17–08/20; prev: 936) |
+| Total documents catalogued | 962 (+6 from 19 Aug: 5 briefs + 1 reference, NHI bootstrap + execution broker + PKI site review; processed 08/25; prev: 956) |
 | **Key decision** | **Risk Mandate.ai** adopted as product name (resolves OQ-company-name-1, 2026-06-25) |
 | **Key decision** | **Grounded alarm** adopted as the Risk Mandate communication strategy term (replaces FUD framing, 2026-07-05) |
 | **Key decision** | **The grant is the mandate** — authorization is the union of what the agent can already do; "never-in-line" (2026-07-23) |

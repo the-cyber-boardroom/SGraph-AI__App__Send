@@ -7,6 +7,23 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-08-25
+
+6 new human briefs (19 Aug: 5 briefs + 1 reference) — NHI bootstrap architecture, agent enrolment via append lane, service twin execution broker, PKI site review. One reality document correction: vault/zip moved from PROPOSED to EXISTS. 6 new PROPOSED items (P-NHI-001 through P-NHI-006).
+
+Files changed:
+- `reality/send-api/index.md` — Vault Zip section added (EXISTS, 19 tests); DOES NOT EXIST and PROPOSED entries corrected; Last updated → 2026-08-25
+- `reality/ai-agents/proposed/agent-communication.md` — New section: Agent Enrolment and NHI Architecture (P-NHI-001–P-NHI-006); Last updated → 2026-08-25
+- `reality/index.md` — User Lambda API count 32→33 (vault/zip correction); cumulative docs 956→962; Last updated → 2026-08-25
+- `reality/changelog.md` — 2026-08-25 entry added (this entry)
+- `team/roles/librarian/DAILY_RUN.md` — session added to COMPLETED
+
+Session: 6 new briefs (5 + 1 reference) | New EXISTS items: 1 (vault/zip) | New PROPOSED items: 6 (P-NHI-001–006) | Test count: ~3100+ (unchanged) | Cumulative docs: 962 (was 956)
+Master index (08/25): `team/roles/librarian/reviews/08/25/v0.33.62__master-index__briefs-19-aug-2026.md`
+Debrief (08/25): `team/humans/dinis_cruz/debriefs/08/25/v0.33.62__debrief__briefs-processing-19-aug-2026.md`
+
+---
+
 ## 2026-08-20
 
 18 new human briefs (6 from 09 Aug, 12 from 14 Aug) — addendum session (08/17–08/18 had already processed the same briefs). Fresh role reviews and debrief produced. vault/index.md and ai-agents/index.md updated with sg.llm P0-P4 section and embed post-review fix sections.
