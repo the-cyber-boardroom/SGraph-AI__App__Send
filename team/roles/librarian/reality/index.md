@@ -31,7 +31,7 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 
 ---
 
-## Quick Stats (as of 2026-08-19)
+## Quick Stats (as of 2026-08-22)
 
 | Metric | Count |
 |--------|-------|
@@ -44,8 +44,8 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | Browser UIs | **7** (share v0.4, open v0.4, admin, workspace, vault browser, vault app /en-gb/app; user v0.3.x legacy) |
 | Active tools (tools.sgraph.ai) | 4 |
 | sgit CLI commands | 20+ |
-| Open PROPOSED items (across all domains) | ~1051+ (+11 net-new from 02-06 Aug: P-ACT-014–024 across vault/, ai-agents/, cli/; previously ~1040+; processed 2026-08-11) |
-| Total documents catalogued | 962 (+6 from 19 Aug: 5 briefs + 1 reference, NHI bootstrap + execution broker + PKI site review; processed 08/25; prev: 956) |
+| Open PROPOSED items (across all domains) | ~1073+ (+6 net-new from 08/25 session: P-NHI-001–006; +16 from 08/23 session: P-ENR-001–009, P-BRK-001–007; previously ~1051+) |
+| Total documents catalogued | 962 (+6 from 19 Aug: 5 briefs + 1 reference, v0.33.60; processed 08/21–08/25; prev: 956) |
 | **Key decision** | **Risk Mandate.ai** adopted as product name (resolves OQ-company-name-1, 2026-06-25) |
 | **Key decision** | **Grounded alarm** adopted as the Risk Mandate communication strategy term (replaces FUD framing, 2026-07-05) |
 | **Key decision** | **The grant is the mandate** — authorization is the union of what the agent can already do; "never-in-line" (2026-07-23) |
@@ -82,8 +82,17 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | **Key decision** | **Read keys publishable, write keys never** — publishable read key enables read-only sharing without revealing authorship capability; lost write key = frozen vault (no recovery path); escrow-before-publish is required (sgit hub security boundary, 2026-08-14) |
 | **Key decision** | **Component, not plugin** — sgit hub feature set delivered as component to avoid collision with the permission-grant model where "plugin" = capability grant; naming matters for the security boundary (sgit hub taxonomy, 2026-08-14) |
 | **Key decision** | **Browser IS the application layer for sgit hub** — object storage is the server; browser is the runtime; all rendering, search, and indexing features must run client-side because the server cannot read plaintext; consequence: server-side features require the server to hold keys, which contradicts zero-knowledge (sgit hub architecture, 2026-08-14) |
+| **Key decision** | **Bootstrap trap = choreography, not cryptography** — creating a key is not creating an identity; an identity is a relationship; every common workaround grants authority broader than the identity being created; the fix is a door narrow enough that walking through it requires nothing; the append lane is that door (2026-08-19) |
+| **Key decision** | **Identity and mandate are separate signed statements** — issued, revoked and reasoned about independently; identity says who a key is; mandate says what it may do; revoke independently; a mandate is checkable by a third party without asking the issuer (2026-08-19) |
+| **Key decision** | **Agent enrolment ingress = vault append lane (SHIPPED)** — the account-less write path (append token in body, no access token, blind acknowledgement) is the narrow door for agent enrolment; the bootstrap architecture configures a deployed transport, it does not build a new one; client sealing layer (derive lane address from recipient public key hash) is PROPOSED (2026-08-19) |
+| **Key decision** | **Execution broker = unit of delegation shifts from credential to action** — agent never holds the credential; broker verifies signed mandate and performs action; closes the authorised-misuse boundary that capability grants, vault kernel, and relay pattern each named as their limit; credential concentration (broker holds everything) inverts the catastrophic-failure property; self-hosting is the mitigation (2026-08-19) |
+| **Key decision** | **Rename "service twin" → "execution broker"** — "twin" already means graph-meets-reality in the risk mandate architecture; naming collision is the third in this corpus; rename before any schema, code, or documentation uses the current name (2026-08-19) |
 | **Key decision** | **Meaning extraction is decompilation** — text-to-semantic-graph produces many valid readings from one source (ambiguous), not one output from one source (compilation); no automated pipeline to a single canonical graph is possible without violating this claim; human author remains a necessary node in the write path; corrections propagate with supersede semantics (graphing text architecture, 2026-08-09) |
 | **Key decision** | **WhatsApp bridge: one vault per conversation** — the bridge provides structured storage and portability for extracted conversation records; this is a portability design, not a zero-knowledge design (WhatsApp sees messages); derivation removes the customer index (WhatsApp bridge architecture, 2026-08-14) |
+| **Key decision** | **The bootstrap trap is a loop, not a gap** — an agent must present an identity to reach a trusted authority, but gaining that identity requires the authority; every workaround trades a small identity problem for a larger one (platform credentials, repository write access, shared bot tokens, etc.); the fix is a transport narrow enough to require nothing (agent identity architecture, 2026-08-19) |
+| **Key decision** | **Identity and mandate are separate signed statements** — identity answers "who is this agent"; mandate answers "what is this agent permitted to do"; they are issued, revoked and reasoned about independently; a certificate proves possession of a key, not authorisation to act (agent enrolment architecture, 2026-08-19) |
+| **Key decision** | **Blind acknowledgement is a stronger write-only property** — the append lane write path returns a blind acknowledgement: the sender learns only that the write succeeded and cannot probe what is in the lane; this is enforced in the response, not only in the permission model (append lane audit, 2026-08-19) |
+| **Key decision** | **Unit of delegation moves from credential to authorised action** — a service twin / execution broker holds service credentials the agent never sees; agent presents a mandate + signed request; broker executes only the permitted operation; closes the "authorised party misusing legitimately held authority" boundary that capability grants, state machines, and per-agent keys cannot close (service twin architecture, 2026-08-19) |
 
 ---
 
