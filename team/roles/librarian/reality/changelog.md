@@ -1140,4 +1140,12 @@ Master index: `team/roles/librarian/reviews/04/24/v0.22.6__master-index__code-de
 
 ---
 
+## 2026-08-29
+
+- `reality/index.md` — Last updated → 2026-08-29; no new EXISTS items; B-014 closed (doc count audit: 956 confirmed as canonical baseline, 08/18 master index annotated)
+
+Master index: `team/roles/librarian/reviews/08/29/v0.33.64__master-index__no-new-briefs-29-aug-2026.md`
+
+---
+
 *For older history, see the archived monolith `v0.16.26__what-exists-today.md` — "Changes Since" sections cover 02/26 through 04/28.*
