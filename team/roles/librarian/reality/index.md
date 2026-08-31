@@ -1,6 +1,6 @@
 # Reality — Master Index
 
-**Version:** v0.33.64 | **Last updated:** 2026-08-29 | **Maintained by:** Librarian (daily run)
+**Version:** v0.33.64 | **Last updated:** 2026-08-31 | **Maintained by:** Librarian (daily run)
 **Structure:** Domain tree — each domain has its own directory with `index.md` and `proposed/`
 
 This file is the entry point. Read it to find the right domain, then go to that domain's
@@ -45,7 +45,7 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | Active tools (tools.sgraph.ai) | 4 |
 | sgit CLI commands | 20+ |
 | Open PROPOSED items (across all domains) | ~1084+ (+11 net-new from 08/26 session: P-REG-001–005, P-CON-001–002, P-EXP-001–002, P-SITE-001–002; +6 from 08/25: P-NHI-001–006; +16 from 08/23: P-ENR-001–009, P-BRK-001–007; previously ~1051+) |
-| Total documents catalogued | 979 (+17 from 20 Aug: 8 agent-identity + 5 explaining-it + 2 sites + 2 consumer-vertical, v0.33.61; processed 08/26–08/27; prev: 962) |
+| Total documents catalogued | 980 (+17 from 20 Aug v0.33.61; processed 08/26–08/27; +1 day index confirmed 08/31; prev: 962) |
 | **Key decision** | **Risk Mandate.ai** adopted as product name (resolves OQ-company-name-1, 2026-06-25) |
 | **Key decision** | **Grounded alarm** adopted as the Risk Mandate communication strategy term (replaces FUD framing, 2026-07-05) |
 | **Key decision** | **Grant ≠ Mandate** (corrected 2026-08-20, doc 963 v0.33.61) — grant is the union of capabilities conferred at assignment; mandate is what the party is authorised and expected to do; excess authority = grant minus mandate = unaccepted blast radius; allow-list mandates are the only measurable form; the July "to grant is to mandate" identification was correct as an accounting identity (a party carries its grant's exposure) but wrong as an object collapse; the two are separate objects |
