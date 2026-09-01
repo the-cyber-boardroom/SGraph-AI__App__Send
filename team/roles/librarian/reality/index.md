@@ -1,6 +1,6 @@
 # Reality — Master Index
 
-**Version:** v0.33.62 | **Last updated:** 2026-08-25 | **Maintained by:** Librarian (daily run)
+**Version:** v0.33.64 | **Last updated:** 2026-09-01 | **Maintained by:** Librarian (daily run)
 **Structure:** Domain tree — each domain has its own directory with `index.md` and `proposed/`
 
 This file is the entry point. Read it to find the right domain, then go to that domain's
@@ -31,7 +31,7 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 
 ---
 
-## Quick Stats (as of 2026-08-22)
+## Quick Stats (as of 2026-09-01)
 
 | Metric | Count |
 |--------|-------|
@@ -44,8 +44,8 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | Browser UIs | **7** (share v0.4, open v0.4, admin, workspace, vault browser, vault app /en-gb/app; user v0.3.x legacy) |
 | Active tools (tools.sgraph.ai) | 4 |
 | sgit CLI commands | 20+ |
-| Open PROPOSED items (across all domains) | ~1073+ (+6 net-new from 08/25 session: P-NHI-001–006; +16 from 08/23 session: P-ENR-001–009, P-BRK-001–007; previously ~1051+) |
-| Total documents catalogued | 962 (+6 from 19 Aug: 5 briefs + 1 reference, v0.33.60; processed 08/21–08/25; prev: 956) |
+| Open PROPOSED items (across all domains) | ~1086+ (+13 net-new from 09/01 session: P-REG-001–005, P-SHD-001–002, P-CON-001–003; previously ~1073+) |
+| Total documents catalogued | 979 (+17 from 20 Aug: 8 agent-identity, 5 explaining-it, 2 the-sites, 2 consumer-vertical, v0.33.61; processed 09/01; prev: 962) |
 | **Key decision** | **Risk Mandate.ai** adopted as product name (resolves OQ-company-name-1, 2026-06-25) |
 | **Key decision** | **Grounded alarm** adopted as the Risk Mandate communication strategy term (replaces FUD framing, 2026-07-05) |
 | **Key decision** | **The grant is the mandate** — authorization is the union of what the agent can already do; "never-in-line" (2026-07-23) |

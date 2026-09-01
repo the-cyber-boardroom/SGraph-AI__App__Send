@@ -1,6 +1,6 @@
 # AI Agents — Proposed: Agent Communication, MCP, and Security Tools
 
-**Domain:** ai-agents/proposed/agent-communication | **Last updated:** 2026-08-25 | **Maintained by:** Librarian (daily run)
+**Domain:** ai-agents/proposed/agent-communication | **Last updated:** 2026-09-01 | **Maintained by:** Librarian (daily run)
 **Parent index:** [`index.md`](index.md)
 
 All items below are PROPOSED. None have been code-verified. Do not describe any of these as existing features.
@@ -147,3 +147,44 @@ All items below are PROPOSED — does not exist yet.
 | # | Feature | One-Line Description | Source |
 |---|---------|---------------------|--------|
 | P-MEB-001 | Mandate execution broker | Agent presents a signed mandate; broker verifies the mandate and executes the specified action against an external service using credentials the agent never sees; broker returns a signed receipt. Unit of delegation moves from credential access to authorised action. Closes the "authorised party misusing authority it legitimately holds" boundary named by three prior briefs (plugins 06 Aug, vault kernel 06 Aug, relay pattern 16 Aug). Mandate schema: subject, issuer, service/instance, capability, resource, constraints, workflow/stage, environment, valid_from/until, usage_limit, signature. Receipt: signed by broker; cannot be amended; can feed later workflow stages; works for rented agents without attestation. **Concentration risk**: broker holds all credentials for all services and all tenants — inverts the catastrophic failure property the vault achieves; self-hosting is the mitigation (not an enterprise upsell). **Naming collision**: "Service Twin" collides with "digital twin" (established corpus term); recommended rename: Mandate Broker or Mandate Execution Broker. | doc 959 (v0.33.60) |
+
+---
+
+## Register UI (20 August 2026, v0.33.61)
+
+All items below are PROPOSED — does not exist yet.
+
+**Note on existing infrastructure:** The append lane and the register design (June 2026) are EXISTS. Items below are proposed UI and query features on top of that infrastructure.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-REG-001 | Register UI: six-field verification badge per trust edge | Every edge in the register UI carries: claim, verifiable-by ("Nobody" is valid and informative), method, cost, last-checked, result; determines whether enforcement or instrumentation applies | doc 970 (v0.33.61, 20 Aug) |
+| P-REG-002 | Register UI: policy-as-query | Policy is a saved query that must return zero rows when all edges are verified; non-empty result means a policy violation exists; the surface claim fails | doc 970 (v0.33.61, 20 Aug) |
+| P-REG-003 | Path-scoped history command | The register's central query — traverse commit history scoped to a single path; confirmed as unwritten code; the one piece the register cannot demonstrate its value without | doc 965 + day index (v0.33.61, 20 Aug) |
+| P-REG-004 | Effective revocation latency as a computable metric | A "verify at least every N hours" mandate clause is decidable; effective revocation latency is the gap between revocation event and last-checked timestamp; computable per issuer/party pair | doc 967 (v0.33.61, 20 Aug) |
+| P-REG-005 | Grant/Mandate data model schema | Grant: `{ id, credential_id, allowed_operations[], issuer, issued_at, signature, private_key_published: bool }`; Mandate: `{ id, agent_id, authorised_actions[], mandate_issuer, mandate_at, signature }`; Exposure = allowed_operations minus authorised_actions | docs 963–964 (v0.33.61, 20 Aug) |
+
+---
+
+## Shared Drive (20 August 2026, v0.33.61)
+
+All items below are PROPOSED — does not exist yet.
+
+**Hard precondition: `.sgitignore` (P-SHD-002) must ship before P-SHD-001 can be built.**
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-SHD-001 | Shared drive: watcher + queue + three vaults | Watcher monitors local folder; commits change queue to staging vault; commits batched per window to destination vault; compare-and-swap on branch reference resolves contention; commit queue specified May 2026, not yet integrated as shared drive | doc 977 (v0.33.61, 20 Aug) |
+| P-SHD-002 | `.sgitignore` file implementation | Pattern-based exclusion from vault commits (analogous to `.gitignore`); specified March 2026 with defaults; absent from site index; blocks the shared drive entirely; overflow above 16k events in queue loses events silently without this | doc 977 + day index (v0.33.61, 20 Aug) |
+
+---
+
+## Consumer Register (20 August 2026, v0.33.61)
+
+All items below are PROPOSED — does not exist yet. **Legal review required before first register entry.**
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-CON-001 | Public consumer register: "ask whether they hold it, publish the record not the verdict" | First question to any company: "do you hold a usage record?"; register records the answer (yes/no/no-response); no adjectives, no verdict; substantial truth is a complete defence; day-one viable — useful with one row | doc 979 (v0.33.61, 20 Aug) |
+| P-CON-002 | Trader compliance standard: five externally-checkable clauses | An adoptable standard with five clauses verifiable without court access; publishable as an open standard; tied to EU subscription regime (operative from spring 2027, not yet in force) | doc 979 (v0.33.61, 20 Aug) |
+| P-CON-003 | User assessment section on pki.sgit.ai | Browser-stores user selections as references (category IDs), not descriptions; verifiable in network panel; high-threat + low-efficacy case must include an efficacy exit (request for signed vendor audit record) | doc 973 (v0.33.61, 20 Aug) |
