@@ -7,6 +7,22 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-08-31
+
+17 briefs + 1 day index from 20 August 2026 (v0.33.61) processed. Four threads: agent identity/registry, explaining it to people, site operations, consumer vertical. Key vocabulary correction: grant ≠ mandate; excess authority = blast radius from the other end. Fixture class named. 9 new PROPOSED items (P-KRG-001–005, P-CON-001–002, P-EXP-001–002).
+
+Files changed:
+- `reality/index.md` — PROPOSED count ~1073→~1082; cumulative docs 962→980; version v0.33.62→v0.33.64; Last updated → 2026-08-31
+- `reality/identity/proposed/agent-enrolment.md` — Added P-KRG-001 (fixture class), P-KRG-002 (agent card personas), P-KRG-003 (grant/mandate measurement), P-KRG-004 (path-scoped history), P-KRG-005 (lane anchor clarification); Last updated → 2026-08-31
+- `reality/identity/proposed/index.md` — P-KRG-001–005 added to P-number inventory; Last updated → 2026-08-31
+- `reality/changelog.md` — 2026-08-31 entry added (this entry)
+
+Session: 18 new briefs (17 + 1 index) | New EXISTS items: 0 | New PROPOSED items: 9 (P-KRG-001–005, P-CON-001–002, P-EXP-001–002) | Test count: ~3100+ (unchanged) | Cumulative docs: 980 (was 962)
+Master index (08/31): `team/roles/librarian/reviews/08/31/v0.33.64__master-index__briefs-20-aug-2026.md`
+Debrief (08/31): `team/humans/dinis_cruz/debriefs/08/31/v0.33.64__debrief__briefs-processing-20-aug-2026.md`
+
+---
+
 ## 2026-08-25
 
 6 new human briefs (19 Aug: 5 briefs + 1 reference) — NHI bootstrap architecture, agent enrolment via append lane, service twin execution broker, PKI site review. One reality document correction: vault/zip moved from PROPOSED to EXISTS. 6 new PROPOSED items (P-NHI-001 through P-NHI-006).
@@ -1137,6 +1153,14 @@ Master index: `team/roles/librarian/reviews/04/25/v0.22.17__master-index__briefs
 - `v0.16.26__what-exists-today.md` — sg-site-header v1.0.4–v1.0.6, 10 homepage components, jsUrl fix
 
 Master index: `team/roles/librarian/reviews/04/24/v0.22.6__master-index__code-delivery-23-24-apr.md`
+
+---
+
+## 2026-08-29
+
+- `reality/index.md` — Last updated → 2026-08-29; no new EXISTS items; B-014 closed (doc count audit: 956 confirmed as canonical baseline, 08/18 master index annotated)
+
+Master index: `team/roles/librarian/reviews/08/29/v0.33.64__master-index__no-new-briefs-29-aug-2026.md`
 
 ---
 
