@@ -7,6 +7,16 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-09-02
+
+- No domain files updated (quiescent day — no new briefs, no new code commits)
+- `reality/index.md` — Last updated → 2026-09-02
+- B-015 added to DAILY_RUN: update qa/index.md test count for sgit key prefix tests (test__sgit_key_prefixes.js, added 08/25 feature commit)
+
+Master index: `team/roles/librarian/reviews/09/02/v0.33.64__master-index__daily-check-02-sep-2026.md`
+
+---
+
 ## 2026-08-31
 
 17 briefs + 1 day index from 20 August 2026 (v0.33.61) processed. Four threads: agent identity/registry, explaining it to people, site operations, consumer vertical. Key vocabulary correction: grant ≠ mandate; excess authority = blast radius from the other end. Fixture class named. 9 new PROPOSED items (P-KRG-001–005, P-CON-001–002, P-EXP-001–002).

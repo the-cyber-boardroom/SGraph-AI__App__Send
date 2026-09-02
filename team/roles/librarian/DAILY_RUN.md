@@ -191,6 +191,15 @@ invisible to agents checking domain indexes may be re-authored from scratch unne
 domain index. The two new Aug 2026 guides (`EXTRACT-AND-EMBED-A-SUB-VAULT.md`,
 `PUBLISHING-SGIT-VAULT-TO-GITHUB.md`) are now visible to agents querying both domain indexes.
 
+### B-015 · Update qa/index.md — Add sgit key prefix test count (08/25 feature)
+**Status:** OPEN
+**What:** The 08/25 vault-key-readonly feature (commit `b3a9220`) added `test__sgit_key_prefixes.js`
+(109 lines) to the ViV loader test suite via `run-all.sh`. The `reality/qa/index.md` still reads
+"~3100+ (updated 2026-08-18)". Read the file to count its assertions and add it to the ViV suite
+table in qa/index.md.
+**Why:** Test count is the one accuracy promise on qa/index.md. A 109-line file likely carries
+~50–80 assertions; omitting it understates the suite.
+
 ### B-006 · Health scan — Check broken relative links across team/ and library/
 **Status:** DONE (2026-07-17)
 **What:** Walk all `.md` files under `team/` and `library/`, extract relative links, verify
@@ -295,6 +304,7 @@ None currently active.
 | 2026-08-13 | No new briefs; PUBLISHING-SGIT-VAULT-TO-GITHUB.md guide documented (missed by 08/12 session); CI bump v0.33.55 → v0.33.56; B-013 added | Master index, 2 reality files updated (index.md, changelog), DAILY_RUN, debrief produced |
 | 2026-08-12 | No new briefs; multi-target deployment plan (P-405–P-412 confirmed); "7 targets" corrected to 4 working + 8 PROPOSED; vault extract-and-embed guide noted; CI bump v0.33.54 → v0.33.55 | Master index, 4 reality files updated (index.md, qa, ui, changelog), DAILY_RUN, debrief produced |
 | 2026-08-11 | 26 new briefs (02 Aug + 06 Aug); 5 new code commits; 1 standing decision corrected; 11 new PROPOSED items | Master index, Dev review, AppSec review, 6 reality files updated, changelog, debrief produced; OpenRouter resale prohibition annotated in index.md |
+| 2026-09-02 | No new briefs; no new feature commits since 08/25; B-015 added (QA test count for sgit key prefix tests); branch 7 commits ahead of dev — merge pending | reality/index.md date updated; changelog entry; master index + debrief produced |
 | 2026-08-29 | No new briefs; no new feature commits; B-014 completed — document count discrepancy audited and annotated | 18 brief files counted in 08/09+08/14 batch; 956 accepted as canonical baseline; 08/18 master index annotated; master index + debrief produced |
 | 2026-08-07 | No new briefs; date/last-updated brought current to today | qa/index.md + index.md "Last updated" updated to 2026-08-07; master index + debrief produced |
 
