@@ -192,13 +192,15 @@ domain index. The two new Aug 2026 guides (`EXTRACT-AND-EMBED-A-SUB-VAULT.md`,
 `PUBLISHING-SGIT-VAULT-TO-GITHUB.md`) are now visible to agents querying both domain indexes.
 
 ### B-015 · Update qa/index.md — Add sgit key prefix test count (08/25 feature)
-**Status:** OPEN
+**Status:** DONE (2026-09-03)
 **What:** The 08/25 vault-key-readonly feature (commit `b3a9220`) added `test__sgit_key_prefixes.js`
 (109 lines) to the ViV loader test suite via `run-all.sh`. The `reality/qa/index.md` still reads
 "~3100+ (updated 2026-08-18)". Read the file to count its assertions and add it to the ViV suite
 table in qa/index.md.
 **Why:** Test count is the one accuracy promise on qa/index.md. A 109-line file likely carries
 ~50–80 assertions; omitting it understates the suite.
+
+**Outcome:** 28 assertions counted (4 suites: KAT derivation 10, stripKeyPrefix 7, classifyKey 6, format detection 5). Table row added to ViV suite at "08/25 state". Total updated: ~1060+ ViV → ~1090+ ViV; ~3100+ overall → ~3130+. Header date updated to 2026-08-25.
 
 ### B-006 · Health scan — Check broken relative links across team/ and library/
 **Status:** DONE (2026-07-17)
