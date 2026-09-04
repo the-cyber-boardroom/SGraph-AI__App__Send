@@ -1,6 +1,6 @@
 # Reality — Master Index
 
-**Version:** v0.33.62 | **Last updated:** 2026-08-25 | **Maintained by:** Librarian (daily run)
+**Version:** v0.33.64 | **Last updated:** 2026-09-04 | **Maintained by:** Librarian (daily run)
 **Structure:** Domain tree — each domain has its own directory with `index.md` and `proposed/`
 
 This file is the entry point. Read it to find the right domain, then go to that domain's
@@ -44,8 +44,13 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | Browser UIs | **7** (share v0.4, open v0.4, admin, workspace, vault browser, vault app /en-gb/app; user v0.3.x legacy) |
 | Active tools (tools.sgraph.ai) | 4 |
 | sgit CLI commands | 20+ |
-| Open PROPOSED items (across all domains) | ~1073+ (+6 net-new from 08/25 session: P-NHI-001–006; +16 from 08/23 session: P-ENR-001–009, P-BRK-001–007; previously ~1051+) |
-| Total documents catalogued | 962 (+6 from 19 Aug: 5 briefs + 1 reference, v0.33.60; processed 08/21–08/25; prev: 956) |
+| Open PROPOSED items (across all domains) | ~1083+ (+10 net-new from 09/04 session: grant/mandate excess-authority measurement, fixture class + private_key_published flag, register UI with verification badges, policy-as-query, check events in issuer's lane, grant tree with control labels, consumer public register, shared drive watcher+queue+vaults, path-scoped history command, lane-with-no-anchors access policy; prev: ~1073+) |
+| Total documents catalogued | 979 (+17 from 20 Aug: 6 arch-briefs + 4 dev-briefs + 4 strategy-briefs + 1 cross-team-brief + 1 reference + 1 day-index, v0.33.61; processed 09/04; prev: 962) |
+| **Key decision** | **Grant ≠ Mandate** — grant = union of capabilities conferred at assignment; mandate = what the party is authorised to do; excess authority = grant − mandate; corrects July claim "to grant is to mandate"; allow-list mandates only (deny-lists widen silently on supplier releases) (2026-08-20) |
+| **Key decision** | **Published private key = fixture, not identity** — a published private half proves nothing (anyone can produce the signature), cannot be promoted, cannot be revoked; fixtures must inhabit a class structurally unreachable from the trust graph; `private_key_published` flag required in register schema (2026-08-20) |
+| **Key decision** | **Publish the record, not the verdict** — consumer register publishes who holds a credential (fact), never a compliance verdict; defamation law and the corpus's own comparison discipline reached this rule independently (2026-08-20) |
+| **Key decision** | **Ignore file is a precondition** — shared drive watcher cannot function without the ignore file; specified March 2026, raised three times, now classified as a precondition blocking all drive work (2026-08-20) |
+| **Key decision** | **A verification is not a use** — check events (verification calls) route to the issuer's lane, not the subject's lane; metering live lookups = surveillance; publishing the public record removes both capabilities simultaneously (2026-08-20) |
 | **Key decision** | **Risk Mandate.ai** adopted as product name (resolves OQ-company-name-1, 2026-06-25) |
 | **Key decision** | **Grounded alarm** adopted as the Risk Mandate communication strategy term (replaces FUD framing, 2026-07-05) |
 | **Key decision** | **The grant is the mandate** — authorization is the union of what the agent can already do; "never-in-line" (2026-07-23) |
