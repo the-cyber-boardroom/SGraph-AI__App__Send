@@ -1,6 +1,6 @@
 # AI Agents — Proposed: Agent Communication, MCP, and Security Tools
 
-**Domain:** ai-agents/proposed/agent-communication | **Last updated:** 2026-08-25 | **Maintained by:** Librarian (daily run)
+**Domain:** ai-agents/proposed/agent-communication | **Last updated:** 2026-09-01 | **Maintained by:** Librarian (daily run)
 **Parent index:** [`index.md`](index.md)
 
 All items below are PROPOSED. None have been code-verified. Do not describe any of these as existing features.
@@ -147,3 +147,47 @@ All items below are PROPOSED — does not exist yet.
 | # | Feature | One-Line Description | Source |
 |---|---------|---------------------|--------|
 | P-MEB-001 | Mandate execution broker | Agent presents a signed mandate; broker verifies the mandate and executes the specified action against an external service using credentials the agent never sees; broker returns a signed receipt. Unit of delegation moves from credential access to authorised action. Closes the "authorised party misusing authority it legitimately holds" boundary named by three prior briefs (plugins 06 Aug, vault kernel 06 Aug, relay pattern 16 Aug). Mandate schema: subject, issuer, service/instance, capability, resource, constraints, workflow/stage, environment, valid_from/until, usage_limit, signature. Receipt: signed by broker; cannot be amended; can feed later workflow stages; works for rented agents without attestation. **Concentration risk**: broker holds all credentials for all services and all tenants — inverts the catastrophic failure property the vault achieves; self-hosting is the mitigation (not an enterprise upsell). **Naming collision**: "Service Twin" collides with "digital twin" (established corpus term); recommended rename: Mandate Broker or Mandate Execution Broker. | doc 959 (v0.33.60) |
+
+---
+
+## Grant/Mandate Registry and Agent Identity (20 August 2026, v0.33.61)
+
+All items below are PROPOSED — does not exist yet. Source: 17 briefs from `team/humans/dinis_cruz/briefs/08/20/` (docs 963–979).
+
+**Vocabulary note (doc 963):** The July identification "to grant is to mandate" (v0.33.49) is corrected. A **grant** is the union of capabilities conferred at assignment. A **mandate** is what the holder is authorised to do. The gap (grant minus mandate) is **excess authority** — measurable, unaccepted by construction, and defaults to critical.
+
+**Governing rule (doc 970):** A key belongs to whatever can keep a secret. Everything else is signed by something that can. Per-object published private keys are rejected: publishing the private half destroys the integrity a signature was meant to supply.
+
+### Registry Architecture
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-REG-001 | Grant/mandate gap measurement | Report or UI showing excess authority (grant minus mandate) as a count; requires mandate stored as allow-list; allow-list form required for the measurement to be well-defined; prohibitions are annotations, not the enforcement surface | doc 963 (v0.33.61, 20 Aug) |
+| P-REG-002 | Register UI with six-field verification badges | Every trust edge carries: claim, verifiable-by ("Nobody" is valid and informative), method, cost, last-checked, result; policy = query that must return zero rows when all edges verified and recent; surface claim that a register shows trust fails unless verification is current and visible | docs 967, 970 (v0.33.61, 20 Aug) |
+| P-REG-003 | Path-scoped history command | CLI/API command showing what was in a path at any commit; "the register's central query and the one piece of unwritten code"; query over the mutable path pointer; not a new storage mechanism | day index (v0.33.61, 20 Aug) |
+| P-REG-004 | Observability/usage graph + revocation latency metric | Route check events to issuer's own lane tagged with the object's identifier; a verification is not a use; missing edges are the finding; metering at the verification step = surveillance; effective revocation latency is computable per issuer/party pair | doc 968 (v0.33.61, 20 Aug) |
+| P-REG-005 | Lane anchor behavior spec | Whether a lane with no anchors accepts any token holder is undocumented in the interface reference; gates observability coverage entirely; answer is a documentation update, not a code change | day index / doc 976 (v0.33.61, 20 Aug) |
+
+### Consumer Transparency Register
+
+All items below require legal review before first register entry is published.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-CON-001 | Consumer transparency register | Companies answer whether they hold usage records for a named subscriber; "the refund is the pretext and the record of who answers is the asset"; five-clause questionnaire; publish dated record of what was asked and answered; never publish a characterisation; "does not hold usage data" is a valid, non-penalised response | doc 979 (v0.33.61, 20 Aug) |
+| P-CON-002 | Subscription compliance standard (5 clauses) | Adoptable by one company without legislation; every clause observable from outside without company cooperation; tied to EU subscription regime (operative from spring 2027, not yet in force) | doc 979 (v0.33.61, 20 Aug) |
+| P-CON-003 | User grant assessment section | High-threat personal page; browser-stores choices (category IDs) not answers — verifiable in network panel; must include efficacy statements (high threat without efficacy produces denial); separate editorial rule from the low-threat general page | doc 973 (v0.33.61, 20 Aug) |
+
+### Explaining-It Tooling
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-EXP-001 | Grant tree persona generator | Adapts the Aug 9 persona generator to produce level × variant grids over grant trees; levels (depth of detail) and variants (rendering/wording) are orthogonal; governing rule: a variant may change emphasis/ordering/vocabulary/format and may never change what is being accepted; checkable: fact-diff across variants must be empty | doc 974 (v0.33.61, 20 Aug) |
+| P-EXP-002 | Screenshot boundary part-two service | Rendering agent calls existing browser-automation service; persona agents receive pixels only — page text is a data leak; patience budget is set exogenously; separated from the banned tool by the question it accepts | doc 975 (v0.33.61, 20 Aug) |
+
+### Sites and Shared Drive
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-SITE-001 | Shared drive (watcher + queue + three vaults) | Watcher is the new component; queue was specified May 2026; three vaults architecture is the design; **hard precondition: `.sgitignore` must ship first** — specified March 2026, not shipped, blocks the entire feature; overflow above 16k events loses silently without it | doc 977 (v0.33.61, 20 Aug) |
+| P-SITE-002 | Three-site composition page | Single page joining sgit.ai, pki.sgit.ai, and nhi.sgit.ai findings; three sites hold three thirds of one answer with no page between them; host-decision needed first | doc 976 (v0.33.61, 20 Aug) |
