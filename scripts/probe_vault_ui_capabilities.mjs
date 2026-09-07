@@ -3,14 +3,23 @@
    probe_vault_ui_capabilities.mjs — "is the declared-mounts / child-kernel sync code live?"
 
    Fetches the deployed vault UI's shipped JS and checks for the capability markers that
-   only exist in the 2026-09-07 change (plus the server's health + versions). Zero deps,
-   read-only, no token needed. Exit 0 = every marker present.
+   only exist in the 2026-09-07 change, plus the deployed build info and the API's health.
+   Zero deps, read-only, no token needed.
 
      node scripts/probe_vault_ui_capabilities.mjs https://dev.vault.sgraph.ai https://dev.send.sgraph.ai
      node scripts/probe_vault_ui_capabilities.mjs                       # same defaults as above
 
+   Exit codes — THREE outcomes, never conflated:
+     0  LIVE          every marker present
+     1  NOT LIVE      the files were fetched, but markers are missing (older build deployed)
+     2  CANNOT CHECK  the UI could not be reached at all (proxy / DNS / offline). This says
+                      NOTHING about the deployment — do not report a failed deploy on a 2.
+
+   That distinction matters: run from a sandbox whose egress proxy refuses sgraph.ai, every
+   fetch 403s and a marker-only check would claim the change is not deployed when it is.
+
    For the full functional confirmation (a real vault written through a declared mount in
-   the deployed UI) see library/guides/vault-html/DECLARED-MOUNTS-E2E.md §7.
+   the deployed UI) see library/guides/vault-html/DECLARED-MOUNTS-E2E.md §6.
    ================================================================================= */
 
 const UI  = (process.argv[2] || 'https://dev.vault.sgraph.ai').replace(/\/$/, '');
@@ -38,36 +47,72 @@ const MARKERS = [
     ['/components/app-shell/viv-mounts-view.js',       'function syncTag',             'HUD Mounts tab sync column'],
 ];
 
-async function text(url) {
-    const r = await fetch(url, { redirect: 'follow' });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    return r.text();
+// Fetch → { text } | { error }. Never throws: the caller distinguishes an unreachable host
+// from a fetched-but-stale one, so a transport failure must stay visible as itself.
+async function fetchText(url) {
+    try {
+        const r = await fetch(url, { redirect: 'follow' });
+        if (!r.ok) return { error: 'HTTP ' + r.status };
+        return { text: await r.text() };
+    } catch (err) {
+        return { error: (err && (err.cause?.code || err.message)) || String(err) };
+    }
 }
 
-let failures = 0;
 const cache = new Map();
-async function fileText(rel) {
-    if (!cache.has(rel)) cache.set(rel, text(JS + rel).catch((e) => ({ error: e.message })));
+function fileText(rel) {
+    if (!cache.has(rel)) cache.set(rel, fetchText(JS + rel));
     return cache.get(rel);
 }
 
 console.log('UI  ' + UI + '\nAPI ' + API + '\n');
-try { console.log('UI version file   ' + (await text(UI + '/version')).trim()); } catch (e) { console.log('UI version file   (unavailable: ' + e.message + ')'); }
-try { console.log('API health        ' + (await text(API + '/api/info/health')).trim().slice(0, 120)); } catch (e) { failures++; console.log('API health        ✗ ' + e.message); }
-try {
-    const v = JSON.parse(await text(API + '/api/info/versions'));
-    console.log('API versions      sgraph_ai_app_send=' + (v.sgraph_ai_app_send || '?'));
-} catch (e) { console.log('API versions      (unavailable: ' + e.message + ')'); }
+
+// ── Deployed build info (written by the deploy's inject_build_version.py step) ──────
+const build = await fetchText(JS + '/build-info.js');
+if (build.text) {
+    const app = build.text.match(/appVersion\s*:\s*'([^']*)'/);
+    const ui  = build.text.match(/uiVersion\s*:\s*'([^']*)'/);
+    console.log('deployed build     app ' + (app ? app[1] : '?') + ' · ui ' + (ui ? ui[1] : '?'));
+} else {
+    console.log('deployed build     (unavailable: ' + build.error + ')');
+}
+const version = await fetchText(UI + '/version');
+console.log('UI version file    ' + (version.text ? version.text.trim() : '(unavailable: ' + version.error + ')'));
+const health = await fetchText(API + '/api/info/health');
+console.log('API health         ' + (health.text ? health.text.trim().slice(0, 120) : '✗ ' + health.error));
 console.log('');
 
+// ── Capability markers ─────────────────────────────────────────────────────────────
+let missing = 0, unreachable = 0;
 for (const [rel, marker, proves] of MARKERS) {
     const body = await fileText(rel);
-    let ok = false, note = '';
-    if (body && body.error) note = body.error; else ok = body.includes(marker);
-    if (!ok) failures++;
-    console.log((ok ? '  ✓ ' : '  ✗ ') + proves.padEnd(52) + rel + (note ? '  (' + note + ')' : ''));
+    if (body.error) {
+        unreachable++;
+        console.log('  ? ' + proves.padEnd(52) + rel + '  (unreachable: ' + body.error + ')');
+        continue;
+    }
+    const ok = body.text.includes(marker);
+    if (!ok) missing++;
+    console.log((ok ? '  ✓ ' : '  ✗ ') + proves.padEnd(52) + rel);
 }
 
-console.log('\n' + (failures ? failures + ' marker(s) missing — the 2026-09-07 change is NOT (fully) live at ' + UI
-                            : 'all markers present — declared mounts + child-kernel sync discipline are live at ' + UI));
-process.exit(failures ? 1 : 0);
+// ── Verdict ────────────────────────────────────────────────────────────────────────
+console.log('');
+if (unreachable === MARKERS.length) {
+    console.log('CANNOT CHECK — no file could be fetched from ' + UI + '.');
+    console.log('This is a NETWORK result, not a deployment result: it says nothing about what is');
+    console.log('deployed. Check egress (a sandbox proxy refusing the host shows up as HTTP 403 on');
+    console.log('every request), then re-run from a network that can reach the UI.');
+    process.exit(2);
+}
+if (unreachable) {
+    console.log(unreachable + ' file(s) unreachable and ' + missing + ' marker(s) missing — result INCONCLUSIVE; re-run when ' + UI + ' is fully reachable.');
+    process.exit(2);
+}
+if (missing) {
+    console.log(missing + ' marker(s) missing — the 2026-09-07 change is NOT (fully) live at ' + UI + '.');
+    console.log('An older build is deployed, or the deploy has not finished (CloudFront can lag a few minutes).');
+    process.exit(1);
+}
+console.log('LIVE — declared mounts + child-kernel sync discipline are deployed at ' + UI + '.');
+process.exit(0);

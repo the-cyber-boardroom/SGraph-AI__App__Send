@@ -212,7 +212,8 @@ nothing and the browser drives the deployed UI:
 | `SG_REQUIRE_API=1` | make a missing API server a failure instead of a skip |
 
 ```bash
-# read-only marker probe, no token
+# read-only marker probe, no token. Exit 0 = live, 1 = an older build is served,
+# 2 = the UI could not be reached (a network result — NOT evidence of a failed deploy).
 npm run probe:vault-ui -- https://dev.vault.sgraph.ai https://dev.send.sgraph.ai
 # server-side contract with the shipped handlers (Node)
 SG_API_URL=https://dev.send.sgraph.ai SG_ACCESS_TOKEN=… npm run test:vault-live
