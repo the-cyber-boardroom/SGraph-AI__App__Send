@@ -1178,10 +1178,11 @@
         // the vault key (reads), the embedded token upgrades to writes. The token is NEVER in the
         // URL. A vault without this file opens read-only from a key-only link (today's behaviour).
         async _readEmbeddedAccessToken(vault) {
+            // ONE implementation (SGVault.readEmbeddedAccessToken) shared with /vault and the
+            // child kernel; the inline copy below only serves vault-likes that lack it.
+            if (vault && typeof vault.readEmbeddedAccessToken === 'function') return vault.readEmbeddedAccessToken();
             try {
-                // `.vault` is a lazy sub-tree after open (listFolder returns [] until expanded),
-                // so expand it on demand before reading — otherwise the token is missed and the
-                // app opens read-only despite the embedded token being present.
+                if (!vault) return null;
                 if (vault.needsLoading && vault.needsLoading('/.vault')) {
                     await vault.loadSubTreeOnDemand('/.vault');
                 }
@@ -1984,8 +1985,14 @@
             // (no allow-same-origin), so VivCustody classifies App-A as 'null-origin' and
             // the gate no longer refuses parent-held mounts (null-origin App-A cannot read
             // the parent's secrets — that was the whole point of the coupling rule).
-            var sandboxSpec = (this._iframeEl && this._iframeEl.getAttribute && this._iframeEl.getAttribute('sandbox')) || null;
-            var appOrigin   = VivCustody.classifyAppFrameOrigin(sandboxSpec);
+            // Evaluated at each gate (a function): declared mounts register just BEFORE the
+            // app iframe exists, so classify the sandbox the frame is ABOUT to get
+            // (_appSandbox()) when there is no element yet, and the live element after.
+            var appOrigin = function () {
+                var spec = (self._iframeEl && self._iframeEl.getAttribute && self._iframeEl.getAttribute('sandbox'))
+                        || (typeof self._appSandbox === 'function' ? self._appSandbox() : null);
+                return VivCustody.classifyAppFrameOrigin(spec);
+            };
             // Synthetic-only escape hatch. NEVER set this for real-data trials. The
             // pack §05 invariant is fail-closed by design; this is the one named opt-in.
             var unsafeOk = (window.SG_VIV_ALLOW_UNSAFE_SYNTHETIC === true);
@@ -2075,7 +2082,13 @@
                 await channel.send('secrets', {
                     vaultKey:    creds.vaultKey,
                     accessToken: creds.accessToken || null,
-                    endpoint:    this._sendEndpoint()
+                    endpoint:    this._sendEndpoint(),
+                    // Per-parent clone branch in the child (07 Sep §6.3): two parents mounting the
+                    // same child must not share one clone ref. HMAC-derived — the parent id never
+                    // appears on the server. Label/kind feed the child's Via-Mount commit trailer.
+                    cloneBranch: 'viv:' + ((this._vault && this._vault._vaultId) || 'top'),
+                    mountLabel:  creds.label || ref,
+                    mountKind:   creds.kind  || 'runtime'
                 }, { sensitive: true });
                 await new Promise(function (resolve, reject) {
                     var t = setTimeout(function () { reject(Object.assign(new Error('child kernel boot timeout'), { code: 'EUNREACH' })); }, 10000);
@@ -2093,12 +2106,54 @@
 
         async _mountChildVault(opts) {
             var kp = this._ensureKernelParent();
-            return kp.mount({ prefix: opts.prefix, ref: opts.ref, label: opts.label });
+            return kp.mount({ prefix: opts.prefix, ref: opts.ref, label: opts.label, meta: opts.meta || {} });
         }
 
-        async _unmountChildVault(mountId) {
+        // Declared mounts (07 Sep analysis §5): every `<name>.link.json` the OWNER put in the
+        // vault becomes an ordinary KernelParent mount before the app runs, so the app reads
+        // and writes `/<name>/…` without ever calling sg.vault.mount — it has no idea the path
+        // is another vault. Register eager (the path resolves from the first bridge call),
+        // spawn lazy (no child kernel until first use). Idempotent per vault. Never fatal: a
+        // link with no resolvable credentials stays a read-only composite link exactly as
+        // before. Top-kernel only by construction — child kernels run kernel-bootstrap, not
+        // this shell, so a child never auto-mounts (no cycles, non-transitive reach holds).
+        async _mountDeclaredVaults() {
+            if (this._declaredMountsDone) return this._declaredMountsResult || [];
+            this._declaredMountsDone = true;
+            var out = [];
+            if (typeof DeclaredMounts === 'undefined' || typeof VaultLinks === 'undefined') return out;
+            if (!this._dataSource || !this._vault) return out;
+            var self = this, specs = [];
+            try {
+                specs = await DeclaredMounts.scan(this._dataSource.getFileList(), function (p) { return self._dataSource.getFileBytes(p); });
+            } catch (_) { specs = []; }
+            if (!specs.length) return out;
+            this._declaredSpecs = specs;
+            var kp = null;
+            try { kp = this._ensureKernelParent(); } catch (_) { return out; }
+            for (var i = 0; i < specs.length; i++) {
+                var spec = specs[i];
+                if (spec.duplicateOf) {
+                    // Same child already declared at another path in THIS vault — one mount per child.
+                    this._emitVaultEvent('declared-mount-skipped', { label: 'Declared mount skipped (duplicate child): ' + spec.prefix, prefix: spec.prefix, ref: spec.ref, err: 'EEXIST', duplicateOf: spec.duplicateOf });
+                    continue;
+                }
+                try {
+                    var res = await kp.mount({ prefix: spec.prefix, ref: spec.ref, label: spec.label, lazy: true,
+                                               meta: { declared: true, linkPath: spec.linkPath } });
+                    out.push({ prefix: spec.prefix, ref: spec.ref, mountId: res.mountId, access: res.access });
+                    this._emitVaultEvent('declared-mount', { label: 'Declared mount ' + spec.prefix + ' (' + res.access + ')', prefix: spec.prefix, ref: spec.ref, access: res.access });
+                } catch (err) {
+                    this._emitVaultEvent('declared-mount-skipped', { label: 'Declared mount skipped: ' + spec.prefix, prefix: spec.prefix, ref: spec.ref, err: (err && (err.code || err.message)) || String(err) });
+                }
+            }
+            this._declaredMountsResult = out;
+            return out;
+        }
+
+        async _unmountChildVault(mountId, opts) {
             if (!this._kernelParent) return { unmounted: false };
-            var res = await this._kernelParent.unmount(mountId);
+            var res = await this._kernelParent.unmount(mountId, opts || {});
             // Tear down the iframe stashed on the channel (DOM cleanup KernelParent can't do).
             try {
                 var iframe = res && res.channel && res.channel._mountIframe;
@@ -2112,13 +2167,34 @@
             return this._kernelParent.list();
         }
 
-        // Trial-only stub. The clinic vault's app.json + an owner record (clinic.json)
-        // can provide child credentials. Real production: Kernel-A holds them
-        // (port-transfer model — architect pack §3 "Cleaner future variant").
-        // Resolved creds are tagged custody:'parent-held' so the B10 gate can refuse
-        // the unsafe combination (this resolver + a same-origin App-A) by default.
+        // Production credential resolver for a mount ref (07 Sep analysis §5.2). Order:
+        //   1. owner-secret store (.vault/owner/secrets/<ref>, parent WRITE-key tier) → full key → rw
+        //   2. ro-links record   (.vault/owner/ro-links.json, parent READ-key tier)  → read cred → ro
+        //   3. a key saved on this device (VaultLinks localStorage)                    → full key → rw
+        //   4. the clinic.json trial stub (kept for the synthetic trial)
+        // In a read-only parent session step 1 cannot decrypt and falls through to 2 —
+        // never throws, never opens rw. The pure ordering lives in DeclaredMounts so it is
+        // unit-tested; this method only wires the sources.
         async _resolveChildCredentials(ref) {
             if (this._resolveChildCredentialsImpl) return this._resolveChildCredentialsImpl(ref);
+            var self = this;
+            if (typeof DeclaredMounts !== 'undefined') {
+                var spec    = (this._declaredSpecs || []).find(function (d) { return d.ref === ref; }) || null;
+                var vaultId = spec ? spec.vaultId : null;
+                return DeclaredMounts.resolveCredentials(ref, vaultId, {
+                    ownerSecret: function (r)   { return self._ownerSecretGet(String(r)); },
+                    roRecord:    function (r)   { return (typeof VaultLinks !== 'undefined') ? VaultLinks.resolveRef(self._vault, r) : null; },
+                    storedKey:   function (vid) { return (typeof VaultLinks !== 'undefined') ? VaultLinks.getStoredChildKey(vid) : null; },
+                    legacy:      function (r)   { return self._resolveChildCredentialsLegacy(r); }
+                });
+            }
+            return this._resolveChildCredentialsLegacy(ref);
+        }
+
+        // Trial-only stub (pre-07-Sep behaviour): clinic.json in the vault tree, PLAINTEXT
+        // credentials. Now the LAST fallback, kept only so the synthetic clinic trial keeps
+        // working. Tagged custody:'parent-held' so the B10 gate applies.
+        async _resolveChildCredentialsLegacy(ref) {
             try {
                 var bytes = await this._dataSource.getFileBytes('clinic.json');
                 var clinic = JSON.parse(new TextDecoder().decode(bytes));
@@ -2348,6 +2424,7 @@
             // Dropping `allow-same-origin` means app code can no longer read
             // localStorage / window.parent / ambient-fetch vault paths; every vault
             // access goes through the postMessage bridge (sg.*), which never needed it.
+            await this._mountDeclaredVaults();         // owner-declared sub-vaults, before the app frame can send a message
             var iframe         = document.createElement('iframe');
             iframe.sandbox     = this._appSandbox();
             iframe.style.cssText = 'border:none;width:100%;height:100%;display:block;flex:1;';
@@ -2426,6 +2503,7 @@
             });
 
             // Phase 3: null-origin frame — srcdoc, no allow-same-origin (see _mountApp).
+            await this._mountDeclaredVaults();         // owner-declared sub-vaults, before the app frame can send a message
             var iframe         = document.createElement('iframe');
             iframe.sandbox     = this._appSandbox();
             iframe.style.cssText = 'border:none;width:100%;height:100%;display:block;flex:1;';
@@ -2480,6 +2558,7 @@
                 var htmlText  = new TextDecoder().decode(htmlBytes);
                 var injected  = AppFrameBootstrap.build({ kind: 'html', htmlText: htmlText, bridgeScript: bridgeScript });
                 // Phase 3: null-origin frame — srcdoc, no allow-same-origin (see _mountApp).
+                await this._mountDeclaredVaults();
                 var iframe         = document.createElement('iframe');
                 iframe.sandbox     = this._appSandbox();
                 iframe.style.cssText = 'border:none;width:100%;height:100%;display:block;flex:1;';
@@ -2521,6 +2600,7 @@
                 });
 
                 // Phase 3: null-origin frame — srcdoc, no allow-same-origin (see _mountApp).
+                await this._mountDeclaredVaults();
                 var iframe         = document.createElement('iframe');
                 iframe.sandbox     = this._appSandbox();
                 iframe.style.cssText = 'border:none;width:100%;height:100%;display:block;flex:1;';
@@ -4258,7 +4338,7 @@
                         }
                         if (vAct === 'unmount') {
                             var uMountId = String(e.data.mountId || '');
-                            self._unmountChildVault(uMountId)
+                            self._unmountChildVault(uMountId, { byApp: true })
                                 .then(function (res) { cmdReply(true, res); self._emitBridgeCall('vault.unmount', { mountId: uMountId, ok: true }); })
                                 .catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('vault.unmount', { mountId: uMountId, ok: false, err: err.message }); });
                             return;

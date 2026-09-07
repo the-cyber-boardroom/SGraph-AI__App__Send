@@ -124,6 +124,16 @@ class CompositeDataSource {
             else        out.files.push(f);
         }
         for (const [name, child] of Object.entries(node.children || {})) {
+            if (out.children[name] && out.children[name]._subvault) {
+                // A REAL folder shares the mount's name. Files (→ mount nodes) are spliced before
+                // children (→ real folders), so without this the real folder silently REPLACED the
+                // mount node and the user browsed the parent's folder believing it was the child —
+                // while _mountForPath still routed reads to the child and writes fell through to
+                // the parent (see _refuseIfMounted). Keep the mount, flag the conflict for the UI,
+                // and hide the shadowed folder: listing the parent's copy would be a lie.
+                out.children[name]._conflict = 'shadowed-by-folder';
+                continue;
+            }
             out.children[name] = this._spliceNode(child);
         }
         return out;
@@ -154,6 +164,7 @@ class CompositeDataSource {
         const out = [];
         for (const e of this._root.getFileList()) {
             if (this._mountByLinkPath(e.path) || this._resourceByLinkPath(e.path)) continue;   // hide raw link files
+            if (this._mountForPath(e.path)) continue;   // parent entry shadowed by a mount (real folder of the same name)
             out.push(e);
         }
         for (const m of this._mounts.values()) {
@@ -223,18 +234,70 @@ class CompositeDataSource {
         }
     }
 
+    // ── Mutations: refuse anything at or under a mount, BEFORE it reaches the root ────
+    // Sub-vaults are read-only on this adapter (v1) — but that was never enforced. Every
+    // mutation was a blind pass-through to the ROOT with the path unchanged, and it "failed"
+    // only because the virtual mount folder does not exist in the root. When the parent
+    // happens to hold a REAL folder at the mount path, the root write SUCCEEDS: the editor
+    // reports success and the bytes land silently in the parent, shadowing the child.
+    // (Executed, not inferred — 07 Sep architect analysis §1.) Refuse with a code the UI can
+    // key off. Applies to the source AND destination of moves, and to the mount root itself,
+    // and does not require the mount to be open — a locked mount is still not the parent's.
+    _refuseIfMounted(verb, paths) {
+        for (const p of paths) {
+            if (p == null || p === '') continue;
+            const m = this._mountForPath(String(p));
+            if (m) {
+                const err = new Error(verb + ": '" + p + "' is inside sub-vault '" + m.nodeName +
+                                      "' — sub-vaults are read-only here (EMOUNT_RO)");
+                err.code = 'EMOUNT_RO'; err.mountPath = m.mountPath;
+                throw err;
+            }
+        }
+    }
+    _join(folder, name) {
+        const f = String(folder == null ? '' : folder).replace(/\/+$/, '');
+        return (f ? f + '/' : '') + String(name == null ? '' : name);
+    }
+
     // ── Pass-throughs to the root ────────────────────────────────────────────
     async loadAllSubTrees()   { return this._root.loadAllSubTrees(); }
     getOrigName()             { return this._root.getOrigName(); }
     getOrigSize()             { return this._root.getOrigSize(); }
-    async saveFile()          { return this._root.saveFile.apply(this._root, arguments); }
-    async renameFile()        { return this._root.renameFile.apply(this._root, arguments); }
-    async deleteFile()        { return this._root.deleteFile.apply(this._root, arguments); }
-    async createFolder()      { return this._root.createFolder.apply(this._root, arguments); }
-    async deleteFolder()      { return this._root.deleteFolder.apply(this._root, arguments); }
-    async renameFolder()      { return this._root.renameFolder.apply(this._root, arguments); }
-    async moveFile()          { return this._root.moveFile.apply(this._root, arguments); }
-    async moveFolder()        { return this._root.moveFolder.apply(this._root, arguments); }
+    async saveFile(folderPath, fileName, bytes) {
+        this._refuseIfMounted('saveFile', [folderPath, this._join(folderPath, fileName)]);
+        return this._root.saveFile(folderPath, fileName, bytes);
+    }
+    async renameFile(folderPath, oldName, newName) {
+        this._refuseIfMounted('renameFile', [folderPath, this._join(folderPath, oldName), this._join(folderPath, newName)]);
+        return this._root.renameFile(folderPath, oldName, newName);
+    }
+    async deleteFile(folderPath, fileName) {
+        this._refuseIfMounted('deleteFile', [folderPath, this._join(folderPath, fileName)]);
+        return this._root.deleteFile(folderPath, fileName);
+    }
+    async createFolder(folderPath) {
+        this._refuseIfMounted('createFolder', [folderPath]);
+        return this._root.createFolder(folderPath);
+    }
+    async deleteFolder(folderPath) {
+        this._refuseIfMounted('deleteFolder', [folderPath]);
+        return this._root.deleteFolder(folderPath);
+    }
+    async renameFolder(folderPath, newName) {
+        const parent = String(folderPath || '').replace(/\/[^/]*$/, '');
+        this._refuseIfMounted('renameFolder', [folderPath, this._join(parent, newName)]);
+        return this._root.renameFolder(folderPath, newName);
+    }
+    async moveFile(srcFolderPath, fileName, destFolderPath) {
+        this._refuseIfMounted('moveFile', [srcFolderPath, this._join(srcFolderPath, fileName), destFolderPath, this._join(destFolderPath, fileName)]);
+        return this._root.moveFile(srcFolderPath, fileName, destFolderPath);
+    }
+    async moveFolder(srcPath, destParentPath) {
+        const base = String(srcPath || '').split('/').filter(Boolean).pop() || '';
+        this._refuseIfMounted('moveFolder', [srcPath, destParentPath, this._join(destParentPath, base)]);
+        return this._root.moveFolder(srcPath, destParentPath);
+    }
 }
 
 // Default opener: open another vault from a full key, using the root vault's transport.

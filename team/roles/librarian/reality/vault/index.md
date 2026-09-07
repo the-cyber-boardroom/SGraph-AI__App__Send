@@ -1,6 +1,6 @@
 # vault — Reality Index
 
-**Domain:** `vault/` | **Last updated:** 2026-08-24 | **Maintained by:** Librarian (daily run)
+**Domain:** `vault/` | **Last updated:** 2026-09-07 | **Maintained by:** Librarian (daily run)
 
 The vault/SGit cryptographic storage system. This domain covers the encryption layer, the
 object storage model, the browser JS client, PKI, and the sgit CLI as it relates to vault
@@ -302,6 +302,21 @@ Round-1 and Round-2 review findings addressed after the initial surface landed:
 | **App-title fallback for unnamed vaults** — when a vault has no explicit title, the browser UI falls back to a generated display name instead of blank | **EXISTS** | `36eb6c2` |
 | **Settings panel credential display in read-only sessions** — the settings panel no longer shows write-key credential fields when the vault is opened in a read-only session | **EXISTS** | `06dca6e` |
 | **Walk every segment when expanding .vault subtree** — the `.vault` subtree expansion now walks every path segment, fixing cases where nested `.vault/` paths did not expand correctly | **EXISTS** | `e1fecad` |
+
+---
+
+### Composite sub-vault adapter — explicit read-only enforcement (2026-09-07)
+
+| Behaviour | Status | Evidence |
+|-----------|--------|---------|
+| **Mutations at/under a `.link.json` mount are refused with `EMOUNT_RO`** (all 8 verbs, move source AND destination, the mount root itself, locked mounts included) — previously a blind pass-through to the root that "failed" only because the virtual folder was absent, and **succeeded silently in the parent** when a real folder of the same name existed | **EXISTS** | `composite-data-source.js` `_refuseIfMounted`; `test__composite_data_source.js` (+20) |
+| **A real folder cannot shadow a mount in the tree** — the mount node is kept and flagged `_conflict:'shadowed-by-folder'`; shadowed parent entries hidden from `getFileList` | **EXISTS** | same; changelog `team/comms/changelog/09/07/` |
+| UI rendering of `_conflict` / `EMOUNT_RO` (disabled controls inside a mount, conflict badge) | **PROPOSED** | analysis §1 step "tell the truth in the interface" |
+| **Declared mounts** — the top kernel turns every owner `*.link.json` into an ordinary `KernelParent.mount()` at the four app-frame sites (after the sandbox is final, before the frame exists); the app reads/writes `/<name>/…` through broker → custody gate → tier gate → relay → child kernel → push **without ever calling `sg.vault.mount`**. Register eager / spawn lazy (`_ensureChannel`, concurrent callers share one spawn). Rules: top-kernel-only by construction (child kernels never auto-mount → no cycles); apps cannot unmount a declared mount (`EPERM`, `byApp`); child opens on a per-parent clone branch `viv:<parent id>`. | **EXISTS** | `declared-mounts.js`, `app-shell.js` `_mountDeclaredVaults`, `kernel-parent.js`; `test__declared_mounts.js` (15), `test__kernel_declared_mounts.js` (28) |
+| **Production mount-credential resolver** — owner-secret store (rw) → `ro-links.json` (ro, as a read credential) → device key → the `clinic.json` trial stub (now last). RO parent sessions fall through to ro, never rw. | **EXISTS** | `DeclaredMounts.resolveCredentials`; `app-shell._resolveChildCredentials` |
+| **Child kernel opens a read credential read-only** (`parseReadOnlyCredential` → `openReadOnly`), strips sgit prefixes, reads its OWN embedded access token (`SGVault.readEmbeddedAccessToken`, one implementation shared with both shells) — but a read-credential child is never writable (server also requires the write key). | **EXISTS** | `kernel-bootstrap.js`; test G in `test__kernel_declared_mounts.js` |
+| **`Via-Mount: <label> (declared\|runtime)` commit trailer** on every commit a child kernel makes for a parent (`SGVault._commitTrailer`) | **EXISTS** | `sg-vault.js` `_commit` |
+| Browser e2e for a declared mount; HUD rendering of `declared` / `_conflict` / `EMOUNT_RO` | **PROPOSED** | analysis test layer 4; changelog 09/07 |
 
 ---
 

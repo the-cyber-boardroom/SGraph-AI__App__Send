@@ -121,7 +121,11 @@ class SGVault {
         return vault
     }
 
-    static async open(sgSend, fullVaultKey) {
+    // options.cloneBranch — name of THIS client's private clone branch (default 'web-ui').
+    // A headless child kernel mounted by a parent passes 'viv:<parent vault id>' so two
+    // parents mounting the same child never share a clone ref (07 Sep analysis §6.3);
+    // the named ref stays the single published branch either way.
+    static async open(sgSend, fullVaultKey, options = {}) {
         const isSimpleToken = /^[a-z]+-[a-z]+-\d{4}$/.test(fullVaultKey)
 
         let passphrase, vaultId, keys
@@ -151,7 +155,8 @@ class SGVault {
         vault._hmacKey           = keys.hmacKey
         vault._refFileId         = keys.refFileId
         vault._branchIndexFileId = keys.branchIndexFileId
-        vault._cloneRefFileId    = await SGVaultCrypto.deriveBranchRefFileId(keys.hmacKey, vaultId, 'web-ui')
+        vault._cloneBranch       = (options && options.cloneBranch) || 'web-ui'
+        vault._cloneRefFileId    = await SGVaultCrypto.deriveBranchRefFileId(keys.hmacKey, vaultId, vault._cloneBranch)
 
         vault._initManagers()
 
@@ -211,6 +216,22 @@ class SGVault {
     // placeholder. Display surfaces use this to fall back to app.json's title instead
     // of showing the placeholder.
     get hasCustomName() { return !!this._settings?.vault_name && !this._settingsDefaulted }
+
+    // --- Embedded access token (.vault/access-token.json) -----------------------------
+    // ONE implementation shared by /app, /vault and the child kernel. The token lives
+    // INSIDE the vault, read_key-encrypted and beneath the .vault/** floor (no app can reach
+    // it through the bridge); it upgrades the ACCOUNT tier only. `.vault` is a lazy sub-tree
+    // after open, so expand it first or the file is never found. Never throws.
+    async readEmbeddedAccessToken() {
+        try {
+            if (this.needsLoading && this.needsLoading('/.vault')) await this.loadSubTreeOnDemand('/.vault')
+            const listed = this.listFolder('/.vault') || []
+            if (!listed.some(e => e.name === 'access-token.json')) return null
+            const bytes = await this.getFile('/.vault', 'access-token.json')
+            const obj   = JSON.parse(new TextDecoder().decode(bytes))
+            return (obj && obj.token) ? String(obj.token) : null
+        } catch (_) { return null }
+    }
     get created()   { return this._settings?.created    }
     get writable()  { return !!this._writeKey           }
     get writeKeyHex() { return this._writeKey || null   }   // hex string (owner-secret store input); null in RO sessions
@@ -327,6 +348,11 @@ class SGVault {
     // --- Commit: serialize tree → create tree object → create commit → update ref
 
     async _commit(message) {
+      // Provenance trailer (07 Sep analysis §7): a kernel writing on behalf of ANOTHER vault
+      // sets _commitTrailer ('Via-Mount: <label> (declared|runtime)') so the child's own
+      // history records which door the write came through — without naming the vault
+      // behind the door. Messages are read_key-encrypted like every commit message.
+      if (this._commitTrailer) message = String(message || '') + '\n\n' + this._commitTrailer
       return this._withBatch(async () => {
         const entries = await this._buildTreeEntries(this._tree['/'])
 
