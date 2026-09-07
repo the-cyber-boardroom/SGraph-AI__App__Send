@@ -235,6 +235,70 @@ const findChild = (tree, name) => tree.children[name];
     const compNo = new CompositeDataSource(rootNoVault, {});
     ok('returns undefined when root has no _vault (no throw)', compNo._vault === undefined);
 
+    // ── Step 0 of the 07 Sep architect analysis: the read-only guard was an ACCIDENT ──
+    // Every mutation used to be a blind pass-through to the root with the path unchanged;
+    // it "failed" only because the virtual mount folder does not exist in the root. These
+    // two suites pin the explicit refusal and the silent-corruption case it prevents.
+    console.log('\n[suite] mutations at/under a mount are refused (EMOUNT_RO) — nothing reaches the root');
+    {
+        const writes = [];
+        class RecordingRoot extends FakeDS {
+            async saveFile(f, n)       { writes.push(['saveFile', f, n]); }
+            async deleteFile(f, n)     { writes.push(['deleteFile', f, n]); }
+            async renameFile(f, o, n)  { writes.push(['renameFile', f, o, n]); }
+            async createFolder(p)      { writes.push(['createFolder', p]); }
+            async deleteFolder(p)      { writes.push(['deleteFolder', p]); }
+            async renameFolder(p, n)   { writes.push(['renameFolder', p, n]); }
+            async moveFile(s, n, d)    { writes.push(['moveFile', s, n, d]); }
+            async moveFolder(s, d)     { writes.push(['moveFolder', s, d]); }
+        }
+        const root = new RecordingRoot(rootSpec, 'token');                       // WRITABLE parent
+        const comp = new CompositeDataSource(root, { vaultOpenerRO: async () => ({}), keyProvider: async () => 'k', vaultOpener: async () => ({}) });
+        await comp.scan();                                                        // mount registered, NOT opened
+        const refused = async (label, fn) => { let code = null; try { await fn(); } catch (e) { code = e.code; } ok(label + ' → EMOUNT_RO', code === 'EMOUNT_RO'); };
+        await refused('saveFile in the mount root',        () => comp.saveFile('/subvaults/acme', 'x.md', enc('a')));
+        await refused('saveFile in a mount sub-folder',    () => comp.saveFile('/subvaults/acme/assets', 'x.md', enc('a')));
+        await refused('deleteFile in the mount',           () => comp.deleteFile('/subvaults/acme', 'x.md'));
+        await refused('renameFile in the mount',           () => comp.renameFile('/subvaults/acme', 'x.md', 'y.md'));
+        await refused('createFolder in the mount',         () => comp.createFolder('/subvaults/acme/new'));
+        await refused('deleteFolder = the mount root',     () => comp.deleteFolder('/subvaults/acme'));
+        await refused('renameFolder = the mount root',     () => comp.renameFolder('/subvaults/acme', 'other'));
+        await refused('moveFile INTO a mount',             () => comp.moveFile('/', 'readme.md', '/subvaults/acme'));
+        await refused('moveFile OUT of a mount',           () => comp.moveFile('/subvaults/acme', 'x.md', '/'));
+        await refused('moveFolder INTO a mount',           () => comp.moveFolder('/docs', '/subvaults/acme'));
+        await refused('moveFolder OF the mount root',      () => comp.moveFolder('/subvaults/acme', '/'));
+        ok('a LOCKED (unopened) mount still refuses — it is not the parent\'s folder', comp._mounts.get('subvaults/acme').status !== 'mounted');
+        ok('NOTHING reached the root data source',         writes.length === 0);
+        await comp.saveFile('/', 'readme.md', enc('hi'));
+        await comp.createFolder('/docs');
+        await comp.saveFile('/subvaults', 'acme.link.json', enc('{}'));         // editing the LINK FILE is a root op
+        ok('mutations outside mounts still pass through (incl. the link file itself)',
+           writes.length === 3 && writes.map(w => w[0]).join(',') === 'saveFile,createFolder,saveFile');
+    }
+
+    console.log('\n[suite] a REAL parent folder at a mount path cannot shadow the mount (the corruption case)');
+    {
+        // Parent holds BOTH `subvaults/acme.link.json` AND a real folder `subvaults/acme/` with a file.
+        const shadow = JSON.parse(JSON.stringify({ tree: rootSpec.tree, list: rootSpec.list }));
+        shadow.tree.children.subvaults.children.acme = { name: 'acme', children: {}, files: [ { path: 'subvaults/acme/stale.md', name: 'subvaults/acme/stale.md', size: 5 } ] };
+        shadow.list.push({ path: 'subvaults/acme/', name: 'subvaults/acme/', dir: true, size: 0 },
+                         { path: 'subvaults/acme/stale.md', name: 'subvaults/acme/stale.md', dir: false, size: 5 });
+        shadow.bytes = rootSpec.bytes; shadow._vault = rootSpec._vault;
+        const writes = [];
+        class RecordingRoot extends FakeDS { async saveFile(f, n) { writes.push([f, n]); } }
+        const root = new RecordingRoot(shadow, 'token');
+        const comp = new CompositeDataSource(root, { vaultOpenerRO: async () => ({}), keyProvider: async () => 'k', vaultOpener: async () => ({}) });
+        await comp.scan();
+        const node = comp.getTree().children.subvaults.children.acme;
+        ok('tree keeps the MOUNT node, the real folder does not replace it', node && node._subvault === true);
+        ok('the conflict is surfaced for the UI',                          node && node._conflict === 'shadowed-by-folder');
+        ok('getFileList hides the shadowed parent entries',                !comp.getFileList().some(e => /subvaults\/acme\/(stale\.md)?$/.test(e.path) && e.size === 5));
+        ok('getFileList still lists the mount folder itself once',         comp.getFileList().filter(e => e.path === 'subvaults/acme/').length === 1);
+        let code = null; try { await comp.saveFile('/subvaults/acme', 'report.md', enc('collector output')); } catch (e) { code = e.code; }
+        ok('write into the shadowed mount is REFUSED (EMOUNT_RO)',          code === 'EMOUNT_RO');
+        ok('and NOTHING landed in the parent',                              writes.length === 0);
+    }
+
     console.log('  ' + pass + ' pass, ' + fail + ' fail\n');
     process.exit(fail === 0 ? 0 : 1);
 })();
