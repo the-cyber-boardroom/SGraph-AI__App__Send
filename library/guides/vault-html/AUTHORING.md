@@ -75,9 +75,46 @@ If you stick to these patterns, your page just works.
 | `new Worker('w.js')` | ❌ 404 | Worker loader, same problem |
 | `fetch('cities.json')` (vault-relative) | ❌ 404 | **`window.fetch` is NOT patched** — use `sg.vfs.readText('cities.json')` |
 | `XMLHttpRequest` | ❌ Not patched | Use `sg.vfs.*` |
+| `fetch('https://api.example.com/…')` (external host) | ❌ Blocked by CSP | Not a 404 — the frame ships `connect-src blob: data:`. See **Egress** below. |
 | `<img src="photo.png">` (declarative, in initial HTML) | ❌ 404 | Only `el.src = …` from JS is intercepted; for markup images, set `src` from JS (§6) |
 
-These all fail with a 404 in the iframe console, because the URL gets resolved against the iframe's opaque blob origin, which has nothing under it.
+These all fail with a 404 in the iframe console, because the URL gets resolved against the iframe's opaque blob origin, which has nothing under it. (The external-`fetch` row is the exception — that one is a CSP block, not a 404.)
+
+---
+
+## Egress: the frame cannot reach the network — and `permissions.network`
+
+Your app frame is served with this meta tag injected as the first thing in `<head>`:
+
+```html
+<meta http-equiv="Content-Security-Policy" content="connect-src blob: data:">
+```
+
+**No network host is reachable from your frame.** `fetch`, `XMLHttpRequest`, `WebSocket` and
+`EventSource` to any `http(s)://` origin fail immediately (typically "Load failed" in 1–15 ms),
+and the browser fires a `securitypolicyviolation` event with `effectiveDirective: "connect-src"`.
+This is deliberate: your app legitimately holds *decrypted* vault content, so the postMessage
+bridge is made the only way out, and everything that leaves it is permission-checked.
+
+`blob:` and `data:` are allowed because the print RPC needs them to inline images and stylesheets;
+neither can reach the network. `img.src` and dynamic `import()` are governed by `img-src` /
+`script-src`, so vault images and CDN component imports are unaffected.
+
+### The escape hatch
+
+Declaring `network` omits the meta tag entirely:
+
+```json
+{ "permissions": { "network": true } }
+```
+
+The HUD then shows a standing "direct network access" chip, so the exception is never silent.
+
+> **This is all-or-nothing.** It reopens egress to *every* host, from a frame holding decrypted
+> vault content. Treat it as a last resort. Before reaching for it, check whether an `sg.*`
+> namespace already covers what you need — `sg.llm.*` for models, `sg.append.write` for
+> delivering into another vault's lane. Those run in the host, keep credentials out of your
+> frame, and need no CSP change.
 
 ---
 
@@ -171,10 +208,13 @@ window.sg = {
         embed   : (mountEl, key, opts?) => Promise<{vaultName, fileCount, hasApp, iframe}>,
     },
     // Append-only transport (renamed from sg.inbox.* on 2026-06-15; the write verb is `write`).
-    // Gated by app.json `permissions.append.*`. See "Receiving messages".
+    // Gated by app.json `permissions.append.*` (note: `fetch` needs the `append.read`
+    // grant). `write` is the ONLY verb that crosses vaults — it takes an explicit
+    // vault_id. Every other verb acts on the currently open vault and ignores any
+    // vault you name. See "Receiving messages".
     append: {
         configure    : ({append_anchors})  => Promise<{...}>,
-        write        : ({vault_id, append_token, payload}) => Promise<{...}>,
+        write        : ({vault_id, append_token, payload}) => Promise<{...}>,   // → ANOTHER vault
         list         : ({inbox, after_file_id, limit, include_content}) => Promise<{...}>,
         fetch        : ({inbox, file_ids}) => Promise<{...}>,
         markProcessed: ({inbox, file_ids}) => Promise<{...}>,
@@ -792,26 +832,104 @@ sub-vault views), since it never writes to the vault.
 
 The append transport lets a vault receive messages/files from other agents or vaults through an
 **append-only lane** that lives outside the version-controlled commit tree (raw vault-pointer API,
-not the commit/push flow). The kernel holds the keys and attaches the gate header per verb; your
-`app.json` `permissions.append.*` grants decide which verbs your app can call. Read-only sessions
-fail closed.
+not the commit/push flow). The kernel holds the keys and attaches the gate header per verb.
+
+### Declare the grants
+
+All six verbs are **booleans, default-deny**, and are *not* path-scoped (append lanes are
+server-held, not vault paths). Note the verb-to-grant mapping is not 1:1 — **`fetch` is gated by
+`append.read`**:
+
+```json
+{ "permissions": { "append": { "write": true, "list": true, "read": true } } }
+```
+
+| Method | Grant it needs |
+|---|---|
+| `sg.append.configure` | `append.configure` |
+| `sg.append.write` | `append.write` |
+| `sg.append.list` | `append.list` |
+| `sg.append.fetch` | **`append.read`** |
+| `sg.append.markProcessed` | `append.markProcessed` |
+| `sg.append.purge` | `append.purge` |
+
+Only `true` grants — `1`, `"yes"` and an array of paths all deny.
+
+> **A read-only session does not block `sg.append.write`.** The grant above is the only gate on
+> it; `sg.app.writable === false` is irrelevant to the append namespace. What *does* fail closed
+> in a read-only session are the **read** verbs (`list`/`fetch`/`markProcessed`), because their
+> `enum_key` is derived from the vault's read key and cannot be derived without it.
+
+### Only `write` crosses vaults
+
+This is the asymmetry to internalise, because nothing else in the API hints at it:
+
+- **`write` takes an explicit `vault_id`** and posts to *that* vault's lane with no headers at
+  all — the `append_token` in the body is the entire gate. This is the account-less delivery
+  path, and it is how a published app sends telemetry or messages **into a different vault**.
+- **Every other verb is bound to the currently open vault.** `list`, `fetch`, `markProcessed`,
+  `purge` and `configure` ignore any vault you name and act on the vault the app is running in,
+  using that vault's derived `enum_key`. **You cannot list or drain a remote lane from an app**,
+  and that is deliberate: the `enum_key` is the recipient's, and handing it to a published app
+  would give every visitor read access to the whole lane. Drain a lane where its key legitimately
+  lives — the recipient vault's own dashboard app, or `sgit`.
 
 ```js
 // Verbs (all take a single opts object — see the API block above for fields):
 await sg.append.configure({ append_anchors: [...] });
-await sg.append.write({ vault_id, append_token, payload });      // send INTO another vault's lane
+
+// Outbound to ANOTHER vault — the only cross-vault verb:
+await sg.append.write({ vault_id, append_token, payload });
+
+// Inbound, always against the CURRENTLY OPEN vault. `inbox` is required on all four:
 const { entries } = await sg.append.list({ limit: 20 });
-await sg.append.fetch({ file_ids: [...] });
-await sg.append.markProcessed({ file_ids: [...] });
-await sg.append.purge({ file_ids: [...] });
+const inbox = entries[0].inbox;                                  // the lane id — see below
+await sg.append.fetch({ inbox, file_ids: [...] });
+await sg.append.markProcessed({ inbox, file_ids: [...] });
+await sg.append.purge({ folder: 'processed', inbox, file_ids: [...] });
 
 // Event push — declare in app.json: "host_events": ["append.new-messages", "append.error"]
 sg.on('append.new-messages', (evt) => { /* {total, per_anchor, entries, new_count, trigger} */ });
 sg.on('append.error',        (evt) => { /* {code, message, http?, trigger} */ });
 ```
 
-The kernel's checker runs on tab focus and app open — your app does not poll; it declares the
-`host_events` allowlist, subscribes with `sg.on`, and reacts.
+`payload` may be a `Uint8Array` (it is base64-encoded for you) or a base64 string you built
+yourself. Ceiling is **5 MB per message**, **1000 pending files per lane**, and **100 `file_ids`
+per batch** for `fetch`/`markProcessed`/`purge`.
+
+### `inbox` is the lane id, and today it *is* the append token
+
+`inbox` is **not** a folder name or an enum — it is the lane identifier that `list` returns in
+every entry, and the value you must pass back to `fetch` / `markProcessed` / `purge`. Always take
+it from `list` output rather than constructing it.
+
+> **Be aware:** as currently implemented the lane id is the **append token itself**, byte for
+> byte — not its hash. So anyone who can `list` a lane (i.e. an `enum_key` holder) learns that
+> lane's write token. In practice the append token is designed as a *public* lane address
+> (`H(recipient public key)`), it grants write only, and `list` already requires the `enum_key`
+> — so this is not a privilege escalation. It is recorded here so integrators are not surprised,
+> and it is expected to change to a hash in a future contract version. Do not build anything that
+> depends on `inbox` being the raw token.
+
+The `folder` argument to `purge` is a separate thing entirely: it is `'pending'` or `'processed'`
+(the value `'inbox'` was removed in v0.32.7 and now returns HTTP 400). `purge` with
+`folder: 'processed'` and no `file_ids` bulk-purges the whole processed set.
+
+### What actually fires `append.new-messages`
+
+The kernel's checker runs on **tab focus and app open** — your app does not poll; it declares the
+`host_events` allowlist, subscribes with `sg.on`, and reacts. It is built only when **all** of
+these hold, so if your handler never fires, check them in order:
+
+1. your `app.json` declares the event in `host_events` (default-deny);
+2. the app is running on the app surface (`/en-gb/app`), which is where the transport is loaded;
+3. a vault is open whose `enum_key` can be derived (i.e. not a read-only session);
+4. **that open vault has a lane of its own.** The checker lists the *currently open* vault — so
+   an app in a vault with no lane can never receive this event, no matter what it declares. Put
+   the receiving app in the vault that owns the lane.
+
+`entries` is `null` in the payload: the shell runs the checker with `auto_fetch` off, so you pull
+ciphertext on demand with `sg.append.fetch` when you get the notification.
 
 ---
 

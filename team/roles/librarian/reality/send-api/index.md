@@ -79,6 +79,18 @@ without requiring both parties to have SGraph accounts.
 | POST | `/vault/append/mark-processed/{vault_id}` | Move entries pending → processed (copy+delete, idempotent) | enum_key (header) | Yes |
 | POST | `/vault/append/purge/{vault_id}` | Delete entries from pending or processed (batched, max 100) | write_key (header) | Yes |
 
+**Lane id (`inbox`) is the raw append token — code-verified 6 Sep 2026.** The pending/processed
+folder is named with the **raw** token (`path__vault_append_pending(vault_id, token, …)` in
+`Storage__Paths.py`, called with `token = _safe_token(append_token)`), and `list_entries()` returns
+that folder name as each entry's `inbox` field. So an `enum_key` holder listing a lane learns that
+lane's write token, and the raw token appears in storage object keys (and therefore in S3 access
+logs, inventories and backups). `config.append_anchors` stores only `H(token)`, so the hashing
+there buys less than it appears to. Not a privilege escalation — the append token is designed as a
+public lane address (`H(recipient public key)`), grants write only, and `list` already requires the
+`enum_key` — but it is unintended-looking and undocumented. Proposed fix: name the folder
+`sha256(token)` and return that as `inbox`; `write` keeps its wire contract (it receives the raw
+token and hashes it). Breaking change for existing lanes — needs migration.
+
 **Security hardening:**
 - Path-component inputs validated via `Safe_Str__Vault__Append_Token` and `Safe_Str__Vault__Append__File_Id` (Type_Safe strict validation) — blocks path traversal
 - Batch operations capped at `APPEND_BATCH_MAX_FILE_IDS = 100`
