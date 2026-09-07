@@ -205,7 +205,7 @@ window.sg = {
         mount   : ({prefix, ref, label}) => Promise<{mountId}>,
         unmount : (mountId)      => Promise<{ok: true}>,
         mounts  : ()             => Promise<[{mountId, prefix, label, ref}]>,
-        notify  : (mountId, name, payload) => Promise<{ok}>,      // wake a mounted child's append lane
+        notify  : (mountId, name, payload) => Promise<{mountId, checked}>,  // run a DECLARED mount's lane check now (needs vault.notify)
         // Open ANOTHER vault inside an iframe in YOUR app. See "Embedding another vault".
         embed   : (mountEl, key, opts?) => Promise<{vaultName, fileCount, hasApp, iframe}>,
     },
@@ -217,9 +217,9 @@ window.sg = {
     append: {
         configure    : ({append_anchors})  => Promise<{...}>,
         write        : ({vault_id, append_token, payload}) => Promise<{...}>,   // → ANOTHER vault
-        list         : ({inbox, after_file_id, limit, include_content}) => Promise<{...}>,
-        fetch        : ({inbox, file_ids}) => Promise<{...}>,
-        markProcessed: ({inbox, file_ids}) => Promise<{...}>,
+        list         : ({inbox, after_file_id, limit, include_content, path?}) => Promise<{...}>,  // path → a declared mount's lane
+        fetch        : ({inbox, file_ids, path?}) => Promise<{...}>,
+        markProcessed: ({inbox, file_ids, path?}) => Promise<{...}>,
         purge        : ({folder, inbox, file_ids}) => Promise<{...}>,
     },
     // Kernel→app events (gated by app.json `host_events` allowlist).
@@ -928,7 +928,8 @@ await sg.append.fetch({ inbox, file_ids: [...] });
 await sg.append.markProcessed({ inbox, file_ids: [...] });
 await sg.append.purge({ folder: 'processed', inbox, file_ids: [...] });
 
-// Event push — declare in app.json: "host_events": ["append.new-messages", "append.error"]
+// Event push — declare in app.json (an OBJECT allowlist, explicit true — NOT an array):
+//   "host_events": { "append.new-messages": true, "append.error": true }
 sg.on('append.new-messages', (evt) => { /* {total, per_anchor, entries, new_count, trigger} */ });
 sg.on('append.error',        (evt) => { /* {code, message, http?, trigger} */ });
 ```
@@ -936,6 +937,60 @@ sg.on('append.error',        (evt) => { /* {code, message, http?, trigger} */ })
 `payload` may be a `Uint8Array` (it is base64-encoded for you) or a base64 string you built
 yourself. Ceiling is **5 MB per message**, **1000 pending files per lane**, and **100 `file_ids`
 per batch** for `fetch`/`markProcessed`/`purge`.
+
+### Draining the lanes of your **declared** sub-vaults — NEW 2026-09-07
+
+The monitoring pattern: a parent vault declares data vaults as `*.link.json` mounts; each data
+vault *receives* append messages from elsewhere; the parent's app watches and drains them. The
+three read verbs take an optional **`path`** — any path under a declared mount — and the host
+binds the transport to **that child**:
+
+```js
+const { entries } = await sg.append.list({ path: 'data/vault-a/' });
+await sg.append.fetch({ path: 'data/vault-a/', inbox, file_ids });
+await sg.append.markProcessed({ path: 'data/vault-a/', inbox, file_ids });
+// then commit the processed events INTO the child through the same declared mount:
+await sg.vfs.write('data/vault-a/events/2026-09-07.jsonl', bytes);
+```
+
+What crosses and what does not:
+
+| | |
+|---|---|
+| `list` / `fetch` / `markProcessed` with `path` | cross to the declared mount's child |
+| `purge` / `configure` with `path` | **`EPERM`** — owner verbs need the child's write key, which the lane never carries |
+| `path` under a **runtime** `sg.vault.mount` | **`ENOLANE`** — only the owner's `*.link.json` declaration is a trust anchor |
+| `path` under no mount | `ENOENT` |
+| the mount's credential yields no read key | `ENOLANE` |
+
+The grants are the same booleans (`append.list` / `append.read` / `append.markProcessed`).
+Nothing new is exposed to the app: the parent already holds each child's credential (that is
+what makes the mount work), and the child's `enum_key` is a pure function of its read key. The
+child vault is **never opened** for this — keys are derived from the credential string alone.
+
+**Events per mount.** With `"host_events": { "append.new-messages": true }` declared (an object allowlist — an array parses to **nothing**, silently), the host runs one
+checker per declared mount alongside the root's, on tab focus and app open. Each event carries
+`mount` (the declared prefix in its canonical form, with a trailing slash — `data/vault-a/`) and
+`mountId`, so the app knows which vault spoke:
+
+```js
+sg.on('append.new-messages', (evt) => {
+    if (evt.mount) refreshLane(evt.mount, evt.total);   // a data vault's lane
+    else           refreshOwnLane(evt.total);           // this vault's own lane
+});
+```
+
+**`sg.vault.notify(mountId)`** — now implemented (it was documented and permission-parsed
+since v0.33.5 but had no host handler; every call returned "Unsupported vault action"). It runs
+the named declared mount's lane check immediately and resolves `{mountId, checked: true}`.
+Needs `"vault": { "notify": true }`. `name` and `payload` are accepted for the documented
+signature but not forwarded anywhere — there is no child-side listener to forward to.
+
+> **Nested kernels have no append transport.** An app running *inside* a mounted child (a
+> child kernel) cannot call `sg.append.*` at all — the child kernel's bundle does not carry the
+> transport and its handler set is `vfs.*` only. This is why lane-draining lives in the top
+> kernel. The reality document previously recorded only the `sg.llm.*` parity gap; this one is
+> the same shape.
 
 ### `inbox` is the lane id, and today it *is* the append token
 
@@ -961,7 +1016,7 @@ The kernel's checker runs on **tab focus and app open** — your app does not po
 `host_events` allowlist, subscribes with `sg.on`, and reacts. It is built only when **all** of
 these hold, so if your handler never fires, check them in order:
 
-1. your `app.json` declares the event in `host_events` (default-deny);
+1. your `app.json` declares the event in `host_events` **as an object with `true`** — `{ "append.new-messages": true }`. An array (`["append.new-messages"]`) is accepted without error and parses to an empty allowlist, so nothing ever fires (default-deny);
 2. the app is running on the app surface (`/en-gb/app`), which is where the transport is loaded;
 3. a vault is open whose `enum_key` can be derived (i.e. not a read-only session);
 4. **that open vault has a lane of its own.** The checker lists the *currently open* vault — so

@@ -671,9 +671,14 @@
                 this._scheduleAppendCheck(0, 'app-remount');
                 return;
             }
+            var self = this;
+            // Lanes of DECLARED mounts (the monitoring pattern: data vaults that RECEIVE appends,
+            // watched from the parent). One checker per mount, its own seen-set, events tagged
+            // with the mount so the app knows which vault spoke. A mount whose credential
+            // yields no read key is skipped (event only) — never fatal to the root checker.
+            await this._initLaneCheckers();
             var inbox = await this._getAppendClient();
             if (!inbox) { this._appendChecker = null; return; }
-            var self = this;
             var bus = { emit: function (name, payload) { self._pushHostEvent(name, payload); } };
             this._appendChecker = new SGAppendChecker(inbox, bus, function () {
                 return { enabled: AppHostEvents.allows(self._hostEvents, 'append.new-messages'), auto_fetch: false };
@@ -682,8 +687,34 @@
             this._scheduleAppendCheck(0, 'app-open');
         }
 
+        async _initLaneCheckers() {
+            this._laneCheckers = this._laneCheckers || {};
+            var mounts = (this._mounts && typeof this._mounts.list === 'function') ? this._mounts.list() : [];
+            var self = this;
+            for (var i = 0; i < mounts.length; i++) {
+                var m = mounts[i];
+                if (!m || !m.meta || !m.meta.declared) continue;
+                if (this._laneCheckers[m.mountId]) continue;                      // keep its seen-set across remounts
+                try {
+                    var client = await this._laneClientFor(m.mountId);
+                    this._laneCheckers[m.mountId] = new SGAppendChecker(client, {
+                        emit: (function (mount) {
+                            return function (name, payload) {
+                                self._pushHostEvent(name, Object.assign({ mount: mount.prefix, mountId: mount.mountId }, payload || {}));
+                            };
+                        })(m)
+                    }, function () {
+                        return { enabled: AppHostEvents.allows(self._hostEvents, 'append.new-messages'), auto_fetch: false };
+                    });
+                } catch (err) {
+                    this._emitVaultEvent('append-lane-skipped', { label: 'Append lane skipped: ' + (m.prefix || m.mountId), mountId: m.mountId, err: (err && (err.code || err.message)) || 'error' });
+                }
+            }
+        }
+
         _scheduleAppendCheck(delayMs, trigger) {
-            if (!this._appendChecker) return;
+            var hasLanes = !!(this._laneCheckers && Object.keys(this._laneCheckers).length);
+            if (!this._appendChecker && !hasLanes) return;
             var DEBOUNCE_MS = 1000;
             var since = Date.now() - (this._lastAppendCheckTime || 0);
             var wait  = Math.max(delayMs || 0, DEBOUNCE_MS - since);
@@ -692,6 +723,8 @@
             this._appendCheckTimer = setTimeout(() => {
                 this._lastAppendCheckTime = Date.now();
                 if (this._appendChecker) this._appendChecker.check(label);
+                var lanes = this._laneCheckers || {};
+                Object.keys(lanes).forEach(function (id) { try { lanes[id].check(label); } catch (_) {} });
             }, Math.max(0, wait));
         }
 
@@ -1265,6 +1298,39 @@
             });
             this._appendVaultId = vault._vaultId;
             return this._append;
+        }
+
+        // Lane client for a DECLARED mount: an SGAppend bound to the CHILD's vault id and enum
+        // key, derived from the credential the parent already resolved for that mount. Lazy
+        // and cached per mountId. The child vault is never opened (MountLanes derives keys
+        // from the credential string alone), and no write key is carried — purge/configure
+        // are parent-only by construction, not just by gate. Runtime (sg.vault.mount) mounts
+        // are refused: an app-chosen mount is not an owner declaration, and the declared
+        // path is the trust anchor here (07 Sep analysis §6, "declared mounts are top-kernel-only").
+        async _laneClientFor(mountId) {
+            if (!this._laneClients) this._laneClients = {};
+            if (this._laneClients[mountId]) return this._laneClients[mountId];
+            var m = this._mounts && this._mounts.get(mountId);
+            if (!m)                                     throw Object.assign(new Error('no such mount: ' + mountId), { code: 'ENOENT' });
+            if (!m.meta || !m.meta.declared)            throw Object.assign(new Error('append lanes cross only DECLARED mounts (owner *.link.json), not runtime mounts'), { code: 'ENOLANE' });
+            if (typeof MountLanes === 'undefined' || typeof SGAppend === 'undefined' || typeof SGVaultCrypto === 'undefined') {
+                throw Object.assign(new Error('append transport unavailable'), { code: 'ENOTRANSPORT' });
+            }
+            var spec  = (this._declaredSpecs || []).find(function (d) { return d.ref === m.ref; }) || null;
+            var creds = await this._resolveChildCredentials(m.ref);
+            var bind  = await MountLanes.laneBinding(creds, spec && spec.vaultId, SGVaultCrypto);
+            if (!bind) throw Object.assign(new Error('no read credential for mount ' + (m.prefix || mountId) + ' — the lane cannot be derived'), { code: 'ENOLANE' });
+            var vault    = this._vault;
+            var sgSend   = (vault && vault._sgSend) || null;
+            var endpoint = (sgSend && sgSend.endpoint)
+                || (window.SG_ENDPOINT
+                    || (function () { try { return sessionStorage.getItem('sg-vault-endpoint'); } catch (_) { return null; } })()
+                    || 'https://dev.send.sgraph.ai');
+            var enumKey = await SGAppend.deriveEnumKey(bind.readKeyBytes);
+            var client  = new SGAppend({ endpoint: endpoint, vaultId: bind.vaultId, enumKey: enumKey, writeKeyHex: null, accessToken: null });
+            client._laneMount = { mountId: mountId, prefix: m.prefix, tier: bind.tier };
+            this._laneClients[mountId] = client;
+            return client;
         }
 
         // ── Release channels ("pin a version") ─────────────────────────────────────────
@@ -3326,9 +3392,9 @@
                     'append:{' +
                       'configure:function(o){o=o||{};return _sgCmd("append",{action:"configure",append_anchors:o.append_anchors});},' +
                       'write:function(o){o=o||{};return _sgCmd("append",{action:"write",vault_id:o.vault_id,append_token:o.append_token,payload:o.payload});},' +
-                      'list:function(o){o=o||{};return _sgCmd("append",{action:"list",inbox:o.inbox,after_file_id:o.after_file_id,limit:o.limit,include_content:o.include_content});},' +
-                      'fetch:function(o){o=o||{};return _sgCmd("append",{action:"fetch",inbox:o.inbox,file_ids:o.file_ids});},' +
-                      'markProcessed:function(o){o=o||{};return _sgCmd("append",{action:"markProcessed",inbox:o.inbox,file_ids:o.file_ids});},' +
+                      'list:function(o){o=o||{};return _sgCmd("append",{action:"list",inbox:o.inbox,after_file_id:o.after_file_id,limit:o.limit,include_content:o.include_content,path:o.path});},' +
+                      'fetch:function(o){o=o||{};return _sgCmd("append",{action:"fetch",inbox:o.inbox,file_ids:o.file_ids,path:o.path});},' +
+                      'markProcessed:function(o){o=o||{};return _sgCmd("append",{action:"markProcessed",inbox:o.inbox,file_ids:o.file_ids,path:o.path});},' +
                       'purge:function(o){o=o||{};return _sgCmd("append",{action:"purge",folder:o.folder,inbox:o.inbox,file_ids:o.file_ids});}' +
                     '},' +
                     // sg.on / sg.off — kernel→app events (see the _sgEvtH registry above).
@@ -3824,7 +3890,29 @@
                             self._emitBridgeCall('append.' + ibAct, { ok: false, err: 'EPERM' }); return;
                         }
                         var ibData = e.data;
-                        self._getAppendClient().then(function (inbox) {
+                        // `path` — drain ANOTHER vault's lane: the path must sit under a DECLARED
+                        // mount (an owner-declared *.link.json, never a runtime sg.vault.mount),
+                        // and only the read verbs cross (owner verbs need the child's write key,
+                        // which the lane binding never carries). The parent holds the child's
+                        // credential already; the read key IS the enum key, so this grants the
+                        // app nothing the parent could not compute. See MountLanes.
+                        var ibPath   = (ibData.path != null && ibData.path !== '') ? String(ibData.path) : null;
+                        var clientP;
+                        if (ibPath) {
+                            if (typeof MountLanes === 'undefined' || !MountLanes.allowsVerb(ibAct)) {
+                                cmdReply(false, null, ibAct + ' cannot target a mounted vault — owner verbs (purge/configure) stay on the open vault', 'EPERM');
+                                self._emitBridgeCall('append.' + ibAct, { ok: false, err: 'EPERM', path: ibPath }); return;
+                            }
+                            var hit = self._mounts ? self._mounts.resolve(ibPath) : null;
+                            if (!hit) {
+                                cmdReply(false, null, 'No mounted vault at ' + ibPath, 'ENOENT');
+                                self._emitBridgeCall('append.' + ibAct, { ok: false, err: 'ENOENT', path: ibPath }); return;
+                            }
+                            clientP = self._laneClientFor(hit.mount.mountId);
+                        } else {
+                            clientP = self._getAppendClient();
+                        }
+                        clientP.then(function (inbox) {
                             if (!inbox) {                                        // SGAppend absent, or no vault open
                                 throw Object.assign(new Error('append transport unavailable'), { code: 'ENOTRANSPORT' });
                             }
@@ -4220,6 +4308,37 @@
                     // ── vault lifecycle (create / unlink / delete) ────────────────
                     if (e.data.__sgCmdType === 'vault') {
                         var vAct  = e.data.action;
+                        // Read-only-safe actions FIRST. `notify` runs a lane check (a list on the
+                        // child's append lane) — it mutates nothing, and a parent opened with only
+                        // its read key still resolves child lanes through ro-links, so it must not
+                        // sit behind the writability gate the mutating verbs need.
+                        // sg.vault.notify(mountId, name, payload) — the C6 "peer wake". Documented
+                        // and permission-parsed since v0.33.5, but no host branch existed: every
+                        // call fell through to "Unsupported vault action". Semantics now: run the
+                        // named DECLARED mount's lane check immediately (the child kernel has no
+                        // checker of its own — see MountLanes). `name`/`payload` are accepted for
+                        // the documented signature and recorded, not forwarded anywhere.
+                        if (vAct === 'notify') {
+                            if (!self._can('vault.notify', '')) {
+                                cmdReply(false, null, 'Permission denied: app.json needs "permissions": { "vault": { "notify": true } }', 'EPERM');
+                                self._emitBridgeCall('vault.notify', { ok: false, err: 'EPERM' }); return;
+                            }
+                            var nId = String(e.data.mountId || '');
+                            var nM  = nId && self._mounts ? self._mounts.get(nId) : null;
+                            if (!nM) { cmdReply(false, null, 'No such mount: ' + nId, 'ENOENT'); self._emitBridgeCall('vault.notify', { mountId: nId, ok: false, err: 'ENOENT' }); return; }
+                            self._initLaneCheckers().then(function () {
+                                var ck = self._laneCheckers && self._laneCheckers[nId];
+                                if (!ck) { cmdReply(false, null, 'Mount ' + nId + ' has no derivable append lane', 'ENOLANE'); self._emitBridgeCall('vault.notify', { mountId: nId, ok: false, err: 'ENOLANE' }); return; }
+                                return Promise.resolve(ck.check('peer:' + String(e.data.name || 'notify'))).then(function () {
+                                    cmdReply(true, { mountId: nId, checked: true });
+                                    self._emitBridgeCall('vault.notify', { mountId: nId, ok: true });
+                                });
+                            }).catch(function (err) {
+                                cmdReply(false, null, (err && err.message) || String(err), (err && err.code) || 'EAPPEND');
+                                self._emitBridgeCall('vault.notify', { mountId: nId, ok: false, err: (err && err.code) || 'error' });
+                            });
+                            return;
+                        }
                         if (!dataSource.writable) { cmdReply(false, null, 'Read-only vault'); return; }   // EREADONLY
                         var vPath = AppPermissions.normalizePath(e.data.path || '');
                         if (vAct === 'create') {
