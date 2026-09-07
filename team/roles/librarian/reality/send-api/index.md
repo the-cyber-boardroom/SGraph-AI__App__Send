@@ -81,9 +81,10 @@ without requiring both parties to have SGraph accounts.
 
 **Edge rewrites API 403 → static `404.html` — measured 7 Sep 2026, NOT an API defect.** The
 CDN in front of `send.sgraph.ai` applies the static site's `403 → /404.html` custom error
-response to `/api/*` as well, so every gate failure across the API surface (wrong
-`append_token`, wrong/missing `enum_key`, write-key mismatch) reaches clients as **404 with an
-HTML page**. Other statuses pass through as JSON — a genuine route miss still answers 404 +
+response to `/api/*` as well, so a gate failure on the append routes (wrong `append_token`,
+wrong/missing `enum_key`) reaches clients as **404 with an HTML page**. Measured on the append
+routes only — other routes gate on an access token (401) before any 403; per-status rules make
+the same behaviour elsewhere likely but unverified. 400/401/404/405 pass through as JSON — a genuine route miss still answers 404 +
 JSON, so the HTML body is the tell, not the status. The API itself returns the documented 403
 (verified in-memory; 133 tests green). **Fix is infrastructure — no distribution config lives
 in this repo.** Client-side mitigation shipped: `SGAppend._errorForResponse` raises `EEDGE` on

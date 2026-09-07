@@ -209,6 +209,12 @@ async function main() {
         err = null;
         try { await c.write({ vault_id: 'BAD ID', append_token: 't', payload: 'QUJD' }); } catch (e) { err = e; }
         ok('write with malformed target vault_id → EINVAL, nothing sent', err && err.code === 'EINVAL' && c._fetch.calls.length === 0);
+
+        // A value mis-passed as the id (a token, say) must not be echoed whole into an error.
+        const leaky = client({ vaultId: 'A'.repeat(200) });
+        err = null;
+        try { await leaky.list({}); } catch (e) { err = e; }
+        ok('a long malformed id is truncated in the message', err && err.message.indexOf('A'.repeat(41)) === -1 && /…/.test(err.message));
     }
 
     console.log('\n[suite] SGAppend — error bodies (JSON detail vs edge HTML page)');

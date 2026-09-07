@@ -2881,6 +2881,19 @@
         }
 
         _buildVfsBridgeScript(currentPath) {
+            // Every runtime value spliced into the bridge lands inside a <script> in a srcdoc
+            // document. JSON.stringify is a valid JS literal but NOT HTML-safe: a value holding
+            // '</script>' closes the bridge early, kills every sg.* call, and runs whatever
+            // follows. vaultName and release.label are owner-authored free text, so escape
+            // the one sequence the HTML parser cares about (and the two JS line terminators
+            // JSON leaves raw). Confirmed by test: a label of '</script>' used to yield three
+            // raw closers in the built bridge instead of one.
+            var _jsLit = function (v) {
+                return JSON.stringify(v === undefined ? null : v)
+                    .replace(/<\//g, '<\\/')
+                    .replace(/\u2028/g, '\\u2028')
+                    .replace(/\u2029/g, '\\u2029');
+            };
             // EFFECTIVE writability — match what the bridge ACTUALLY enforces (and what the
             // SG/Vault editor preview reports via send-browse). Two distinct gates:
             //   • this._writable      = read_key tier: do we have a full key (not an ro-token)?
@@ -2950,9 +2963,9 @@
                 // The frame also logs it itself, prefixed, because the browser's own uncaught
                 // error line says nothing about WHOSE code threw — and a syntax error in an
                 // app's script reads exactly like a fault in the vault to anyone debugging.
-                'function _sgAppErr(msg){try{console.error("[vault-app] " + ' + JSON.stringify(currentPath) +
+                'function _sgAppErr(msg){try{console.error("[vault-app] " + ' + _jsLit(currentPath) +
                   ' + " — this error is from the APP\'s own JavaScript, not the vault platform:\\n" + msg);}catch(_){}' +
-                  'try{window.parent.postMessage({type:"sg-app-error",message:msg,appPath:' + JSON.stringify(currentPath) + '},"*");}catch(_){}}' +
+                  'try{window.parent.postMessage({type:"sg-app-error",message:msg,appPath:' + _jsLit(currentPath) + '},"*");}catch(_){}}' +
                 'window.onerror=function(m,s,l,c){_sgAppErr(String(m)+(l?" (line "+l+(c?":"+c:"")+")":""));return false;};' +
                 'window.addEventListener("unhandledrejection",function(e){var r=e&&e.reason;_sgAppErr("Unhandled rejection: "+String((r&&r.message)||r));});' +
 
@@ -3091,7 +3104,10 @@
                       'payload[type]=id;' +
                       'var rk=type==="__sgVfsWriteReq"?"__sgVfsWriteReply":"__sgVfsListReply";' +
                       'function h(e){if(!e.data||e.data[rk]!==id)return;window.removeEventListener("message",h);' +
-                        'if(e.data.ok)res(e.data);else rej(new Error(e.data.err||"VFS error"));}' +
+                        'if(e.data.ok){res(e.data);return;}' +
+                        'var er=new Error(e.data.err||"VFS error");' +
+                        'var c=e.data.code||(/^E[A-Z0-9]+$/.test(e.data.err||"")?e.data.err:null);' +   // ENOENT arrives in `err`
+                        'if(c)er.code=c;rej(er);}' +
                       'window.addEventListener("message",h);window.parent.postMessage(payload,"*");' +
                     '});' +
                   '}' +
@@ -3115,7 +3131,8 @@
                       'var id=(Math.random()*1e9|0).toString(36)+Date.now().toString(36);' +
                       'function h(e){if(!e.data||e.data.__sgVfsReadReply!==id)return;window.removeEventListener("message",h);' +
                         'if(e.data.ok)res(e.data.buf);' +
-                        'else rej(new Error(e.data.err==="ENOENT"?"No such file: "+e.data.path:(e.data.err||"Read failed")));' +
+                        'else{var er=new Error(e.data.err==="ENOENT"?"No such file: "+e.data.path:(e.data.err||"Read failed"));' +
+                        'var c=e.data.code||(e.data.err==="ENOENT"?"ENOENT":null);if(c)er.code=c;rej(er);}' +
                       '}' +
                       'window.addEventListener("message",h);window.parent.postMessage({__sgVfsReadReq:id,path:path},"*");' +
                     '});' +
@@ -3250,10 +3267,10 @@
                       // inline preview should set 'preview' so apps can feature-detect deliberately
                       // (cross-repo parity work — see brief v0.33.5__brief__vault-preview-app-parity).
                       'context:"app",' +
-                      'selfPath:'  + JSON.stringify(currentPath) + ',' +
+                      'selfPath:'  + _jsLit(currentPath) + ',' +
                       'writable:'  + (writable  ? 'true' : 'false') + ',' +
-                      'vaultName:' + JSON.stringify(vaultName) + ',' +
-                      'vaultId:'   + JSON.stringify(vaultId)   + ',' +
+                      'vaultName:' + _jsLit(vaultName) + ',' +
+                      'vaultId:'   + _jsLit(vaultId)   + ',' +
                       'fileCount:' + fileCount + ',' +
                       // Which version the app is running as. `.vault/releases.json` is inside the
                       // permission floor, so an app cannot read it and previously had no way to tell
@@ -3261,7 +3278,7 @@
                       // explains "I pushed a new app.json and nothing changed", and a pinned mount is
                       // read-only for everyone, owner included. Read-only mirror of the host's state.
                       'pinned:'    + (releaseInfo.pinned ? 'true' : 'false') + ',' +
-                      'release:'   + JSON.stringify(releaseInfo.release)     + ',' +
+                      'release:'   + _jsLit(releaseInfo.release)     + ',' +
                       'totalSize:0' +
                     '},' +
                     'sync:{' +
@@ -3369,7 +3386,7 @@
                   // The resolved path is sent to the parent via _read() which postMessages
                   // {__sgVfsReadReq, path} — this call will appear in the Bridge debug tab.
                   '(function(){' +
-                    'var _hd=' + JSON.stringify(htmlDir) + ';' +
+                    'var _hd=' + _jsLit(htmlDir) + ';' +
                     'function _rp(b,r){if(!b)return r;var p=(b+r).split("/"),o=[];' +
                       'for(var i=0;i<p.length;i++){if(p[i]==="..")o.pop();' +
                       'else if(p[i]!=="."&&p[i]!=="")o.push(p[i]);}return o.join("/");}' +
@@ -3406,7 +3423,10 @@
                     '}catch(e){console.warn("[sg-vfs] img.src patch failed:",e.message);}' +
                   '})();' +
 
-                  'console.log("[sg-vfs] ready | writable=' + (writable ? 'true' : 'false') + ' | vaultName=' + vaultName.replace(/'/g, "\\'") + ' | page: /en-gb/app");' +
+                  // The name is spliced into a double-quoted literal, so escaping only the single
+                  // quote left `"` and newlines as syntax errors that took the whole bridge down —
+                  // every app in a vault named `Q3 "final"` died on mount. Emit it as a JS literal.
+                  'console.log("[sg-vfs] ready | writable=' + (writable ? 'true' : 'false') + ' | vaultName=" + ' + _jsLit(vaultName) + ' + " | page: /en-gb/app");' +
                 '})();' +
               '})();<\/script>';
         }
@@ -3515,7 +3535,7 @@
                     function wReply(ok, payload) {
                         try { writeSrc.postMessage(Object.assign({ __sgVfsWriteReply: writeId, ok: ok }, payload), '*'); } catch (_) {}
                     }
-                    if (!dataSource.writable) { wReply(false, { err: 'Read-only vault' }); return; }
+                    if (!dataSource.writable) { wReply(false, { err: 'Read-only vault', code: 'EREADONLY' }); return; }   // the code AUTHORING.md/skill already promise
                     var wBytes;
                     try {
                         var bin = atob(e.data.data || '');
@@ -3677,8 +3697,8 @@
                     // `code` is optional and carries a machine-readable error class
                     // (EPERM / ECONSENT / ENOKEY / EBUDGET / EMODEL / EABORT / EPROTO) so an
                     // app can branch on the reason instead of string-matching a message.
-                    function cmdReply(ok, result, errMsg, code) {
-                        try { cmdSrc.postMessage({ __sgCmdReply: cmdId, ok: ok, result: result || null, err: errMsg || null, code: code || null }, '*'); } catch (_) {}
+                    function cmdReply(ok, result, errMsg, code, status) {         // status: HTTP status when the transport saw one (else omitted)
+                        try { cmdSrc.postMessage({ __sgCmdReply: cmdId, ok: ok, result: result || null, err: errMsg || null, code: code || null, status: (status == null ? null : status) }, '*'); } catch (_) {}
                     }
                     var vault    = self._vault;
                     var endpoint = (window.SG_ENDPOINT
@@ -3739,7 +3759,7 @@
                         }).then(function (r) {
                             cmdReply(true, r); self._emitBridgeCall('append.' + ibAct, { ok: true });
                         }).catch(function (err) {
-                            cmdReply(false, null, (err && err.message) || String(err), (err && err.code) || 'EAPPEND');
+                            cmdReply(false, null, (err && err.message) || String(err), (err && err.code) || 'EAPPEND', err && err.http);
                             self._emitBridgeCall('append.' + ibAct, { ok: false, err: (err && err.code) || (err && err.message) || 'error' });
                         });
                         return;

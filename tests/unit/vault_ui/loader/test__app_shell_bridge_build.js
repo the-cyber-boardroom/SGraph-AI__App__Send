@@ -245,5 +245,135 @@ console.log('\n[suite] app-shell — sg.app tells an app it is running from a pi
     ok('the bridge still parses with a release object', perr === null, perr && perr.message);
 }
 
+console.log('\n[suite] app-shell — owner-authored text cannot close the bridge <script>');
+{
+    /* Every runtime value spliced into the bridge lands inside a <script> in a srcdoc
+       document. JSON.stringify is a valid JS literal but not HTML-safe: '</script>' in a
+       vault name or a release label closed the bridge early and killed every sg.* call.
+       Measured before the fix: a label of '</script>' produced THREE raw closers. */
+    const EVIL = '</script><script>window.__pwned=1</script>';
+    const closers = (src) => (src.match(/<\/script>/g) || []).length;
+
+    const viaLabel = makeShell(AppPermissions.parsePermissions(null));
+    viaLabel._release = { live: false, name: 'v1', label: EVIL, commit: 'c' };
+    const srcL = viaLabel._buildVfsBridgeScript('index.html');
+    ok('release.label with </script> → exactly one closer in the bridge', closers(srcL) === 1, 'got ' + closers(srcL));
+    ok('…the escaped form is what reaches the frame', /<\\\/script>/.test(srcL));
+
+    const viaName = makeShell(AppPermissions.parsePermissions(null));
+    viaName._vault = { name: EVIL, _vaultId: 'vid12345' };
+    const srcN = viaName._buildVfsBridgeScript('index.html');
+    ok('vaultName with </script> → exactly one closer (pre-existing hole, same fix)', closers(srcN) === 1, 'got ' + closers(srcN));
+
+    const viaPath = makeShell(AppPermissions.parsePermissions(null));
+    const srcP = viaPath._buildVfsBridgeScript('x/</script>/index.html');
+    ok('currentPath with </script> → exactly one closer', closers(srcP) === 1, 'got ' + closers(srcP));
+
+    for (const [label, src] of [['label', srcL], ['name', srcN], ['path', srcP]]) {
+        const body = src.slice(src.indexOf('<script>') + '<script>'.length).replace(/<\/script>\s*$/, '');
+        let perr = null;
+        try { new Function(body); } catch (e) { perr = e; }
+        ok('bridge still parses with hostile ' + label, perr === null, perr && perr.message);
+    }
+    // The escape must not alter what the app actually reads.
+    const lit = srcL.slice(srcL.indexOf('release:') + 'release:'.length).match(/^\{[^}]*\}/)[0];
+    ok('the app still receives the original label verbatim', JSON.parse(lit).label === EVIL);
+
+    /* Found during review: the ready-line console.log spliced the vault name RAW into a
+       double-quoted literal, escaping only single quotes. A `"` or a newline in the name was
+       a syntax error in the bridge — window.sg never installed and every app in that vault
+       died on mount, with an unattributed error. Measured before the fix. */
+    for (const name of ['Q3 "final"', 'multi\nline', 'tab\there', 'back\\slash', "it's"]) {
+        const el = makeShell(AppPermissions.parsePermissions(null));
+        el._vault = { name, _vaultId: 'vid12345' };
+        const src = el._buildVfsBridgeScript('index.html');
+        const body = src.slice(src.indexOf('<script>') + '<script>'.length).replace(/<\/script>\s*$/, '');
+        let perr = null;
+        try { new Function(body); } catch (e) { perr = e; }
+        ok('bridge parses with vault name ' + JSON.stringify(name), perr === null, perr && perr.message);
+    }
+}
+
+console.log('\n[suite] app-shell — the HOST reply carries code + HTTP status (not a faked reply)');
+{
+    /* The earlier test faked `status` in the reply; cmdReply never sent one, so it asserted
+       behaviour the host never produced. Drive the real handler instead. */
+    const replies = [];
+    const src = { postMessage: (m) => replies.push(m) };          // the frame: registered AND the message source
+    const ds  = { getFileList: () => [], writable: false, readFile: async () => new Uint8Array(0) };
+    const tick = () => new Promise((r) => setTimeout(r, 15));
+    const el = makeShell(AppPermissions.parsePermissions({ permissions: { append: { list: true } } }));
+    el._setupVfsBridgeHandlers({ contentWindow: src }, ds);
+
+    // Transport error that knew an HTTP status (the EEDGE case: masked 403 → 404 + HTML).
+    el._getAppendClient = async () => ({ list: async () => { throw Object.assign(new Error('edge page'), { code: 'EEDGE', http: 404 }); } });
+    el._vfsBridgeHandler({ source: src, data: { __sgCmdType: 'append', __sgCmdId: 'c1', action: 'list' } });
+    await tick();
+    const r1 = replies.find((m) => m.__sgCmdReply === 'c1');
+    ok('reply carries the transport code',   r1 && r1.code === 'EEDGE');
+    ok('reply carries the HTTP status',      r1 && r1.status === 404);
+    ok('reply carries the message',          r1 && r1.err === 'edge page');
+
+    // Denied before any transport: code, no status.
+    const denied = makeShell(AppPermissions.parsePermissions(null));
+    denied._setupVfsBridgeHandlers({ contentWindow: src }, ds);
+    denied._vfsBridgeHandler({ source: src, data: { __sgCmdType: 'append', __sgCmdId: 'c2', action: 'write', vault_id: 'remote99', append_token: 't', payload: 'QUJD' } });
+    await tick();
+    const r2 = replies.find((m) => m.__sgCmdReply === 'c2');
+    ok('denied → EPERM',                       r2 && r2.code === 'EPERM');
+    ok('denied → status is null, not fabricated', r2 && r2.status === null);
+    ok('denied message names the app.json key', r2 && /"append":\s*\{\s*"write"/.test(r2.err));
+
+    // Transport error without an HTTP status (e.g. EINVAL raised client-side).
+    const noHttp = makeShell(AppPermissions.parsePermissions({ permissions: { append: { list: true } } }));
+    noHttp._setupVfsBridgeHandlers({ contentWindow: src }, ds);
+    noHttp._getAppendClient = async () => ({ list: async () => { throw Object.assign(new Error('no id'), { code: 'EINVAL' }); } });
+    noHttp._vfsBridgeHandler({ source: src, data: { __sgCmdType: 'append', __sgCmdId: 'c3', action: 'list' } });
+    await tick();
+    const r3 = replies.find((m) => m.__sgCmdReply === 'c3');
+    ok('no http on the error → status null', r3 && r3.code === 'EINVAL' && r3.status === null);
+}
+
+console.log('\n[suite] app-shell — sg.vfs.* errors carry the host\'s code too');
+{
+    const src  = makeShell(AppPermissions.parsePermissions(null))._buildVfsBridgeScript('index.html');
+    const body = src.slice(src.indexOf('<script>') + '<script>'.length).replace(/<\/script>\s*$/, '');
+    function sliceFn(text, needle) {
+        const start = text.indexOf(needle); if (start === -1) return null;
+        let depth = 0;
+        for (let i = text.indexOf('{', start); i < text.length; i++) {
+            if (text[i] === '{') depth++; else if (text[i] === '}' && --depth === 0) return text.slice(start, i + 1);
+        }
+        return null;
+    }
+    const vfsMsg = sliceFn(body, 'function _vfsMsg(');
+    ok('_vfsMsg is extractable', !!vfsMsg);
+
+    const drive = async (reply) => {
+        const listeners = [];
+        const fakeWin = {
+            addEventListener: (_n, h) => listeners.push(h),
+            removeEventListener: (_n, h) => { const i = listeners.indexOf(h); if (i > -1) listeners.splice(i, 1); },
+            parent: { postMessage: (payload) => setTimeout(() => listeners.slice().forEach((h) =>
+                h({ data: Object.assign({ __sgVfsWriteReply: payload.__sgVfsWriteReq }, reply) })), 0) }
+        };
+        const fn = new Function('window', vfsMsg + '; return _vfsMsg;')(fakeWin);
+        let caught = null;
+        await fn('__sgVfsWriteReq', {}).catch((e) => { caught = e; });
+        return caught;
+    };
+    const e1 = await drive({ ok: false, err: 'Permission denied', code: 'EPERM' });
+    ok('host code EPERM survives to the frame',        e1 && e1.code === 'EPERM');
+    const e2 = await drive({ ok: false, err: 'Read-only vault', code: 'EREADONLY' });
+    ok('EREADONLY (now sent by the host) survives',    e2 && e2.code === 'EREADONLY');
+    const e3 = await drive({ ok: false, err: 'ENOENT', path: 'x' });
+    ok('a code-shaped err (ENOENT) becomes .code',     e3 && e3.code === 'ENOENT');
+    const e4 = await drive({ ok: false, err: 'Write failed' });
+    ok('a plain message yields no fabricated code',    e4 && e4.code === undefined && e4.message === 'Write failed');
+
+    ok('host sends EREADONLY on a read-only write (was code-less)',
+        /wReply\(false, \{ err: 'Read-only vault', code: 'EREADONLY' \}\)/.test(readFileSync(base + 'app-shell.js', 'utf8')));
+}
+
 console.log('\n' + (fail === 0 ? '✓' : '✗') + ' ' + pass + ' passed, ' + fail + ' failed');
 if (fail > 0) process.exit(1);

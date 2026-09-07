@@ -178,8 +178,9 @@ class SGAppend {
                 'have gone to a path with an empty id. Nothing was sent.')
         }
         if (!/^[a-z0-9]{8,24}$/.test(id)) {                                     // mirrors VAULT_ID_PATTERN server-side
+            const shown = id.length > 40 ? id.slice(0, 40) + '…' : id           // a mis-passed secret must not be echoed whole
             throw SGAppend._err('EINVAL',
-                `${verb}: "${id}" is not a valid vault id (8-24 lowercase alphanumerics, no hyphens). Nothing was sent.`)
+                `${verb}: "${shown}" is not a valid vault id (8-24 lowercase alphanumerics, no hyphens). Nothing was sent.`)
         }
     }
 

@@ -859,14 +859,25 @@ Only `true` grants — `1`, `"yes"` and an array of paths all deny.
 
 > **A read-only session does not block `sg.append.write`.** The grant above is the only gate on
 > it; `sg.app.writable === false` is irrelevant to the append namespace. What *does* fail closed
-> in a read-only session are the **read** verbs (`list`/`fetch`/`markProcessed`), because their
-> `enum_key` is derived from the vault's read key and cannot be derived without it.
+> in a read-only session are the **read** verbs (`list`/`fetch`/`markProcessed`): their
+> `enum_key` is derived from the vault's read key, and a read-only open imports that key
+> non-extractable, so the host cannot derive it and answers `ENOAUTH` without a request.
+>
+> **Security note — the read key *is* the enum key.** `enum_key = SHA256("sg-inbox-enum:" ||
+> read_key_bytes)` is a pure function of the read key. The non-extractable import is a courtesy
+> of the web UI, not a boundary: anyone holding a vault's read key can compute its `enum_key`
+> elsewhere and list, fetch and mark-processed that vault's lane. So **never publish the read key
+> of a vault that receives a lane.** The telemetry pattern (a public games vault that *writes*,
+> a private telemetry vault that *receives*) is the right shape precisely because the receiving
+> vault's read key stays private.
 
 ### Errors carry a `code` — check that, not the message
 
-Every rejection from `sg.append.*` (and every other `sg.*` namespace) is an `Error` with a
-stable `.code`, and `.status` when an HTTP status is known. Branch on the code; the message is
-for humans and will change.
+Every rejection from `sg.append.*` is an `Error` with a stable `.code`, and `.status` when the
+transport saw an HTTP status. The same is true of every namespace that goes through the command
+bridge (`sg.fs`, `sg.vault`, `sg.sync`, `sg.auth`, `sg.state`, `sg.ui`, `sg.history`) and of
+`sg.vfs.*` (`EPERM`, `EPROTECTED`, `EREADONLY`, `ENOENT`, `EPROTO`). Branch on the code; the
+message is for humans and will change.
 
 | Code | Meaning |
 |---|---|
@@ -879,6 +890,7 @@ for humans and will change.
 | `ENOTRANSPORT` | no vault open, or the transport isn't loaded on this surface |
 | `EEDGE` | **an HTML error page came back instead of JSON — see below** |
 | `EHTTP` | any other HTTP failure; read `.status` |
+| `EAPPEND` | the append layer threw something without a code of its own (a client bug, not a server answer) |
 
 > **`EEDGE` — an HTML page came back, so the status is not the API's.** A CDN error page can
 > replace both the body *and* the status code. There is a live case of this: the static site's
