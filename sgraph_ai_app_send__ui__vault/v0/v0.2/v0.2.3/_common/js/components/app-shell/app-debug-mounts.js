@@ -61,6 +61,9 @@
                         '<span class="mlabel">' + esc(m.label) + '</span>' +
                         '<span class="mcust' + custCls + '" title="credential custody mode (gap-doc B10)">' + esc(m.custodyTag) + '</span>' +
                         '<span class="miso">' + esc(m.isolation) + '</span>' +
+                        (m.declared ? '<span class="miso" title="owner-declared via .link.json">declared</span>' : '') +
+                        '<span class="miso" title="access tier">' + esc(m.access || 'rw') + '</span>' +
+                        '<span class="miso" title="sync state reported by the child kernel">' + esc(m.syncTag || '—') + '</span>' +
                         '</div>';
                 }).join('');
 

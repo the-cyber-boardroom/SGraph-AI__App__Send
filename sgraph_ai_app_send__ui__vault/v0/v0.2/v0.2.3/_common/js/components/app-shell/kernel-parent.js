@@ -158,6 +158,33 @@
             return globalThis.VivMonitor.requestLog(ch, opts || {});
         }
 
+        // Sync surface (parent side). status() is one ref read in the child; sync() forces
+        // a reconcile. syncAll() is what the tab-focus behind-check calls. Results are
+        // cached on the mount entry so list() can show them synchronously.
+        async status(mountId) {
+            const m = this.mounts.get(mountId);
+            if (!m) throw codeError('ENOMOUNT', 'no such mount ' + mountId);
+            if (!m.channel) return { syncable: false, spawned: false };      // never touched: nothing to be stale
+            const st = await m.channel.request('vfs.status', {});
+            m._sync = Object.assign({ at: Date.now() }, st);
+            return st;
+        }
+        async sync(mountId) {
+            const m = this.mounts.get(mountId);
+            if (!m) throw codeError('ENOMOUNT', 'no such mount ' + mountId);
+            if (!m.channel) return { syncable: false, spawned: false };
+            const st = await m.channel.request('vfs.sync', {});
+            m._sync = Object.assign({ at: Date.now() }, st);
+            return st;
+        }
+        async syncAll() {
+            const out = {};
+            for (const m of this.mounts.list()) {
+                try { out[m.mountId] = await this.sync(m.mountId); } catch (err) { out[m.mountId] = { error: err.code || err.message }; }
+            }
+            return out;
+        }
+
         list() {
             return this.mounts.list().map(function (m) {
                 return {
@@ -169,7 +196,8 @@
                     custody:   m.custody || VC.MODES.PARENT_HELD,
                     access:    (m.meta && m.meta.access) || 'rw',
                     declared:  !!(m.meta && m.meta.declared),
-                    spawned:   !!m.channel
+                    spawned:   !!m.channel,
+                    sync:      m._sync || null
                 };
             });
         }

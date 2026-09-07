@@ -47,10 +47,12 @@ node tests/unit/vault_ui/loader/test__app_permissions__append.js
 node tests/unit/vault_ui/loader/test__app_host_events.js
 node tests/unit/vault_ui/loader/test__secure_channel_envelope.js
 node tests/unit/vault_ui/loader/test__secure_channel.js
+node tests/unit/vault_ui/loader/test__secure_channel_timeout.js
 node tests/unit/vault_ui/loader/test__kernel_mounts.js
 node tests/unit/vault_ui/loader/test__kernel_broker.js
 node tests/unit/vault_ui/loader/test__kernel_relay.js
 node tests/unit/vault_ui/loader/test__kernel_app_handlers.js
+node tests/unit/vault_ui/loader/test__kernel_app_handlers_sync.js
 node tests/unit/vault_ui/loader/test__kernel_bootstrap.js
 node tests/unit/vault_ui/loader/test__kernel_parent.js
 node tests/unit/vault_ui/loader/test__declared_mounts.js

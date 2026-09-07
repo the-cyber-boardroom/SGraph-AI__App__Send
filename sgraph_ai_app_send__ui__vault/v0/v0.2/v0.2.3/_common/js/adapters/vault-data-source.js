@@ -224,6 +224,10 @@ class VaultDataSource {
 
         _hudNotify('start', fileName);
         const data   = new Uint8Array(bytes);
+        // A lazy (unloaded) folder has EMPTY children in memory; addFile would commit a tree
+        // holding only the new file and silently drop its siblings. Load it first — the same
+        // guard getFileBytes has. (Reached after a sync reloaded the tree lazily.)
+        await this._ensureLoaded(folderPath);
         const folder = this._vault._findNode(folderPath);
         try {
             if (folder && folder.children && folder.children[fileName]) {
@@ -244,6 +248,7 @@ class VaultDataSource {
         if (oldName === '.vault-settings.json') {
             throw new Error('.vault-settings.json is the vault settings record — it cannot be renamed');
         }
+        await this._ensureLoaded(folderPath);
         await this._vault.renameFile(folderPath, oldName, newName);
         if (this.onTreeChanged) this.onTreeChanged();
     }
@@ -253,6 +258,7 @@ class VaultDataSource {
         if (fileName === '.vault-settings.json') {
             throw new Error('.vault-settings.json is the vault settings record — edit it instead of deleting it');
         }
+        await this._ensureLoaded(folderPath);
         await this._vault.removeFile(folderPath, fileName);
         if (this.onTreeChanged) this.onTreeChanged();
     }

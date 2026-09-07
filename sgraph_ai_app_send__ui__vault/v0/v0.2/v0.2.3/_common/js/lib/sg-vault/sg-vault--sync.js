@@ -96,6 +96,21 @@
             this._namedHeadId = this._headCommitId
         },
 
+        // --- Push, compare-and-swap: refuse to overwrite a moved named ref ------------
+        // push() is unconditional — it re-points the named ref to our head even if another
+        // client published in between, silently dropping their commits from the published
+        // branch. pushIfMatch() only succeeds if the named ref still holds what we last read
+        // (readRef caches the exact ciphertext). Throws 'ECAS' otherwise: the caller
+        // reconciles (merge) and retries. Used by headless child kernels, which have nobody
+        // to notice a lost update; the shells keep push() for now.
+        async pushIfMatch() {
+            if (!this._cloneRefFileId) throw new Error('No clone branch initialised')
+            if (!this.writable)        throw new Error('Read-only: no write key')
+            await this._refManager.writeRefIfMatch(this._refFileId, this._headCommitId)
+            try { await this._refManager.writeBranchIndex(this._branchIndexFileId, this._refFileId) } catch (_) {}
+            this._namedHeadId = this._headCommitId
+        },
+
         // --- Behind count: new commits on named branch not yet in clone ----------
 
         async getBehindCount() {
@@ -143,7 +158,10 @@
         // Fast-forwards if no local divergence; three-way file merge if diverged.
         // Returns: { merged: bool, fastForward: bool, conflicts: string[] }
 
-        async merge(theirCommitId) {
+        // opts.publish === false → do NOT push after a three-way merge (the caller pushes,
+        // e.g. with pushIfMatch). Default (undefined/true) keeps the shells' behaviour.
+        async merge(theirCommitId, opts) {
+            opts = opts || {}
             if (!this.writable)          throw new Error('Read-only: no write key')
             if (!this._cloneRefFileId)   throw new Error('No clone branch initialised')
             if (!theirCommitId)          throw new Error('No commit ID provided')
@@ -196,7 +214,9 @@
             // already succeeded locally; if the push fails (offline / race) the next sync's ahead-path
             // auto-push retries it.
             let published = false
-            try { await this.push(); published = true } catch (_) { /* stays local; next sync publishes */ }
+            if (opts.publish !== false) {
+                try { await this.push(); published = true } catch (_) { /* stays local; next sync publishes */ }
+            }
 
             return { merged: true, fastForward: false, conflicts, published }
         },

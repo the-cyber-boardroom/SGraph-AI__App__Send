@@ -4,6 +4,13 @@
    ================================================================================= */
 
 import { defineConfig, devices } from '@playwright/test';
+import fs from 'node:fs';
+
+// Managed sandboxes ship Chromium at a fixed path instead of Playwright's per-version cache
+// (PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1). Use it when present; a normal `playwright install`
+// setup is untouched because the path does not exist there.
+const CHROMIUM = process.env.PW_CHROMIUM_EXECUTABLE
+    || (fs.existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : undefined);
 
 export default defineConfig({
     testDir:   'tests/e2e/vault_ui',
@@ -14,6 +21,7 @@ export default defineConfig({
     use: {
         baseURL:       'http://localhost:3999',
         actionTimeout: 10_000,
+        launchOptions: CHROMIUM ? { executablePath: CHROMIUM } : {},
     },
 
     projects: [

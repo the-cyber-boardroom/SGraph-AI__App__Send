@@ -46,10 +46,58 @@ class SGVaultRefManager {
     async readRef(refFileId) {
         const filePath  = `bare/refs/${refFileId}`
         const encrypted = await this._sgSend.vaultRead(this._vaultId, filePath)
+        this._rememberRaw(refFileId, encrypted)
         if (!encrypted) return null
         const decrypted = await SGSendCrypto.decrypt(encrypted, this._readKey)
         const parsed    = JSON.parse(new TextDecoder().decode(decrypted))
         return parsed.commit_id
+    }
+
+    // --- Raw ciphertext cache (for compare-and-swap) ------------------------------
+    // Refs are AES-GCM with a fresh IV per write, so two writes of the same commit_id
+    // are different bytes. The server's CAS compares raw bytes, so we keep the exact
+    // ciphertext we last READ per ref id. `null` = "we read it and it was absent".
+
+    _rememberRaw(refFileId, encrypted) {
+        if (!this._rawRefs) this._rawRefs = Object.create(null)
+        this._rawRefs[refFileId] = encrypted ? new Uint8Array(encrypted) : null
+    }
+
+    lastRawRef(refFileId) {
+        return (this._rawRefs && refFileId in this._rawRefs) ? this._rawRefs[refFileId] : undefined
+    }
+
+    // --- Write ref, compare-and-swap -------------------------------------------------
+    // Succeeds only if the server still holds the exact bytes we last read for this ref
+    // (or nothing, if we last saw it absent). On success the cache is updated to the
+    // bytes we just wrote; on conflict the cache is updated to the server's CURRENT
+    // bytes (so the next readRef→merge→retry cycle can succeed) and 'ECAS' is thrown.
+    // Throws 'ENOMATCH' if the ref was never read through this manager.
+
+    async writeRefIfMatch(refFileId, commitId) {
+        const raw = this.lastRawRef(refFileId)
+        if (raw === undefined) {
+            const e = new Error('writeRefIfMatch: ref never read: ' + refFileId); e.code = 'ENOMATCH'; throw e
+        }
+        const filePath  = `bare/refs/${refFileId}`
+        const payload   = new TextEncoder().encode(JSON.stringify({ commit_id: commitId }))
+        const encrypted = new Uint8Array(await SGSendCrypto.encrypt(payload, this._readKey))
+        const results   = await this._sgSend.vaultBatch(this._vaultId, this._writeKey, [{
+            op      : 'write-if-match',
+            file_id : filePath,
+            data    : SGSend._abToB64(encrypted),
+            match   : raw ? SGSend._abToB64(raw) : null
+        }])
+        const r = results && results[0]
+        if (r && r.status === 'ok') {
+            this._rawRefs[refFileId] = encrypted
+            return true
+        }
+        if (r && r.status === 'conflict') {
+            this._rawRefs[refFileId] = r.current ? SGSend._b64ToBytes(r.current) : null
+            const e = new Error('writeRefIfMatch: ref moved on server: ' + refFileId); e.code = 'ECAS'; throw e
+        }
+        const e = new Error('writeRefIfMatch: unexpected batch result ' + JSON.stringify(r || null)); e.code = 'EUNREACH'; throw e
     }
 
     // --- Read branch index: decrypt and return parsed index ----------------------
