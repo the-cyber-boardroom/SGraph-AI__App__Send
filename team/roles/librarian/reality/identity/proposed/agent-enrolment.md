@@ -183,3 +183,113 @@ Each registry must declare which roots it accepts. An unresolvable trust chain i
 | No directory, no revocation, no chain | All three |
 
 **Effort estimate:** 2–3 weeks for registry MVP (after P-ENR-002 Phases 1–5).
+
+---
+
+## P-FIX-001 — Fixture Keypair Class
+
+**Status:** PROPOSED — architecture design; no code
+**Source:** doc 962 (20 August 2026, v0.33.61) — `v0.33.61__arch-brief__register-was-designed-in-june-published-keypairs-are-fixtures-not-identities.md`
+**Last updated:** 2026-09-07 (Librarian daily run, 20 Aug batch)
+
+A keypair whose private half is published provides no authentication and no confidentiality. These
+objects need their own class — **fixture** — that is bounded structurally rather than by convention.
+
+### What a Fixture Is
+
+| Property | With private key held | With private key published |
+|----------|-----------------------|---------------------------|
+| Signature proves signer | Yes | No — anybody can produce it |
+| Sealed message is confidential | Yes | No — anybody can open it |
+| Revocation means something | Yes | No — there is no holder |
+| Can be promoted to a real key | Yes | **No — permanently spent** |
+
+### The Fixture Class Rules
+
+1. A fixture is never reachable from the real trust graph
+2. A fixture's append lane is a public inbox (key is public → anyone can decrypt)
+3. `private_key_published: bool` is a required field in the register entry (no default; read before verifying signature)
+4. A fixture cannot be revoked through the register's revocation mechanism (revocation is a signed append; the signing key is public)
+5. A fixture is marked in the register itself, not only in prose beside it
+
+### Fixture Material Layout
+
+```
+REGISTER (vault, public content)
+  entry: fingerprint, public key, metadata, relationships
+  entry: private_key_published = true   <- required field, first-class
+
+  pointer to →
+
+FIXTURE MATERIAL (separate, clearly named vault)
+  private half, role definition, worked examples
+```
+
+### What a Fixture Is For
+
+Exercising the choreography end-to-end: generate → publish → discover → fetch card → verify → seal → write lane → list → fetch → decrypt. Every step has a shipped command. No sequence has ever been run by an agent starting from nothing.
+
+**Effort estimate:** 1–2 days to define class + publish one persona (librarian).
+
+---
+
+## P-GRANT-001 — Five-Field Mandate Declaration Format
+
+**Status:** PROPOSED — vocabulary/schema design; no code
+**Source:** doc 961 (20 August 2026, v0.33.61) — `v0.33.61__strategy-brief__grant-is-not-the-mandate-the-gap-between-them-is-the-exposure-nobody-accepted.md`
+**Last updated:** 2026-09-07 (Librarian daily run, 20 Aug batch)
+
+A mandate is a durable statement that can be checked by somebody who was not present. It requires five fields before it earns the word. A mandate with no interval is architecturally indistinguishable from a grant.
+
+| Field | Why required |
+|-------|-------------|
+| **Issuer** | Somebody authorised this, and their key says so |
+| **Subject** | The identity it binds, by fingerprint rather than name |
+| **Scope** | What may be done, as an allow-list (deny-lists widen silently on provider releases) |
+| **Interval** | When it expires — a mandate with no interval is a grant |
+| **Revocation path** | How it is withdrawn before expiry, and where a checker looks |
+
+**Key architectural rule:** Scope must be an allow-list, not a deny-list. A deny-list mandate
+widens silently whenever the provider adds a capability, because the new capability is absent
+from the list and is therefore not prohibited.
+
+**Published home:** Agent cards (A2A v1.0) already declare scope of authority, spend caps,
+and what requires human approval. The missing half is an issuer signature and an interval.
+
+**Effort estimate:** Schema definition only; no new infrastructure beyond agent cards + register.
+
+---
+
+## P-FIX-002 — Agent Persona as Signed Agent Card
+
+**Status:** PROPOSED — no code
+**Source:** doc 962 (20 August 2026, v0.33.61) — `v0.33.61__arch-brief__register-was-designed-in-june-published-keypairs-are-fixtures-not-identities.md`
+**Last updated:** 2026-09-07 (Librarian daily run, 20 Aug batch)
+
+Personas (librarian, cartographer, and others) published as signed agent cards using the A2A v1.0
+format, with a companion fixture object marking that the private half is published.
+
+### Format
+
+- **Agent card** (A2A v1.0, JSON manifest, well-known path): identity, capabilities, skills, endpoint, auth requirements, signed using JSON Web Signature
+- **Companion fixture object**: keypair + role definition + worked examples; clearly marked as fixture; lives in separate vault (never the register itself)
+- **Register entry**: `private_key_published = true`; pointer to companion fixture vault
+
+### Discovery Flow
+
+A fresh agent given the machine-readable index must be able to:
+1. Discover → fetch agent card
+2. Verify card signature (workflow identity; reveals repository + workflow)
+3. Seal a message to the persona's public key
+4. Write to the persona's append lane
+5. List, fetch, decrypt
+
+### Build Order
+
+1. Fixture class rules written (P-FIX-001 complete)
+2. Librarian persona first (least likely to be mistaken for operational)
+3. Run full choreography once from scratch
+4. Cartographer persona second, only after choreography runs clean
+
+**Note:** The A2A canonical discovery path changed once in 2026. Pin to the current path and
+add a test that fails if the path returns 404 before assuming stability.

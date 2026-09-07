@@ -1,6 +1,6 @@
 # Reality — Master Index
 
-**Version:** v0.33.62 | **Last updated:** 2026-08-25 | **Maintained by:** Librarian (daily run)
+**Version:** v0.33.64 | **Last updated:** 2026-09-07 | **Maintained by:** Librarian (daily run)
 **Structure:** Domain tree — each domain has its own directory with `index.md` and `proposed/`
 
 This file is the entry point. Read it to find the right domain, then go to that domain's
@@ -44,8 +44,8 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | Browser UIs | **7** (share v0.4, open v0.4, admin, workspace, vault browser, vault app /en-gb/app; user v0.3.x legacy) |
 | Active tools (tools.sgraph.ai) | 4 |
 | sgit CLI commands | 20+ |
-| Open PROPOSED items (across all domains) | ~1073+ (+6 net-new from 08/25 session: P-NHI-001–006; +16 from 08/23 session: P-ENR-001–009, P-BRK-001–007; previously ~1051+) |
-| Total documents catalogued | 962 (+6 from 19 Aug: 5 briefs + 1 reference, v0.33.60; processed 08/21–08/25; prev: 956) |
+| Open PROPOSED items (across all domains) | ~1079+ (+6 net-new from 09/07 session: P-FIX-001, P-FIX-002, P-GRANT-001, P-REG-UI-001, P-REG-UI-002, P-HIST-001; +6 from 08/25: P-NHI-001–006; +16 from 08/23: P-ENR-001–009, P-BRK-001–007; previously ~1051+) |
+| Total documents catalogued | 980 (+18 from 20 Aug: 17 briefs + 1 day-index, v0.33.61; processed 09/07; prev: 962) |
 | **Key decision** | **Risk Mandate.ai** adopted as product name (resolves OQ-company-name-1, 2026-06-25) |
 | **Key decision** | **Grounded alarm** adopted as the Risk Mandate communication strategy term (replaces FUD framing, 2026-07-05) |
 | **Key decision** | **The grant is the mandate** — authorization is the union of what the agent can already do; "never-in-line" (2026-07-23) |
@@ -90,6 +90,11 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | **Key decision** | **Meaning extraction is decompilation** — text-to-semantic-graph produces many valid readings from one source (ambiguous), not one output from one source (compilation); no automated pipeline to a single canonical graph is possible without violating this claim; human author remains a necessary node in the write path; corrections propagate with supersede semantics (graphing text architecture, 2026-08-09) |
 | **Key decision** | **WhatsApp bridge: one vault per conversation** — the bridge provides structured storage and portability for extracted conversation records; this is a portability design, not a zero-knowledge design (WhatsApp sees messages); derivation removes the customer index (WhatsApp bridge architecture, 2026-08-14) |
 | **Key decision** | **The bootstrap trap is a loop, not a gap** — an agent must present an identity to reach a trusted authority, but gaining that identity requires the authority; every workaround trades a small identity problem for a larger one (platform credentials, repository write access, shared bot tokens, etc.); the fix is a transport narrow enough to require nothing (agent identity architecture, 2026-08-19) |
+| **Key decision** | **Grant ≠ Mandate** — the July 2026 "the grant is the mandate" claim is corrected; grant is the union of capabilities conferred at assignment; mandate is what the holder is authorised to do; excess authority = grant − mandate; excess authority is unaccepted by construction and escalates unaided without instrumentation (vocabulary correction, 2026-08-20) |
+| **Key decision** | **A mandate requires five fields** — issuer (signed), subject (fingerprint), scope (allow-list not deny-list), interval (no interval = a grant), revocation path; a mandate without any of these is architecturally indistinguishable from a grant; deny-lists widen silently on provider releases (five-field mandate format, 2026-08-20) |
+| **Key fact** | **Attestation gap is distribution, not knowledge** — in a rented agent session the surface is named (environment variables) but unprovable to a third party (no hardware attestation); the vendor knows but cannot sign it for a third party; this is a product decision a vendor could make, not a hardware problem (PKI register dev brief, 2026-08-20) |
+| **Key decision** | **Consumer register: publish record, not verdict** — the refund is the pretext; the record of who answers is the asset; exit-path measurements (sign-up vs cancellation click counts across 50 companies) can be built without company cooperation; BYOM (bring your own model) is the privacy default; legal review before first entry (consumer subscription register, 2026-08-20) |
+| **Key decision** | **Fixture keypair class** — a keypair whose private half is published provides no authentication; cannot be revoked; cannot be promoted to a real key; must be a named bounded class with `private_key_published` as a required register field (not a convention), not reachable from the real trust graph; the distinction matters before any agent card is published (fixture class, 2026-08-20) |
 | **Key decision** | **Identity and mandate are separate signed statements** — identity answers "who is this agent"; mandate answers "what is this agent permitted to do"; they are issued, revoked and reasoned about independently; a certificate proves possession of a key, not authorisation to act (agent enrolment architecture, 2026-08-19) |
 | **Key decision** | **Blind acknowledgement is a stronger write-only property** — the append lane write path returns a blind acknowledgement: the sender learns only that the write succeeded and cannot probe what is in the lane; this is enforced in the response, not only in the permission model (append lane audit, 2026-08-19) |
 | **Key decision** | **Unit of delegation moves from credential to authorised action** — a service twin / execution broker holds service credentials the agent never sees; agent presents a mandate + signed request; broker executes only the permitted operation; closes the "authorised party misusing legitimately held authority" boundary that capability grants, state machines, and per-agent keys cannot close (service twin architecture, 2026-08-19) |

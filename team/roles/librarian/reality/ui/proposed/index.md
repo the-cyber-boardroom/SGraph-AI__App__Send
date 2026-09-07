@@ -178,3 +178,16 @@ All items below are PROPOSED — does not exist yet.
 |---------|---------------------|--------|
 | P-279 | **Kernel Path Unification / CompositeDataSource Retirement** — retire `CompositeDataSource` (read-only sub-vault adapter in `vault-shell.js`) and converge the tree view (`/en-gb/vault`) and app view (`/en-gb/app`) onto a single `KernelParent` + relay kernel path; all file ops (root + every mount) go through `VaultAccess → relay → KernelParent → SecureChannel → child kernel → _safePush`; the two shells become one shell over one data path; enables rw sub-vault writes from the tree view; security stack (broker policy, B10 custody gate, floor, audit, Edge-1 push) lives on one code path only; app-shell already builds a full VaultDataSource and tree — the seam is already there (`index.html:19-20` routes `#token → /en-gb/app`, and app-shell redirects to `/en-gb/vault` when no `app.json` found). Scoped in `team/roles/architect/reviews/05/31/v0.31.2__scoping__rw-sub-vaults-kernel-relay-in-tree.md` | Architect session 05/31 |
 | P-280 | **Popup Capability Gate for Inner Vaults** (SEC-VIV-002 fix) — gate `allow-popups-to-escape-sandbox` to the root vault only; inner/mounted sub-vault HTML/markdown content must NOT inherit this capability unconditionally; fix: at the four mount sites (`_mountApp`, `_mountPageLayout`, `_mountVaultFile` HTML, `_mountVaultFile` markdown) detect whether the path is root-vault vs mounted sub-vault and strip popup flags for inner-vault renders; inner vaults wanting popups use a future request + parent-consent capability-grant flow; easier after P-279 (kernel path unification) provides clean context for detecting inner-vault renders. Decision: Dinis 05/31 | AppSec session 05/31 |
+
+---
+
+## PKI Register Graph UI (20 Aug 2026, v0.33.61)
+
+All items below are PROPOSED — does not exist yet.
+**Source:** doc 962 — `v0.33.61__dev-brief__register-ui-every-edge-carries-a-verification-badge-policy-is-a-query-that-must-return-empty.md`
+**Last updated:** 2026-09-07 (Librarian daily run, 20 Aug batch)
+
+| # | Feature | One-Line Description |
+|---|---------|---------------------|
+| P-REG-UI-001 | PKI register graph UI — badge primitive | A graph interface where every edge carries a verification badge: 6 fields (Claim, Verifiable by, Method, Cost, Last checked, Result) and 5 result states (Confirmed, Denied, Unknown, Unreachable, Not checked). `Nobody` is a legitimate first-class value for Verifiable by. The most valuable page is the list of every edge nobody can check. |
+| P-REG-UI-002 | Policy engine — saved query over register | A policy is a saved query that must return no rows; returned rows are the violations. The badge on the constrained edge decides whether a policy is enforcement (verifiable) or instrumentation (unverifiable). A policy whose edge is unverifiable must say "instrumentation" on its own result page, not "compliant". |

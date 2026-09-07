@@ -7,6 +7,30 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-09-07
+
+17 new human briefs (20 Aug: 17 briefs + 1 day-index, v0.33.61) — vocabulary correction (grant ≠ mandate), PKI register UI badge primitive, fixture keypair class, consumer subscription register. Key architectural finding: attestation gap is distribution not knowledge. 6 net-new PROPOSED items (P-FIX-001, P-FIX-002, P-GRANT-001, P-REG-UI-001, P-REG-UI-002, P-HIST-001); P-IGNORE-001 already existed as P-ACT-018. 0 new EXISTS items.
+
+Files changed:
+- `reality/identity/proposed/agent-enrolment.md` — P-FIX-001 (fixture keypair class), P-GRANT-001 (five-field mandate declaration), P-FIX-002 (agent persona as signed agent card) appended; Last updated → 2026-09-07
+- `reality/identity/proposed/index.md` — P-FIX-001 and P-GRANT-001 added to topic file table and P-number inventory; Last updated → 2026-09-07
+- `reality/ui/proposed/index.md` — P-REG-UI-001 (badge primitive) and P-REG-UI-002 (policy engine as saved query) appended in new section; Last updated → 2026-09-07 (implicit)
+- `reality/cli/proposed/index.md` — P-ACT-018/P-IGNORE-001 updated (now a precondition for P-DRIVE-001); P-HIST-001 (path-scoped history) appended in new section; Last updated → 2026-09-07 (implicit)
+- `reality/index.md` — Version v0.33.62 → v0.33.64; Last updated → 2026-09-07; docs 962 → 980; PROPOSED ~1073+ → ~1079+; 5 new key decisions/facts added (grant≠mandate, five-field mandate, attestation gap, consumer register, fixture class)
+- `reality/changelog.md` — 2026-09-07 entry added (this entry)
+
+New role reviews and outputs produced (09/07):
+- `team/roles/librarian/reviews/09/07/v0.33.64__master-index__briefs-20-aug-2026.md`
+- `team/roles/architect/reviews/09/07/v0.33.64__architect-review__briefs-20-aug-2026.md`
+- `team/roles/dev/reviews/09/07/v0.33.64__dev-review__briefs-20-aug-2026.md`
+- `team/humans/dinis_cruz/debriefs/09/07/v0.33.64__debrief__briefs-processing-20-aug-2026.md`
+
+Session: 17+1 new briefs (20 Aug) | New EXISTS items: 0 | Net-new PROPOSED: 6 (P-FIX-001, P-FIX-002, P-GRANT-001, P-REG-UI-001, P-REG-UI-002, P-HIST-001) | Cumulative docs: 980 | Version: v0.33.64
+Master index (09/07): `team/roles/librarian/reviews/09/07/v0.33.64__master-index__briefs-20-aug-2026.md`
+Debrief (09/07): `team/humans/dinis_cruz/debriefs/09/07/v0.33.64__debrief__briefs-processing-20-aug-2026.md`
+
+---
+
 ## 2026-08-25
 
 6 new human briefs (19 Aug: 5 briefs + 1 reference) — NHI bootstrap architecture, agent enrolment via append lane, service twin execution broker, PKI site review. One reality document correction: vault/zip moved from PROPOSED to EXISTS. 6 new PROPOSED items (P-NHI-001 through P-NHI-006).
