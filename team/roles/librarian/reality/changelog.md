@@ -7,27 +7,45 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
-## 2026-09-07
+## 2026-09-03
 
-17 new human briefs (20 Aug: 17 briefs + 1 day-index, v0.33.61) — vocabulary correction (grant ≠ mandate), PKI register UI badge primitive, fixture keypair class, consumer subscription register. Key architectural finding: attestation gap is distribution not knowledge. 6 net-new PROPOSED items (P-FIX-001, P-FIX-002, P-GRANT-001, P-REG-UI-001, P-REG-UI-002, P-HIST-001); P-IGNORE-001 already existed as P-ACT-018. 0 new EXISTS items.
+B-015 completed: `test__sgit_key_prefixes.js` (08/25 commit `b3a9220`) counted and added to the ViV loader suite table. 28 assertions (4 suites). Test count updated ~3100+ → ~3130+; ViV suite ~1060+ → ~1090+.
 
 Files changed:
-- `reality/identity/proposed/agent-enrolment.md` — P-FIX-001 (fixture keypair class), P-GRANT-001 (five-field mandate declaration), P-FIX-002 (agent persona as signed agent card) appended; Last updated → 2026-09-07
-- `reality/identity/proposed/index.md` — P-FIX-001 and P-GRANT-001 added to topic file table and P-number inventory; Last updated → 2026-09-07
-- `reality/ui/proposed/index.md` — P-REG-UI-001 (badge primitive) and P-REG-UI-002 (policy engine as saved query) appended in new section; Last updated → 2026-09-07 (implicit)
-- `reality/cli/proposed/index.md` — P-ACT-018/P-IGNORE-001 updated (now a precondition for P-DRIVE-001); P-HIST-001 (path-scoped history) appended in new section; Last updated → 2026-09-07 (implicit)
-- `reality/index.md` — Version v0.33.62 → v0.33.64; Last updated → 2026-09-07; docs 962 → 980; PROPOSED ~1073+ → ~1079+; 5 new key decisions/facts added (grant≠mandate, five-field mandate, attestation gap, consumer register, fixture class)
-- `reality/changelog.md` — 2026-09-07 entry added (this entry)
+- `reality/qa/index.md` — last-updated date → 2026-08-25; ViV total ~1060+ → ~1090+; overall ~3100+ → ~3130+; new table row and total row for 08/25 state
+- `reality/index.md` — unit test count ~3100+ → ~3130+; ViV count annotation updated to ~1090+; date updated to 2026-08-25 (B-015)
+- `DAILY_RUN.md` — B-015 status OPEN → DONE (2026-09-03)
+- `reality/changelog.md` — this entry
 
-New role reviews and outputs produced (09/07):
-- `team/roles/librarian/reviews/09/07/v0.33.64__master-index__briefs-20-aug-2026.md`
-- `team/roles/architect/reviews/09/07/v0.33.64__architect-review__briefs-20-aug-2026.md`
-- `team/roles/dev/reviews/09/07/v0.33.64__dev-review__briefs-20-aug-2026.md`
-- `team/humans/dinis_cruz/debriefs/09/07/v0.33.64__debrief__briefs-processing-20-aug-2026.md`
+Session: 0 new briefs | New EXISTS items: 0 | New PROPOSED items: 0 | Cumulative docs: 979 (unchanged) | Backlog: B-015 closed (all tasks done)
+Master index (09/03): `team/roles/librarian/reviews/09/03/v0.33.64__master-index__daily-check-03-sep-2026.md`
+Debrief (09/03): `team/humans/dinis_cruz/debriefs/09/03/v0.33.64__debrief__daily-check-03-sep-2026.md`
 
-Session: 17+1 new briefs (20 Aug) | New EXISTS items: 0 | Net-new PROPOSED: 6 (P-FIX-001, P-FIX-002, P-GRANT-001, P-REG-UI-001, P-REG-UI-002, P-HIST-001) | Cumulative docs: 980 | Version: v0.33.64
-Master index (09/07): `team/roles/librarian/reviews/09/07/v0.33.64__master-index__briefs-20-aug-2026.md`
-Debrief (09/07): `team/humans/dinis_cruz/debriefs/09/07/v0.33.64__debrief__briefs-processing-20-aug-2026.md`
+---
+
+## 2026-09-02
+
+- No domain files updated (quiescent day — no new briefs, no new code commits)
+- `reality/index.md` — Last updated → 2026-09-02
+- B-015 added to DAILY_RUN: update qa/index.md test count for sgit key prefix tests (test__sgit_key_prefixes.js, added 08/25 feature commit)
+
+Master index: `team/roles/librarian/reviews/09/02/v0.33.64__master-index__daily-check-02-sep-2026.md`
+
+---
+
+## 2026-08-31
+
+17 briefs + 1 day index from 20 August 2026 (v0.33.61) processed. Four threads: agent identity/registry, explaining it to people, site operations, consumer vertical. Key vocabulary correction: grant ≠ mandate; excess authority = blast radius from the other end. Fixture class named. 9 new PROPOSED items (P-KRG-001–005, P-CON-001–002, P-EXP-001–002).
+
+Files changed:
+- `reality/index.md` — PROPOSED count ~1073→~1082; cumulative docs 962→980; version v0.33.62→v0.33.64; Last updated → 2026-08-31
+- `reality/identity/proposed/agent-enrolment.md` — Added P-KRG-001 (fixture class), P-KRG-002 (agent card personas), P-KRG-003 (grant/mandate measurement), P-KRG-004 (path-scoped history), P-KRG-005 (lane anchor clarification); Last updated → 2026-08-31
+- `reality/identity/proposed/index.md` — P-KRG-001–005 added to P-number inventory; Last updated → 2026-08-31
+- `reality/changelog.md` — 2026-08-31 entry added (this entry)
+
+Session: 18 new briefs (17 + 1 index) | New EXISTS items: 0 | New PROPOSED items: 9 (P-KRG-001–005, P-CON-001–002, P-EXP-001–002) | Test count: ~3100+ (unchanged) | Cumulative docs: 980 (was 962)
+Master index (08/31): `team/roles/librarian/reviews/08/31/v0.33.64__master-index__briefs-20-aug-2026.md`
+Debrief (08/31): `team/humans/dinis_cruz/debriefs/08/31/v0.33.64__debrief__briefs-processing-20-aug-2026.md`
 
 ---
 
@@ -1161,6 +1179,14 @@ Master index: `team/roles/librarian/reviews/04/25/v0.22.17__master-index__briefs
 - `v0.16.26__what-exists-today.md` — sg-site-header v1.0.4–v1.0.6, 10 homepage components, jsUrl fix
 
 Master index: `team/roles/librarian/reviews/04/24/v0.22.6__master-index__code-delivery-23-24-apr.md`
+
+---
+
+## 2026-08-29
+
+- `reality/index.md` — Last updated → 2026-08-29; no new EXISTS items; B-014 closed (doc count audit: 956 confirmed as canonical baseline, 08/18 master index annotated)
+
+Master index: `team/roles/librarian/reviews/08/29/v0.33.64__master-index__no-new-briefs-29-aug-2026.md`
 
 ---
 
