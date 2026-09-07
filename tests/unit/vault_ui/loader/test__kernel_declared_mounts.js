@@ -105,6 +105,20 @@ const autoAllow = (kp, id) => { for (const c of ['fs.read', 'fs.write', 'fs.dele
         ok('shell force-unmount of a declared mount works (never-spawned: no channel to close)', forced.unmounted === true && !kp.mounts.resolve('d/x'));
     }
 
+    console.log('\n[suite] one mount per child per kernel — EEXIST instead of a silent overwrite');
+    {
+        const log = [], children = { c: makeChildStack() };
+        const kp  = new KernelParent({ kernelId: 'k-top', spawnChannel: makeSpawn(children, log),
+                                       resolveCredentials: async () => ({ vaultKey: 'pass:childvault', custody: 'parent-held' }) });
+        await kp.mount({ prefix: 'first', ref: 'c', lazy: true, meta: { declared: true } });
+        const e1 = await tryCatch(() => kp.mount({ prefix: 'second', ref: 'c', lazy: true }));
+        ok('same ref at another prefix → EEXIST',                    e1 && e1.code === 'EEXIST');
+        ok('…and the FIRST prefix is still mounted (no overwrite)',  !!kp.mounts.resolve('first/x') && !kp.mounts.resolve('second/x'));
+        const e2 = await tryCatch(() => kp.mount({ prefix: 'first', ref: 'other', lazy: true }));
+        ok('same prefix for a different ref → EEXIST',               e2 && e2.code === 'EEXIST');
+        ok('exactly one mount in the table',                         kp.list().length === 1);
+    }
+
     console.log('\n[suite] an ro credential mounts read-only — the CHILD refuses the write');
     {
         const log = [], children = { ro: makeChildStack({ files: { 'a.md': 'x' }, writable: false }) };

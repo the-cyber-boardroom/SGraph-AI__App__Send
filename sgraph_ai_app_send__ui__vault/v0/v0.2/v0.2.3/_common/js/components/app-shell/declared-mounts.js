@@ -33,23 +33,34 @@
         //   fileList  — the data source's flat list ({path, dir})
         //   readBytes — async (path) → bytes, used only for *.link.json entries
         // Malformed links, links without a ref_id and non-vault link types are skipped.
+        // ONE mount per child per parent. Two links in the same parent pointing at the same
+        // child (same vault_id, or same ref_id) would be two kernels sharing one clone
+        // branch (viv:<parent>) — a self-inflicted divergence — and two folders that are
+        // secretly the same vault. Deterministic: link paths are sorted and the FIRST wins;
+        // later ones are returned with `duplicateOf` so the caller can report, not mount.
         async scan(fileList, readBytes) {
             const VL = globalThis.VaultLinks;
             if (!VL || !Array.isArray(fileList)) return [];
-            const out = [];
-            for (const e of fileList) {
-                if (!e || e.dir || !VL.isLinkFile(e.path)) continue;
+            const links = fileList.filter(e => e && !e.dir && VL.isLinkFile(e.path))
+                                  .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+            const out = [], seenVault = new Map(), seenRef = new Map();
+            for (const e of links) {
                 const link = await _try(async () => VL.parseLinkFile(await readBytes(e.path)));
                 if (!link || !link.ref_id) continue;
                 const type = link.type || (link.vault_id ? 'vault' : null);
                 if (type && type !== 'vault') continue;                    // external resources are not mounts
-                out.push({
+                const spec = {
                     prefix:   VL.mountPathFor(e.path),
                     ref:      String(link.ref_id),
                     label:    VL.mountLabel(e.path, link),
                     linkPath: e.path,
                     vaultId:  link.vault_id || null
-                });
+                };
+                const dup = (spec.vaultId && seenVault.get(spec.vaultId)) || seenRef.get(spec.ref) || null;
+                if (dup) { spec.duplicateOf = dup; out.push(spec); continue; }
+                if (spec.vaultId) seenVault.set(spec.vaultId, e.path);
+                seenRef.set(spec.ref, e.path);
+                out.push(spec);
             }
             return out;
         },

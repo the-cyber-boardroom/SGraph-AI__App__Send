@@ -53,6 +53,27 @@ const RK_B64 = Buffer.from(RK_HEX, 'hex').toString('base64');
         ok('empty or non-array input → []',               (await DeclaredMounts.scan(null, async () => null)).length === 0);
     }
 
+    console.log('\n[suite] DeclaredMounts.scan — ONE mount per child per parent');
+    {
+        const files = [
+            { path: 'z-later.link.json',      dir: false },   // same child as a-first (vault_id) — sorted AFTER it
+            { path: 'a-first.link.json',      dir: false },
+            { path: 'other.link.json',        dir: false },   // same ref_id as a-first, different vault_id field
+            { path: 'distinct.link.json',     dir: false }
+        ];
+        const bytes = {
+            'z-later.link.json':  enc({ vault_id: 'childdup', ref_id: 'lk-2' }),
+            'a-first.link.json':  enc({ vault_id: 'childdup', ref_id: 'lk-1' }),
+            'other.link.json':    enc({ vault_id: 'childxyz', ref_id: 'lk-1' }),
+            'distinct.link.json': enc({ vault_id: 'childok',  ref_id: 'lk-3' })
+        };
+        const specs = await DeclaredMounts.scan(files, async (p) => bytes[p]);
+        const mountable = specs.filter(s => !s.duplicateOf), dups = specs.filter(s => s.duplicateOf);
+        ok('two mountable specs (a-first, distinct) — deterministic by sorted path', mountable.map(s => s.prefix).join(',') === 'a-first,distinct');
+        ok('same vault_id at a later path → duplicateOf the first',   dups.some(s => s.prefix === 'z-later' && s.duplicateOf === 'a-first.link.json'));
+        ok('same ref_id → duplicateOf the first',                     dups.some(s => s.prefix === 'other' && s.duplicateOf === 'a-first.link.json'));
+    }
+
     console.log('\n[suite] DeclaredMounts.resolveCredentials — ordering');
     {
         const owner  = async (ref) => ref === 'lk-rw' ? { vault_id: 'child01', key: 'pass:child01' } : null;

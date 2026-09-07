@@ -66,6 +66,17 @@
         // Spawn + register a child vault under `prefix`. Returns { mountId, ref, custody }.
         async mount(opts) {
             const prefix = opts.prefix, ref = opts.ref, label = opts.label;
+            // One mount per child per kernel. A second mount of the same ref used to REPLACE
+            // the table entry silently (Map.set on the same mountId) — the first prefix vanished
+            // and, worse, two kernels of the same child would share a clone branch. Refuse.
+            if (this.mounts.get('m-' + ref)) {
+                throw codeError('EEXIST', 'ref ' + ref + ' is already mounted (one mount per child vault)');
+            }
+            const normPrefix = (globalThis.AppPermissions.normalizePath(prefix) || '').replace(/\/+$/, '');
+            const clash = this.mounts.list().find(m => m.prefix.slice(0, -1) === normPrefix);
+            if (clash) {
+                throw codeError('EEXIST', 'prefix ' + prefix + ' is already mounted (' + clash.mountId + ')');
+            }
             const creds = await this._resolveCredentials(ref);
             if (!creds || !creds.vaultKey) {
                 throw codeError('EUNREACH', 'no credentials for ref ' + ref);

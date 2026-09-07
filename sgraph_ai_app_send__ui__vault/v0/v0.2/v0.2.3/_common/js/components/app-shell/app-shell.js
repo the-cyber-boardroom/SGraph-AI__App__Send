@@ -2108,6 +2108,11 @@
             try { kp = this._ensureKernelParent(); } catch (_) { return out; }
             for (var i = 0; i < specs.length; i++) {
                 var spec = specs[i];
+                if (spec.duplicateOf) {
+                    // Same child already declared at another path in THIS vault — one mount per child.
+                    this._emitVaultEvent('declared-mount-skipped', { label: 'Declared mount skipped (duplicate child): ' + spec.prefix, prefix: spec.prefix, ref: spec.ref, err: 'EEXIST', duplicateOf: spec.duplicateOf });
+                    continue;
+                }
                 try {
                     var res = await kp.mount({ prefix: spec.prefix, ref: spec.ref, label: spec.label, lazy: true,
                                                meta: { declared: true, linkPath: spec.linkPath } });
