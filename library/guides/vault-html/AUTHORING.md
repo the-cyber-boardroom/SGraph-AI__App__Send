@@ -141,6 +141,8 @@ window.sg = {
         vaultName: 'My Vault',
         vaultId  : 'abcd1234',
         fileCount: 12,
+        pinned   : false,               // true when mounted from a published release, not HEAD
+        release  : null,                // when pinned: {name, label, commit} — otherwise null
         totalSize: 0,                   // reserved (currently always 0)
     },
     // History — read past commits / trees / blobs (read-only). See "Reading history".
@@ -860,6 +862,32 @@ Only `true` grants — `1`, `"yes"` and an array of paths all deny.
 > in a read-only session are the **read** verbs (`list`/`fetch`/`markProcessed`), because their
 > `enum_key` is derived from the vault's read key and cannot be derived without it.
 
+### Errors carry a `code` — check that, not the message
+
+Every rejection from `sg.append.*` (and every other `sg.*` namespace) is an `Error` with a
+stable `.code`, and `.status` when an HTTP status is known. Branch on the code; the message is
+for humans and will change.
+
+| Code | Meaning |
+|---|---|
+| `EPERM` | the grant is missing — the message names the `app.json` key to add |
+| `EINVAL` | bad arguments, or no vault id — **nothing was sent** |
+| `ENOAUTH` | this session has no key for that verb (a read-only session calling a read verb) |
+| `E2BIG` | payload over 5 MB, or a batch over 100 `file_ids` |
+| `ENOSPC` | the lane is at its 1000-file ceiling |
+| `EUNREACH` | the request never completed (offline, DNS, CSP) |
+| `ENOTRANSPORT` | no vault open, or the transport isn't loaded on this surface |
+| `EEDGE` | **an HTML error page came back instead of JSON — see below** |
+| `EHTTP` | any other HTTP failure; read `.status` |
+
+> **`EEDGE` — an HTML page came back, so the status is not the API's.** A CDN error page can
+> replace both the body *and* the status code. There is a live case of this: the static site's
+> `403 → /404.html` custom error response also applies to `/api/*`, so a genuine gate failure —
+> a wrong `append_token`, a mismatched `enum_key` — reaches the browser as **404 with the
+> "Page Not Found" HTML page**. A real route miss still answers 404 with *JSON*, so the HTML
+> body is the reliable tell, not the status. **If you get `EEDGE`, check your credential before
+> you suspect your URL.** (Verified against dev, 7 Sep 2026.)
+
 ### Only `write` crosses vaults
 
 This is the asymmetry to internalise, because nothing else in the API hints at it:
@@ -945,10 +973,22 @@ You do not need to do anything for this to work — but two consequences matter:
    `false`, and writes reject with `EPINNED`. (Committing on top of an old tree would fork the
    branch, so this is a safety rule, not a missing feature.) If your app writes, you already have
    to handle `writable === false` — this is one more reason it happens.
-2. **You cannot detect or override which version you are.** That is deliberate:
-   `.vault/**` is inside the permission floor, so an app cannot read the release map, and which
-   version is running is the host's decision, not the versioned code's. Don't build version logic
-   that assumes it is always the newest.
+2. **You can detect that you are pinned, but you cannot change it — UPDATED 2026-09-07.**
+   `sg.app.pinned` is `true` when you are mounted from a release, and `sg.app.release` then
+   carries `{name, label, commit}`; both are read-only mirrors of the host's decision. Which
+   version runs stays the host's call, not the versioned code's — `.vault/**` is still inside
+   the permission floor, so you cannot read or edit the release map. Don't build version logic
+   that assumes you are always the newest.
+
+   ```js
+   if (sg.app.pinned) {
+       banner.textContent = `Viewing release ${sg.app.release.name} — read-only`;
+   }
+   ```
+
+   This exists because its absence was expensive: an author pushed a new `app.json`, saw no
+   change, and had no way to learn the mount was pinned to an older commit. If a push of yours
+   appears to do nothing, check `sg.app.pinned` first.
 
 The practical upshot for authors: **write apps that degrade cleanly to read-only**, and put any
 "what's new" copy in the content rather than in code that assumes it is running at HEAD.

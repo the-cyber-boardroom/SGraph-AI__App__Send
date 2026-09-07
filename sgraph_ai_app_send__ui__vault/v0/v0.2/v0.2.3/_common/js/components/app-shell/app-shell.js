@@ -846,6 +846,31 @@
         // Make `appJson` the active app manifest — its permissions, host_events, consent identity
         // and title govern the running app. Used when a folder app.json takes over from the root.
         async _setActiveManifest(appJson) {
+            // A folder app.json REPLACES the root manifest wholesale — AppNavHelpers
+            // .resolveFolderManifest does Object.assign({}, folderJson), so nothing is
+            // inherited. Grants declared at the vault root then stop applying, silently, and
+            // the app fails with a bare "Permission denied" that points nowhere near the
+            // cause. Say so once, loudly, naming the groups that were dropped.
+            try {
+                var rootPerms   = (this._appJson && this._appJson.permissions) || null;
+                var folderPerms = (appJson       && appJson.permissions)       || null;
+                if (rootPerms && appJson !== this._appJson) {
+                    var dropped = Object.keys(rootPerms).filter(function (k) {
+                        return !folderPerms || !(k in folderPerms);
+                    });
+                    if (dropped.length) {
+                        var msg = 'This folder\'s app.json replaces the vault-root manifest, so these root '
+                                + 'permission groups no longer apply: ' + dropped.join(', ')
+                                + '. Re-declare them in the folder app.json if the app needs them.';
+                        console.warn('[app-shell] ' + msg);
+                        this._emitVaultEvent('app-json-permissions-dropped', { label: 'Root permissions dropped by folder app.json', dropped: dropped });
+                        var hudEl = document.getElementById('app-hud') || document.querySelector('app-hud');
+                        if (hudEl && typeof hudEl.showMessage === 'function') {
+                            try { hudEl.showMessage('permissions', msg, 'warn', 10000); } catch (_) {}
+                        }
+                    }
+                }
+            } catch (_) {}
             this._appJson = appJson;
             this._perm    = AppPermissions.parsePermissions(appJson);
             this._appId   = '';
@@ -2865,6 +2890,18 @@
             // as TRUE; the app then tried to write, the host rejected, and the user saw a
             // red "Read-only vault" error — exactly the parity bug vs the Vault UI preview.
             var writable  = !!(this._writable && this._dataSource && this._dataSource.writable);
+            // Release pin, surfaced read-only to the app (see sg.app.pinned / sg.app.release).
+            // this._release is SGReleases.resolve()'s result: {live, name, commit, label, ...},
+            // or null when the vault publishes no releases at all — both mean "not pinned".
+            var releaseInfo = { pinned: false, release: null };
+            try {
+                if (this._release && this._release.live === false) {
+                    releaseInfo.pinned  = true;
+                    releaseInfo.release = { name  : this._release.name  || null,
+                                            label : this._release.label || null,
+                                            commit: this._release.commit || null };
+                }
+            } catch (_) {}
             // External-link handling (Options C/D). When the app has the externalLinks grant,
             // its sandbox carries allow-popups-to-escape-sandbox, so links open in-frame via
             // window.open (frictionless). Without it, links are posted to the host for a
@@ -3105,7 +3142,14 @@
                       'var id=(Math.random()*1e9|0).toString(36)+Date.now().toString(36);' +
                       'payload.__sgCmdId=id;payload.__sgCmdType=cmdType;' +
                       'function h(e){if(!e.data||e.data.__sgCmdReply!==id)return;window.removeEventListener("message",h);' +
-                        'if(e.data.ok)res(e.data.result);else rej(new Error(e.data.err||"Command failed"));}' +
+                        // cmdReply has always sent a `code`; it used to be dropped here, so every
+                        // bridge error reached the app as a bare Error with no enumerable keys and
+                        // apps had to string-match `message`. Carry it (and any HTTP status) across.
+                        'if(e.data.ok){res(e.data.result);return;}' +
+                        'var er=new Error(e.data.err||"Command failed");' +
+                        'if(e.data.code)er.code=e.data.code;' +
+                        'if(e.data.status!=null)er.status=e.data.status;' +
+                        'rej(er);}' +
                       'window.addEventListener("message",h);window.parent.postMessage(payload,"*");' +
                     '});' +
                   '}' +
@@ -3211,6 +3255,13 @@
                       'vaultName:' + JSON.stringify(vaultName) + ',' +
                       'vaultId:'   + JSON.stringify(vaultId)   + ',' +
                       'fileCount:' + fileCount + ',' +
+                      // Which version the app is running as. `.vault/releases.json` is inside the
+                      // permission floor, so an app cannot read it and previously had no way to tell
+                      // it was mounted from a pinned commit rather than HEAD — the one fact that
+                      // explains "I pushed a new app.json and nothing changed", and a pinned mount is
+                      // read-only for everyone, owner included. Read-only mirror of the host's state.
+                      'pinned:'    + (releaseInfo.pinned ? 'true' : 'false') + ',' +
+                      'release:'   + JSON.stringify(releaseInfo.release)     + ',' +
                       'totalSize:0' +
                     '},' +
                     'sync:{' +
@@ -3663,11 +3714,20 @@
                         var ibAct = e.data.action;
                         var ibCap = { configure: 'append.configure', write: 'append.write', list: 'append.list',
                                       fetch: 'append.read', markProcessed: 'append.markProcessed', purge: 'append.purge' }[ibAct];
-                        if (!ibCap) { cmdReply(false, null, 'Unknown append action: ' + ibAct); return; }
-                        if (!self._can(ibCap, '')) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('append.' + ibAct, { ok: false, err: 'EPERM' }); return; }
+                        if (!ibCap) { cmdReply(false, null, 'Unknown append action: ' + ibAct, 'ENOSYS'); return; }
+                        if (!self._can(ibCap, '')) {
+                            // Name the grant that is missing. 'Permission denied' alone sent one
+                            // integrator hunting a read-only gate that does not exist on this branch
+                            // (there is no writable check here — the grant is the only gate).
+                            cmdReply(false, null, 'Permission denied: app.json needs "permissions": { "append": { "'
+                                     + ibCap.slice(7) + '": true } }', 'EPERM');
+                            self._emitBridgeCall('append.' + ibAct, { ok: false, err: 'EPERM' }); return;
+                        }
                         var ibData = e.data;
                         self._getAppendClient().then(function (inbox) {
-                            if (!inbox) throw new Error('append transport unavailable');
+                            if (!inbox) {                                        // SGAppend absent, or no vault open
+                                throw Object.assign(new Error('append transport unavailable'), { code: 'ENOTRANSPORT' });
+                            }
                             switch (ibAct) {
                                 case 'configure':     return inbox.configure({ append_anchors: ibData.append_anchors });
                                 case 'write':         return inbox.write({ vault_id: ibData.vault_id, append_token: ibData.append_token, payload: ibData.payload });
@@ -3679,7 +3739,7 @@
                         }).then(function (r) {
                             cmdReply(true, r); self._emitBridgeCall('append.' + ibAct, { ok: true });
                         }).catch(function (err) {
-                            cmdReply(false, null, (err && err.message) || String(err));
+                            cmdReply(false, null, (err && err.message) || String(err), (err && err.code) || 'EAPPEND');
                             self._emitBridgeCall('append.' + ibAct, { ok: false, err: (err && err.code) || (err && err.message) || 'error' });
                         });
                         return;

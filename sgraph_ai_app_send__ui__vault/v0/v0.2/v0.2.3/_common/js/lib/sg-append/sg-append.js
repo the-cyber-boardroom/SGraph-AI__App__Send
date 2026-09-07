@@ -83,11 +83,12 @@ class SGAppend {
         const body = {}
         if (append_anchors !== undefined) body.append_anchors = append_anchors
         if (this.enumKey) body.enum_key_hash = await SGAppend.deriveEnumKeyHash(this.enumKey)
-        return this._post(`/configure/${this.vaultId}`, body, this._ownerHeaders())
+        return this._post(this._vaultPath('configure'), body, this._ownerHeaders())
     }
 
     async write({ vault_id, append_token, payload } = {}) {                     // outbound: deliver to a REMOTE vault's append lane (POST /write/)
         if (!vault_id)     throw SGAppend._err('EINVAL', 'vault_id (target) required')
+        SGAppend._assertVaultId(vault_id, 'write')
         if (!append_token) throw SGAppend._err('EINVAL', 'append_token required')
         const payload_b64 = (typeof payload === 'string') ? payload : SGAppend._b64(payload)
         if (!payload_b64)  throw SGAppend._err('EINVAL', 'payload required')
@@ -100,19 +101,19 @@ class SGAppend {
         if (after_file_id != null) body.after_file_id   = after_file_id
         if (limit         != null) body.limit           = limit
         if (include_content)       body.include_content = true
-        return this._post(`/list/${this.vaultId}`, body, this._enumHeaders())
+        return this._post(this._vaultPath('list'), body, this._enumHeaders())
     }
 
     async fetch({ inbox, file_ids } = {}) {                                     // pull ciphertext for a batch of file_ids
         if (!inbox) throw SGAppend._err('EINVAL', 'inbox required')
         SGAppend._assertBatch(file_ids)
-        return this._post(`/fetch/${this.vaultId}`, { inbox, file_ids }, this._enumHeaders())
+        return this._post(this._vaultPath('fetch'), { inbox, file_ids }, this._enumHeaders())
     }
 
     async markProcessed({ inbox, file_ids } = {}) {                            // move inbox/ → processed/
         if (!inbox) throw SGAppend._err('EINVAL', 'inbox required')
         SGAppend._assertBatch(file_ids)
-        return this._post(`/mark-processed/${this.vaultId}`, { inbox, file_ids }, this._enumHeaders())
+        return this._post(this._vaultPath('mark-processed'), { inbox, file_ids }, this._enumHeaders())
     }
 
     async purge({ folder = 'processed', inbox, file_ids } = {}) {              // owner: delete; empty file_ids + processed = bulk purge
@@ -123,10 +124,18 @@ class SGAppend {
         if (file_ids) SGAppend._assertBatch(file_ids)
         const body = { folder, inbox }
         if (file_ids) body.file_ids = file_ids
-        return this._post(`/purge/${this.vaultId}`, body, this._ownerHeaders())
+        return this._post(this._vaultPath('purge'), body, this._ownerHeaders())
     }
 
     // --- Header builders --------------------------------------------------------
+
+    // Build a vault-scoped path, refusing to issue a request that cannot succeed. Without
+    // this an unset vaultId produced `/list/` — no route match, and (per _errorForResponse)
+    // an error whose shape sends the caller hunting for a server bug that isn't there.
+    _vaultPath(verb) {
+        SGAppend._assertVaultId(this.vaultId, verb)
+        return `/${verb}/${this.vaultId}`
+    }
 
     _enumHeaders() {
         if (!this.enumKey) throw SGAppend._err('ENOAUTH', 'enum_key required for this verb')
@@ -155,14 +164,63 @@ class SGAppend {
         } catch (e) {
             throw SGAppend._err('EUNREACH', 'network: ' + String((e && e.message) || e))
         }
-        if (!res.ok) {
-            const detail = await res.text().catch(() => '')
-            throw SGAppend._err(SGAppend._codeForStatus(res.status), `${res.status}: ${detail}`, res.status)
-        }
+        if (!res.ok) throw await SGAppend._errorForResponse(res, url)
         return res.json()
     }
 
     // --- Static helpers ---------------------------------------------------------
+
+    static _assertVaultId(value, verb) {
+        const id = value == null ? '' : String(value)
+        if (!id) {
+            throw SGAppend._err('EINVAL',
+                `${verb}: no vault id — this client was built without one, so the request would ` +
+                'have gone to a path with an empty id. Nothing was sent.')
+        }
+        if (!/^[a-z0-9]{8,24}$/.test(id)) {                                     // mirrors VAULT_ID_PATTERN server-side
+            throw SGAppend._err('EINVAL',
+                `${verb}: "${id}" is not a valid vault id (8-24 lowercase alphanumerics, no hyphens). Nothing was sent.`)
+        }
+    }
+
+    // Turn a failed response into an Error worth reading.
+    //
+    // An HTML body from a JSON API is never the API talking — it is an edge/CDN error page,
+    // and the status was rewritten along with the body, so it cannot be trusted either. This
+    // is not hypothetical: send.sgraph.ai's static-site custom error response maps 403 to
+    // /404.html, and it also applies to /api/*, so a genuine gate failure (a wrong
+    // append_token, a mismatched enum_key) reaches the browser as "404 + Page Not Found".
+    // Verified 7 Sep 2026 against dev; a real route miss still answers 404 + JSON, so the
+    // HTML body is the reliable tell, not the status.
+    //
+    // We surface that as its own code (EEDGE) rather than guessing, because the honest answer
+    // is "the API's real status is unknown, and 403 is the likeliest" — which is a very
+    // different debugging session from "your URL is wrong".
+    static async _errorForResponse(res, url) {
+        let ctype = ''
+        try { ctype = String((res.headers && res.headers.get && res.headers.get('content-type')) || '') } catch (_) {}
+        const raw    = await res.text().catch(() => '')
+        const isHtml = ctype.indexOf('text/html') > -1 || /^\s*(?:<!doctype|<html)/i.test(raw)
+
+        if (isHtml) {
+            return SGAppend._err('EEDGE',
+                `${res.status} from ${url}: an HTML error page was returned instead of JSON, so this ` +
+                'is an edge/CDN page and the status is not the API\'s. The usual cause is a gate ' +
+                'failure (403 — wrong append_token or enum_key) rewritten to the static 404 page. ' +
+                'Check the credential before suspecting the URL.',
+                res.status)
+        }
+
+        let detail = raw
+        try {
+            const parsed = JSON.parse(raw)
+            if (parsed && parsed.detail != null) {
+                detail = (typeof parsed.detail === 'string') ? parsed.detail : JSON.stringify(parsed.detail)
+            }
+        } catch (_) {}
+        detail = String(detail).replace(/\s+/g, ' ').trim().slice(0, 300)       // never paste a whole document into a message
+        return SGAppend._err(SGAppend._codeForStatus(res.status), `${res.status}: ${detail}`, res.status)
+    }
 
     static _codeForStatus(s) {
         if (s === 400) return 'EINVAL'                                          // invalid input

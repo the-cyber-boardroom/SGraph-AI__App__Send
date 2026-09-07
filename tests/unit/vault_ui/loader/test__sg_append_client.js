@@ -101,7 +101,7 @@ async function main() {
         ok('append passes a string payload through unchanged', true);
 
         const c2 = client();
-        await c2.write({ vault_id: 'r', append_token: 't', payload: 'QUJD' });   // already-b64
+        await c2.write({ vault_id: 'remote99', append_token: 't', payload: 'QUJD' });   // already-b64
         ok('append leaves a string payload as-is', c2._fetch.calls[0].body.payload === 'QUJD');
     }
 
@@ -182,6 +182,75 @@ async function main() {
         err = null;
         try { await noWrite.purge({ inbox: 'h1' }); } catch (e) { err = e; }
         ok('purge without write_key → ENOAUTH', err && err.code === 'ENOAUTH');
+    }
+
+    console.log('\n[suite] SGAppend — vault-id validation (never issue a doomed request)');
+    {
+        // Regression: an unset vaultId used to build `/api/vault/append/list/` — no route
+        // match, a 404, and three rounds of debugging aimed at the server. Fail here instead.
+        const noId = client({ vaultId: null });
+        let err = null;
+        try { await noId.list({}); } catch (e) { err = e; }
+        ok('list with null vaultId → EINVAL', err && err.code === 'EINVAL');
+        ok('list with null vaultId sends nothing', noId._fetch.calls.length === 0);
+        ok('EINVAL message names the cause', err && /no vault id/i.test(err.message));
+
+        const emptyId = client({ vaultId: '' });
+        err = null;
+        try { await emptyId.fetch({ inbox: 'h1', file_ids: ['f'] }); } catch (e) { err = e; }
+        ok('fetch with empty vaultId → EINVAL, nothing sent', err && err.code === 'EINVAL' && emptyId._fetch.calls.length === 0);
+
+        const badId = client({ vaultId: 'NOT-A-VAULT-ID' });
+        err = null;
+        try { await badId.list({}); } catch (e) { err = e; }
+        ok('list with malformed vaultId → EINVAL, nothing sent', err && err.code === 'EINVAL' && badId._fetch.calls.length === 0);
+
+        const c = client();
+        err = null;
+        try { await c.write({ vault_id: 'BAD ID', append_token: 't', payload: 'QUJD' }); } catch (e) { err = e; }
+        ok('write with malformed target vault_id → EINVAL, nothing sent', err && err.code === 'EINVAL' && c._fetch.calls.length === 0);
+    }
+
+    console.log('\n[suite] SGAppend — error bodies (JSON detail vs edge HTML page)');
+    {
+        const jsonRes = { ok: false, status: 403,
+                          headers: { get: () => 'application/json' },
+                          text  : async () => JSON.stringify({ detail: 'Forbidden' }) };
+        let err = null;
+        try { await client({ fetchImpl: makeFetch(jsonRes) }).list({}); } catch (e) { err = e; }
+        ok('403 JSON → EPERM', err && err.code === 'EPERM');
+        ok('403 JSON message uses `detail`, not the raw body', err && err.message === '403: Forbidden');
+        ok('403 carries .http', err && err.http === 403);
+
+        // The masked-403 case: send.sgraph.ai's static-site custom error response maps 403 to
+        // /404.html and applies to /api/* too, so a gate failure arrives as 404 + HTML. The
+        // status is not the API's, and the old client pasted the whole page into .message.
+        const html = '<!DOCTYPE html>\n<html lang="en-GB"><head><title>Page Not Found — SG/Send</title></head>'
+                   + '<body>' + 'x'.repeat(4000) + '</body></html>';
+        const htmlRes = { ok: false, status: 404,
+                          headers: { get: () => 'text/html; charset=utf-8' },
+                          text  : async () => html };
+        err = null;
+        try { await client({ fetchImpl: makeFetch(htmlRes) }).list({}); } catch (e) { err = e; }
+        ok('HTML error page → EEDGE (not EHTTP)', err && err.code === 'EEDGE');
+        ok('EEDGE keeps the observed status', err && err.http === 404);
+        ok('EEDGE message does NOT contain the HTML body', err && err.message.indexOf('<!DOCTYPE') === -1);
+        ok('EEDGE message stays short', err && err.message.length < 400);
+        ok('EEDGE message points at the credential, not the URL', err && /403|append_token|enum_key/.test(err.message));
+
+        // Content-type absent (some edges strip it) — the body sniff must still catch it.
+        const sniffRes = { ok: false, status: 404, headers: { get: () => '' },
+                           text: async () => '<html><body>nope</body></html>' };
+        err = null;
+        try { await client({ fetchImpl: makeFetch(sniffRes) }).list({}); } catch (e) { err = e; }
+        ok('HTML detected without a content-type header', err && err.code === 'EEDGE');
+
+        // A plain-text body must still surface, just bounded.
+        const textRes = { ok: false, status: 500, headers: { get: () => 'text/plain' },
+                          text: async () => 'boom '.repeat(200) };
+        err = null;
+        try { await client({ fetchImpl: makeFetch(textRes) }).list({}); } catch (e) { err = e; }
+        ok('500 text → EHTTP, message truncated', err && err.code === 'EHTTP' && err.message.length <= 310);
     }
 
     console.log(`\n  ${pass} pass, ${fail} fail`);

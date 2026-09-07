@@ -176,5 +176,74 @@ console.log('\n[suite] app-shell — sg.ui.preview (host quick-look overlay)');
     ok('close removes the overlay', !document.getElementById('sg-host-preview'));
 }
 
+console.log('\n[suite] app-shell — bridge errors carry a stable code');
+{
+    /* cmdReply has always accepted a 4th `code` argument, but _sgCmd rebuilt the rejection
+       as `new Error(e.data.err)` and dropped it — so every bridge error reached the app as a
+       bare Error whose Object.keys() was [], and apps had to string-match `message`. An
+       integrator reported exactly that. Guard both halves. */
+    const el  = makeShell(AppPermissions.parsePermissions(null));
+    const src = el._buildVfsBridgeScript('index.html');
+
+    ok('_sgCmd copies `code` onto the rejected Error', /er\.code\s*=\s*e\.data\.code/.test(src));
+    ok('_sgCmd copies `status` when present',          /er\.status\s*=\s*e\.data\.status/.test(src));
+
+    // Drive the real _sgCmd out of the built bridge: a reply carrying a code must reject
+    // with an Error that exposes it.
+    const body    = src.slice(src.indexOf('<script>') + '<script>'.length).replace(/<\/script>\s*$/, '');
+    // Brace-match rather than regex — _sgCmd nests braces, so a lazy match truncates it.
+    function sliceFn(text, needle) {
+        const start = text.indexOf(needle);
+        if (start === -1) return null;
+        let depth = 0;
+        for (let i = text.indexOf('{', start); i < text.length; i++) {
+            if (text[i] === '{') depth++;
+            else if (text[i] === '}' && --depth === 0) return text.slice(start, i + 1);
+        }
+        return null;
+    }
+    const sgCmd = sliceFn(body, 'function _sgCmd(');
+    ok('_sgCmd is extractable from the bridge', !!sgCmd);
+
+    const listeners = [];
+    const fakeWin = {
+        addEventListener   : (_n, h) => listeners.push(h),
+        removeEventListener: (_n, h) => { const i = listeners.indexOf(h); if (i > -1) listeners.splice(i, 1); },
+        parent             : { postMessage: (payload) => {
+            setTimeout(() => listeners.slice().forEach((h) => h({
+                data: { __sgCmdReply: payload.__sgCmdId, ok: false, err: 'Permission denied', code: 'EPERM', status: 403 }
+            })), 0);
+        } }
+    };
+    const mk  = new Function('window', sgCmd + '; return _sgCmd;')(fakeWin);
+    let caught = null;
+    await mk('append', { action: 'write' }).catch((e) => { caught = e; });
+    ok('rejection is an Error with .code', caught instanceof Error && caught.code === 'EPERM');
+    ok('rejection carries .status',        caught && caught.status === 403);
+    ok('rejection keeps the message',      caught && caught.message === 'Permission denied');
+}
+
+console.log('\n[suite] app-shell — sg.app tells an app it is running from a pinned release');
+{
+    /* `.vault/releases.json` is inside the permission floor, so an app cannot read it and had
+       no way to learn it was mounted from a commit rather than HEAD — the fact that explains
+       "I pushed a new app.json and nothing changed", and which also forces writable:false. */
+    const live = makeShell(AppPermissions.parsePermissions(null));
+    const srcL = live._buildVfsBridgeScript('index.html');
+    ok('unpinned mount reports pinned:false', /pinned:false/.test(srcL));
+    ok('unpinned mount reports release:null', /release:null/.test(srcL));
+
+    const pinned = makeShell(AppPermissions.parsePermissions(null));
+    pinned._release = { live: false, name: 'v1-2', label: 'Spring build', commit: 'abc123' };
+    const srcP = pinned._buildVfsBridgeScript('index.html');
+    ok('pinned mount reports pinned:true', /pinned:true/.test(srcP));
+    ok('pinned mount names the release',   /"name":"v1-2"/.test(srcP) && /"commit":"abc123"/.test(srcP));
+
+    const bodyP = srcP.slice(srcP.indexOf('<script>') + '<script>'.length).replace(/<\/script>\s*$/, '');
+    let perr = null;
+    try { new Function(bodyP); } catch (e) { perr = e; }
+    ok('the bridge still parses with a release object', perr === null, perr && perr.message);
+}
+
 console.log('\n' + (fail === 0 ? '✓' : '✗') + ' ' + pass + ' passed, ' + fail + ' failed');
 if (fail > 0) process.exit(1);

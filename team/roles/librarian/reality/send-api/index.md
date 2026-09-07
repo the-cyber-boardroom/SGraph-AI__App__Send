@@ -79,6 +79,17 @@ without requiring both parties to have SGraph accounts.
 | POST | `/vault/append/mark-processed/{vault_id}` | Move entries pending → processed (copy+delete, idempotent) | enum_key (header) | Yes |
 | POST | `/vault/append/purge/{vault_id}` | Delete entries from pending or processed (batched, max 100) | write_key (header) | Yes |
 
+**Edge rewrites API 403 → static `404.html` — measured 7 Sep 2026, NOT an API defect.** The
+CDN in front of `send.sgraph.ai` applies the static site's `403 → /404.html` custom error
+response to `/api/*` as well, so every gate failure across the API surface (wrong
+`append_token`, wrong/missing `enum_key`, write-key mismatch) reaches clients as **404 with an
+HTML page**. Other statuses pass through as JSON — a genuine route miss still answers 404 +
+JSON, so the HTML body is the tell, not the status. The API itself returns the documented 403
+(verified in-memory; 133 tests green). **Fix is infrastructure — no distribution config lives
+in this repo.** Client-side mitigation shipped: `SGAppend._errorForResponse` raises `EEDGE` on
+an HTML body and says the status is untrustworthy. Impact if unfixed: a rotated or revoked
+append token — the expected lifecycle event for a published lane — reports as "page not found".
+
 **Lane id (`inbox`) is the raw append token — code-verified 6 Sep 2026.** The pending/processed
 folder is named with the **raw** token (`path__vault_append_pending(vault_id, token, …)` in
 `Storage__Paths.py`, called with `token = _safe_token(append_token)`), and `list_entries()` returns
