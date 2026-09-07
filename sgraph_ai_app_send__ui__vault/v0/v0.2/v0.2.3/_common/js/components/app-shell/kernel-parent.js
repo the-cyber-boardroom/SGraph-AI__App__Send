@@ -77,19 +77,58 @@
             const custodyMode = creds.custody || VC.MODES.PARENT_HELD;
             VC.gate({
                 custodyMode:          custodyMode,
-                appFrameOrigin:       this._appFrameOrigin,
+                appFrameOrigin:       this._frameOrigin(),
                 allowUnsafeSynthetic: this._allowUnsafeSynthetic
             });
-            // spawnChannel owns the bring-up AND its own cleanup on failure.
-            const channel = await this._spawnChannel(ref, creds);
+            const meta    = Object.assign({}, opts.meta || {}, { access: (opts.meta && opts.meta.access) || creds.access || 'rw' });
             const mountId = 'm-' + ref;
-            this.mounts.add({ mountId, prefix, ref, channel, label, custody: custodyMode, meta: opts.meta || {} });
-            return { mountId, ref, custody: custodyMode };
+            // Register EAGERLY (the path resolves from this moment), spawn LAZILY when asked:
+            // a declared mount must not cost one child-kernel bring-up per link at boot, and
+            // an app that never touches a mount never pays for it. spawnChannel owns the
+            // bring-up AND its own cleanup on failure.
+            const entry = this.mounts.add({ mountId, prefix, ref, channel: null, label, custody: custodyMode, meta });
+            const spawnCreds = Object.assign({}, creds, { label: label || ref, kind: meta.declared ? 'declared' : 'runtime' });
+            entry._spawn = () => this._spawnChannel(ref, spawnCreds);
+            if (!opts.lazy) {
+                try { await this._ensureChannel(entry); }
+                catch (err) { this.mounts.remove(mountId); throw err; }
+            }
+            return { mountId, ref, custody: custodyMode, access: meta.access, lazy: !!opts.lazy };
         }
 
-        async unmount(mountId) {
+        // appFrameOrigin may be a string or a function returning one (evaluated at gate time,
+        // so a frame whose sandbox is decided after this parent is constructed is still
+        // classified correctly).
+        _frameOrigin() {
+            const o = this._appFrameOrigin;
+            return (typeof o === 'function') ? (o() || 'null-origin') : (o || 'null-origin');
+        }
+
+        // Bring the child up on first use; concurrent callers share one in-flight spawn.
+        async _ensureChannel(m) {
+            if (m.channel) return m.channel;
+            if (!m._spawning) {
+                if (typeof m._spawn !== 'function') throw codeError('EUNREACH', 'mount has no spawner');
+                m._spawning = Promise.resolve().then(m._spawn).then(
+                    (ch) => { m.channel = ch; m._spawning = null; return ch; },
+                    (err) => { m._spawning = null; throw err; });
+            }
+            return m._spawning;
+        }
+
+        // opts.byApp — the request came from the sandboxed app via the bridge. An app may not
+        // unmount a DECLARED mount: the owner declared it, and removing it would let the app's
+        // next write to that prefix land in the parent (07 Sep analysis §6.2). Shell/teardown
+        // callers pass { force: true }.
+        async unmount(mountId, opts) {
+            opts = opts || {};
+            const existing = this.mounts.get(mountId);
+            if (!existing) return { unmounted: false };
+            if (existing.meta && existing.meta.declared && !opts.force) {
+                throw codeError('EPERM', 'declared mount ' + mountId + ' cannot be unmounted by the app');
+            }
             const m = this.mounts.remove(mountId);
-            if (!m) return { unmounted: false };
+            if (m._spawning) { try { await m._spawning; } catch (_) {} }      // never orphan an in-flight spawn
             try { m.channel && m.channel.close(); } catch (_) {}
             // The broker log is intentionally retained for audit (the entries outlive the mount).
             // channel is returned so a DOM caller can tear down any iframe stashed on it.
@@ -104,7 +143,8 @@
             if (!globalThis.VivMonitor) throw codeError('EUNREACH', 'VivMonitor not loaded');
             const m = this.mounts.get(mountId);
             if (!m) throw codeError('ENOMOUNT', 'no such mount ' + mountId);
-            return globalThis.VivMonitor.requestLog(m.channel, opts || {});
+            const ch = await this._ensureChannel(m);
+            return globalThis.VivMonitor.requestLog(ch, opts || {});
         }
 
         list() {
@@ -115,7 +155,10 @@
                     prefix:    m.prefix,
                     label:     m.label,
                     isolation: 'isolated',
-                    custody:   m.custody || VC.MODES.PARENT_HELD
+                    custody:   m.custody || VC.MODES.PARENT_HELD,
+                    access:    (m.meta && m.meta.access) || 'rw',
+                    declared:  !!(m.meta && m.meta.declared),
+                    spawned:   !!m.channel
                 };
             });
         }
@@ -136,7 +179,8 @@
                 throw codeError('ECONSENT', 'Broker denied');
             }
             try {
-                const res = await hit.mount.channel.request('vfs.' + op,
+                const ch  = await this._ensureChannel(hit.mount);          // lazy spawn on first use
+                const res = await ch.request('vfs.' + op,
                     { path: hit.rest, data: args.data, credential: args.credential },
                     { sensitive: !!args.data || op === 'read' });
                 this.broker.finalize(med.entryId, 'ok');

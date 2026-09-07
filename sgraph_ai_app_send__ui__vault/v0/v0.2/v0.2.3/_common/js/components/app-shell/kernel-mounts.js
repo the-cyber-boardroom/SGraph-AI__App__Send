@@ -34,6 +34,7 @@
                 ref:     opts.ref || null,
                 channel: opts.channel || null,
                 label:   opts.label || null,
+                custody: opts.custody || null,
                 meta:    opts.meta  || null
             });
             return this._mounts.get(opts.mountId);
