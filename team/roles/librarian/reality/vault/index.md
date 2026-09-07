@@ -316,7 +316,23 @@ Round-1 and Round-2 review findings addressed after the initial surface landed:
 | **Production mount-credential resolver** — owner-secret store (rw) → `ro-links.json` (ro, as a read credential) → device key → the `clinic.json` trial stub (now last). RO parent sessions fall through to ro, never rw. | **EXISTS** | `DeclaredMounts.resolveCredentials`; `app-shell._resolveChildCredentials` |
 | **Child kernel opens a read credential read-only** (`parseReadOnlyCredential` → `openReadOnly`), strips sgit prefixes, reads its OWN embedded access token (`SGVault.readEmbeddedAccessToken`, one implementation shared with both shells) — but a read-credential child is never writable (server also requires the write key). | **EXISTS** | `kernel-bootstrap.js`; test G in `test__kernel_declared_mounts.js` |
 | **`Via-Mount: <label> (declared\|runtime)` commit trailer** on every commit a child kernel makes for a parent (`SGVault._commitTrailer`) | **EXISTS** | `sg-vault.js` `_commit` |
-| Browser e2e for a declared mount; HUD rendering of `declared` / `_conflict` / `EMOUNT_RO` | **PROPOSED** | analysis test layer 4; changelog 09/07 |
+| **Browser e2e for a declared mount** — real API server, real vaults, shipped App UI, real null-origin app + child kernel iframes, a second writer racing the app; screenshots + guide | **EXISTS** | `tests/e2e/vault_ui/test__declared_mounts_e2e.spec.js` (4), fixtures in `tests/e2e/vault_ui/fixtures/`; `library/guides/vault-html/DECLARED-MOUNTS-E2E.md` |
+| HUD rendering of `declared` + access tier + sync state on the Mounts tab | **EXISTS** | `viv-mounts-view.js`, `app-debug-mounts.js` (screenshot 04 in the guide) |
+| HUD rendering of composite `_conflict` / `EMOUNT_RO` | **PROPOSED** | changelog 09/07 (composite) |
+
+### Child-kernel sync discipline — reconcile-before-write, CAS push, status/sync (2026-09-07)
+
+| Item | Status | Evidence |
+|---|---|---|
+| **`SGVaultRefManager.writeRefIfMatch`** — CAS ref write via the server's `write-if-match` batch op against the exact ciphertext last read (`readRef` caches it; `lastRawRef`); `ECAS` on a moved ref, `ENOMATCH` if never read | **EXISTS** | `sg-vault-ref-manager.js`; live test suite 8 |
+| **`SGVault.pushIfMatch()`**; `merge(their, { publish: false })` | **EXISTS** | `sg-vault--sync.js` |
+| **Child kernel handlers**: reconcile-before-write (FF or three-way), CAS push with reconcile + one retry → `EDIVERGED`, throttled refresh-before-read (`registerKernelVfsHandlers.REFRESH_MS`, 5 s), `vfs.status`, `vfs.sync`, `onUpdated('/')` on a replaced tree; synthetic vaults (no ref manager) keep the plain-push path | **EXISTS** | `kernel-app-handlers.js`; `test__kernel_app_handlers_sync.js` (20); `tests/integration/vault_ui/live/test__child_kernel_sync_live.js` (45, real server) |
+| **`KernelParent.status/sync/syncAll`**, `list()` rows carry `sync`; `app-shell._checkBehind` (tab focus) → `syncAll()` | **EXISTS** | `kernel-parent.js`, `app-shell.js` |
+| Declared mounts set the broker policy to `auto` for fs verbs (app grant + app-level consent + child policy still gate) | **EXISTS** | `app-shell._mountDeclaredVaults` |
+| Child's `.vault-settings.json` hidden from mount listings and refused (`EPROTECTED`) | **EXISTS** | `kernel-app-handlers.js` `_isSettingsRecord` |
+| **Fixes found by the browser e2e** — srcdoc bootstrap race (`_spawnChildChannel` waits for `load`; `SecureChannel.create({ timeoutMs })`); lexical-binding lookup of `SGSend`/`SGVault`/`VaultDataSource` in the kernel shell; child app.json read via the data source; `loadAllSubTrees()` at child boot; `vfs.list` on a real `VaultDataSource`; `VaultDataSource.saveFile/renameFile/deleteFile` load a lazy target folder; `boot-error` reported to the parent | **EXISTS** | changelog `team/comms/changelog/09/07/v0.33.64__changelog__child-kernel-sync-discipline-and-declared-mounts-browser-e2e.md`; `test__secure_channel_timeout.js` (5) |
+| Real API server + real vault libraries as Node test fixtures (`startApiServer`, `seedDeclaredMounts`, `openAll`, `openReadOnlyAll`) | **EXISTS** | `tests/e2e/vault_ui/fixtures/api-server.{py,js}`, `sg-vault-node.js` |
+| Visible per-mount behind/diverged indicator on the HUD chip; `sgit` binary as the e2e's other writer; `EDIVERGED` surfaced to the app with conflict paths | **PROPOSED** | debrief 09/07 |
 
 ---
 
@@ -372,6 +388,7 @@ inline cross-reference on the static-host mode section above (HOSTING-ON-STATIC-
 | [`PLAYWRIGHT-VAULT-APP-ACCESS.md`](../../../../../library/guides/vault-html/PLAYWRIGHT-VAULT-APP-ACCESS.md) | Accessing vault apps from Playwright tests; authentication; iframe interaction |
 
 ---
+- `library/guides/vault-html/DECLARED-MOUNTS-E2E.md` — declared mounts end to end in a real browser: what the test proves, how to run/replicate it, the sync discipline table, the six defects it found (2026-09-07)
 
 ## Sub-files
 

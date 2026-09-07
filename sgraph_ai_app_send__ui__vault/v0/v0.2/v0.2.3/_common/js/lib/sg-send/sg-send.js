@@ -263,4 +263,13 @@ class SGSend {
         }
         return btoa(binary)
     }
+
+    // base64 → Uint8Array (inverse of _abToB64). Used by the CAS ref writer to cache the
+    // server's CURRENT ref bytes returned on a write-if-match conflict.
+    static _b64ToBytes(b64) {
+        const binary = atob(b64)
+        const out    = new Uint8Array(binary.length)
+        for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i)
+        return out
+    }
 }

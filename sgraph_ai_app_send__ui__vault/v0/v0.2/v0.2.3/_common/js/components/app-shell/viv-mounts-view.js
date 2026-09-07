@@ -57,6 +57,20 @@
         }
     }
 
+    // Short sync state for the row: what the child kernel last reported (07 Sep §"pulls
+    // and merges"). Never-spawned mounts cannot be stale ("idle"); a child that has not
+    // been asked yet shows "—".
+    function syncTag(m) {
+        if (m.spawned === false) return 'idle';
+        var s = m.sync;
+        if (!s) return '—';
+        if (s.syncable === false) return 'n/a';
+        var tag = s.state || 'in-sync';
+        if (s.lastPush && s.lastPush.ok === false) tag += ' · push ' + (s.lastPush.code || 'failed');
+        if (s.lastMerge && s.lastMerge.conflicts && s.lastMerge.conflicts.length) tag += ' · ' + s.lastMerge.conflicts.length + ' conflict';
+        return tag;
+    }
+
     function mountRows(mounts) {
         return (mounts || []).map(function (m) {
             var custody = m.custody || 'parent-held';
@@ -67,7 +81,10 @@
                 label:     m.label || m.ref || m.mountId,
                 isolation: m.isolation || 'isolated',
                 custody:   custody,
-                custodyTag: custodyTag(custody)
+                custodyTag: custodyTag(custody),
+                access:    m.access || 'rw',
+                declared:  !!m.declared,
+                syncTag:   syncTag(m)
             };
         });
     }
@@ -121,6 +138,7 @@
         opIcon:       opIcon,
         credTag:      credTag,
         custodyTag:   custodyTag,
+        syncTag:      syncTag,
         mountRows:    mountRows,
         logRows:      logRows,
         summary:      summary,

@@ -583,6 +583,11 @@
 
         async _checkBehind() {
             if (!this._vault) return;
+            // Children first: a mounted child kernel is headless, so this tab-focus check is
+            // its only unprompted chance to fast-forward / merge with what others published.
+            if (this._kernelParent && typeof this._kernelParent.syncAll === 'function') {
+                try { await this._kernelParent.syncAll(); } catch (_) {}
+            }
             // Pinned to a published release: auto-sync must NOT drag the viewer forward.
             // Silently remounting someone mid-demo onto HEAD is the exact failure release
             // channels exist to prevent. Keep checking, but surface it passively instead.
@@ -2046,12 +2051,21 @@
             var iframe = document.createElement('iframe');
             iframe.sandbox = 'allow-scripts';            // null origin
             iframe.style.cssText = 'display:none;';      // headless mount; visible UI mounts are Phase 5
+            // srcdoc navigation is asynchronous: the moment the element is in the DOM its
+            // contentWindow is the initial about:blank document, so a port posted before
+            // `load` reaches a window with no listener and the boot hangs forever (the
+            // broker entry stayed 'pending' — found by the declared-mounts browser e2e).
+            // Arm the load promise BEFORE setting srcdoc, wait for it, then bootstrap.
+            var loaded = new Promise(function (resolve) { iframe.addEventListener('load', resolve, { once: true }); });
             iframe.srcdoc = KERNEL_SHELL_HTML;
             document.body.appendChild(iframe);
 
             var channel;
             try {
-                channel = await SecureChannel.create(iframe, { sensitiveKey: true, cid: 'ch-' + ref });
+                await Promise.race([loaded, new Promise(function (_, reject) {
+                    setTimeout(function () { reject(Object.assign(new Error('child kernel load timeout'), { code: 'EUNREACH' })); }, 10000);
+                })]);
+                channel = await SecureChannel.create(iframe, { sensitiveKey: true, cid: 'ch-' + ref, timeoutMs: 10000 });
                 // M5: tell the child WHICH server to hit — its own Edge 1. Without this the
                 // child falls back to the hardcoded dev endpoint regardless of where we are.
                 await channel.send('secrets', {
@@ -2068,6 +2082,12 @@
                 await new Promise(function (resolve, reject) {
                     var t = setTimeout(function () { reject(Object.assign(new Error('child kernel boot timeout'), { code: 'EUNREACH' })); }, 10000);
                     channel.on('ready', function (p) { clearTimeout(t); resolve(p); });
+                    // The child reports a failed boot (vault open, policy read…) instead of
+                    // leaving the parent to time out: fail fast with the real cause.
+                    channel.on('boot-error', function (p) {
+                        clearTimeout(t);
+                        reject(Object.assign(new Error('child kernel boot failed: ' + ((p && p.message) || 'unknown')), { code: (p && p.code) || 'EUNREACH' }));
+                    });
                 });
             } catch (err) {
                 if (channel) { try { channel.close(); } catch (_) {} }
@@ -2116,6 +2136,14 @@
                 try {
                     var res = await kp.mount({ prefix: spec.prefix, ref: spec.ref, label: spec.label, lazy: true,
                                                meta: { declared: true, linkPath: spec.linkPath } });
+                    // The broker's per-mount 'ask' is for RUNTIME mounts an app requested itself.
+                    // A declared mount is the owner's decision, the app's grant on that prefix is
+                    // still checked by _can, the app-level consent flow (fs.write 'once'…) still
+                    // runs, and the child's own policy still gates every op. A second prompt naming
+                    // a mount id would only reveal the mount the design hides. → auto.
+                    ['fs.read', 'fs.write', 'fs.delete', 'fs.mkdir', 'fs.move'].forEach(function (cap) {
+                        try { kp.broker.setPolicy(res.mountId, cap, 'auto'); } catch (_) {}
+                    });
                     out.push({ prefix: spec.prefix, ref: spec.ref, mountId: res.mountId, access: res.access });
                     this._emitVaultEvent('declared-mount', { label: 'Declared mount ' + spec.prefix + ' (' + res.access + ')', prefix: spec.prefix, ref: spec.ref, access: res.access });
                 } catch (err) {

@@ -63,11 +63,18 @@
     function _defaultDataSourceFactory(VaultDataSource) {
         return function (vault, accessToken) { return new VaultDataSource(vault, accessToken || null); };
     }
-    async function _defaultAppJsonReader(vault) {
+    // Reads the CHILD's own app.json (its policy — the second gate). Goes through the data
+    // source: a real SGVault has getFile(folder, name), not getFileBytes — reading the vault
+    // directly threw, the reader returned null and every child write was EPERM "no
+    // capability" (found by the declared-mounts browser e2e). Falls back to the vault for
+    // harnesses whose synthetic vault exposes getFileBytes.
+    async function _defaultAppJsonReader(vault, dataSource) {
         // Try the new location first (.vault/app.json), then the shipped legacy root.
         for (const p of ['.vault/app.json', 'app.json']) {
             try {
-                const bytes = await vault.getFileBytes(p);
+                const bytes = (dataSource && typeof dataSource.getFileBytes === 'function')
+                    ? await dataSource.getFileBytes(p)
+                    : await vault.getFileBytes(p);
                 if (!bytes) continue;
                 const txt   = new TextDecoder().decode(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes));
                 return JSON.parse(txt);
@@ -83,8 +90,18 @@
         const AP = need('AppPermissions', globalThis.AppPermissions);
         const registerHandlers = need('registerKernelVfsHandlers', globalThis.registerKernelVfsHandlers);
 
-        const vaultFactory      = opts.vaultFactory      || _defaultVaultFactory(globalThis.SGSend, globalThis.SGVault);
-        const dataSourceFactory = opts.dataSourceFactory || _defaultDataSourceFactory(globalThis.VaultDataSource);
+        // The shipped libraries are top-level `class` declarations in classic <script>s:
+        // global LEXICAL bindings, NOT globalThis properties — `globalThis.SGSend` is
+        // undefined inside the kernel shell and the real boot died with "SGSend is not a
+        // constructor" (only the test override, which sets globalThis.*, ever worked).
+        // An explicit globalThis.* (a harness override) wins; otherwise resolve the lexical
+        // binding by name in this document's scope.
+        const SGSendCtor     = globalThis.SGSend          || ((typeof SGSend          !== 'undefined') ? SGSend          : undefined);
+        const SGVaultCtor    = globalThis.SGVault         || ((typeof SGVault         !== 'undefined') ? SGVault         : undefined);
+        const VaultDSCtor    = globalThis.VaultDataSource || ((typeof VaultDataSource !== 'undefined') ? VaultDataSource : undefined);
+        if (!globalThis.SGVaultCrypto && typeof SGVaultCrypto !== 'undefined') globalThis.SGVaultCrypto = SGVaultCrypto;
+        const vaultFactory      = opts.vaultFactory      || _defaultVaultFactory(SGSendCtor, SGVaultCtor);
+        const dataSourceFactory = opts.dataSourceFactory || _defaultDataSourceFactory(VaultDSCtor);
         const appJsonReader     = opts.appJsonReader     || _defaultAppJsonReader;
         const endpointFor       = opts.endpointFor       || function () { return opts.endpoint || 'https://dev.send.sgraph.ai'; };
 
@@ -96,6 +113,19 @@
         // tick could double-invoke. Idempotence is the responder's job.
         let booted = false;
         ch.handle('secrets', async function (payload) {
+            // `secrets` is a fire-and-forget send: a thrown error would be swallowed by the
+            // channel and the parent would only ever see a 10s "boot timeout". Log it here
+            // and tell the parent WHY (boot-error) so it fails fast with the real cause.
+            try { return await _bootWithSecrets(payload); }
+            catch (err) {
+                const info = { code: (err && err.code) || 'EUNREACH', message: (err && err.message) || String(err) };
+                try { console.error('[kernel] boot failed', info.code, info.message); } catch (_) {}
+                try { await ch.send('boot-error', info); } catch (_) {}
+                throw err;
+            }
+        });
+
+        async function _bootWithSecrets(payload) {
             if (booted) throw codeError('EPROTO', 'secrets replay');
             booted = true;
             const vaultKey = payload && payload.vaultKey;
@@ -134,7 +164,13 @@
             }
 
             const dataSource = dataSourceFactory(vault, effectiveToken);
-            const appJson    = await appJsonReader(vault);
+            // Both shells expand every lazy sub-folder on open; a child kernel must too, or
+            // its listings show folders as empty and a nested write drops siblings.
+            if (typeof dataSource.loadAllSubTrees === 'function') {
+                try { await dataSource.loadAllSubTrees(); }
+                catch (err) { throw codeError('EUNREACH', 'vault tree load failed: ' + (err && err.message || err)); }
+            }
+            const appJson    = await appJsonReader(vault, dataSource);
             const perm       = AP.parsePermissions(appJson);
 
             registerHandlers(ch, {
@@ -162,7 +198,7 @@
                 try { opts.onReady(readyPayload); } catch (_) {}
             }
             return readyPayload;
-        });
+        }
 
         return ch;
     }
