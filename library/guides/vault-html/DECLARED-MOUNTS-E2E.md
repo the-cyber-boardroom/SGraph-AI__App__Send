@@ -199,14 +199,40 @@ Node harnesses (synthetic vaults, `globalThis` overrides) could not see:
 
 ---
 
-## 6 · Files
+## 6 · Against a deployed environment ("is it live?")
+
+Both tests accept a deployed target through environment variables; the fixtures then spawn
+nothing and the browser drives the deployed UI:
+
+| Variable | Effect |
+|---|---|
+| `SG_API_URL` | use this API instead of spawning `api-server.py` |
+| `SG_ACCESS_TOKEN` (or `SGRAPH_SEND__ACCESS_TOKEN`) | account token for writes on that API |
+| `SG_UI_BASE` | e2e only: open this UI (e.g. `https://dev.vault.sgraph.ai`) instead of the local file server; the CDN scripts are loaded for real |
+| `SG_REQUIRE_API=1` | make a missing API server a failure instead of a skip |
+
+```bash
+# read-only marker probe, no token
+npm run probe:vault-ui -- https://dev.vault.sgraph.ai https://dev.send.sgraph.ai
+# server-side contract with the shipped handlers (Node)
+SG_API_URL=https://dev.send.sgraph.ai SG_ACCESS_TOKEN=… npm run test:vault-live
+# the deployed UI in a real browser
+SG_UI_BASE=https://dev.vault.sgraph.ai SG_API_URL=https://dev.send.sgraph.ai SG_ACCESS_TOKEN=… SG_REQUIRE_API=1 \
+  npm run test:vault-e2e-declared-mounts
+```
+
+The brief for other agents (`team/comms/briefs/09/07/v0.33.64__brief__declared-mounts-and-child-kernel-sync-on-dev.md`)
+walks through the three levels.
+
+## 7 · Files
 
 | File | Role |
 |---|---|
 | `tests/e2e/vault_ui/test__declared_mounts_e2e.spec.js` | the browser test (4 serial tests, screenshots) |
 | `tests/e2e/vault_ui/fixtures/clinic-app.html` | the app under test — copy it as a starting point |
 | `tests/e2e/vault_ui/fixtures/sg-vault-node.js` | real vault libraries in Node; `seedDeclaredMounts`, `openAll`, `openReadOnlyAll` |
-| `tests/e2e/vault_ui/fixtures/api-server.{py,js}` | the real API server for a run |
+| `tests/e2e/vault_ui/fixtures/api-server.{py,js}` | the real API server for a run (or a deployed one via `SG_API_URL`) |
+| `scripts/probe_vault_ui_capabilities.mjs` | deployed-UI capability probe (`npm run probe:vault-ui`) |
 | `tests/e2e/vault_ui/fixtures/sg-layout-offline.js` | offline stand-in for the CDN layout manager (test infra only) |
 | `tests/integration/vault_ui/live/test__child_kernel_sync_live.js` | the Node twin: CAS, reconcile, race, read-only refresh, status/sync, throttle |
 | `tests/unit/vault_ui/loader/test__kernel_app_handlers_sync.js` | controlled-failure unit tests (`EDIVERGED`, throttle, real-shaped data source) |

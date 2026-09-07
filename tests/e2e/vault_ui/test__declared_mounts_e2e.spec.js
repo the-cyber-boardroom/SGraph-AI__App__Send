@@ -43,7 +43,12 @@ test.use({
     ignoreHTTPSErrors: true,
     launchOptions: CHROMIUM ? { executablePath: CHROMIUM } : {}
 });
+// Deployed target: SG_UI_BASE=https://dev.vault.sgraph.ai (with SG_API_URL + a token) drives
+// the DEPLOYED App UI against the deployed API — the "is this live?" check. The CDN scripts
+// are real there, so the offline stand-ins are only installed for the local file server.
+const UI_BASE = (process.env.SG_UI_BASE || '').replace(/\/$/, '');
 test.beforeEach(async ({ page }) => {
+    if (UI_BASE) return;
     await page.route('https://dev.tools.sgraph.ai/**/sg-layout.js', (route) => route.fulfill({ contentType: 'application/javascript', body: LAYOUT_JS }));
     await page.route('https://**/sg-print.js',                       (route) => route.fulfill({ contentType: 'application/javascript', body: '' }));
 });
@@ -54,7 +59,15 @@ let api, seed;
 
 test.beforeAll(async () => {
     fs.mkdirSync(SHOTS, { recursive: true });
-    api  = await startApiServer();
+    // The real API server needs the repo's Python dependencies. In a Node-only job (the plain
+    // `test:vault-e2e` run) that is not available: skip, visibly. SG_REQUIRE_API=1 (the
+    // dedicated CI job, or an agent confirming a deployment) turns that into a failure.
+    try { api = await startApiServer(); }
+    catch (err) {
+        if (process.env.SG_REQUIRE_API) throw err;
+        test.skip(true, 'SGraph Send API server unavailable (' + String(err.message).split('\n')[0] + ') — set SG_REQUIRE_API=1 to fail instead');
+        return;
+    }
     seed = await seedDeclaredMounts(api, { appHtml: APP_HTML, childName: 'Clinic Data', parentName: 'Clinic App' });
 });
 test.afterAll(async () => { if (api) await api.stop(); });
@@ -66,7 +79,7 @@ async function openApp(page, vaultKey) {
         try { localStorage.setItem('sg-vault-key', key); } catch (_) {}
         try { sessionStorage.setItem('sg-vault-endpoint', endpoint); } catch (_) {}
     }, { endpoint: api.url, key: vaultKey });
-    await page.goto('/en-gb/app');
+    await page.goto(UI_BASE + '/en-gb/app');
     return appFrame(page);
 }
 

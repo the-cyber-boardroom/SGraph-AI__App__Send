@@ -1,9 +1,10 @@
 /* =================================================================================
    startApiServer() — spawn the REAL SGraph Send API (api-server.py) for a test run.
 
-   Returns { url, token, stop() }. Local calls must bypass any HTTP(S) proxy configured in
-   the environment: Node's fetch ignores proxy env vars, but Chromium does not, so the
-   Playwright spec launches the browser with --no-proxy-server (see the spec).
+   Returns { url, token, stop() }. With SG_API_URL set, no server is spawned: the handle
+   points at that deployment (token from SG_ACCESS_TOKEN / SGRAPH_SEND__ACCESS_TOKEN).
+   Node's fetch ignores proxy env vars; Chromium honours them, and its default bypass list
+   covers 127.0.0.1 / localhost.
    ================================================================================= */
 
 import { spawn }          from 'node:child_process';
@@ -26,7 +27,20 @@ function pythonBin() {
     return 'python3';
 }
 
+// A deployed target instead of a spawned server: SG_API_URL (+ SG_ACCESS_TOKEN or
+// SGRAPH_SEND__ACCESS_TOKEN). This is how an agent points the live test / the browser e2e
+// at dev.send.sgraph.ai to confirm a deployment (see DECLARED-MOUNTS-E2E.md §6).
+export function remoteApiFromEnv() {
+    const url = process.env.SG_API_URL;
+    if (!url) return null;
+    const token = process.env.SG_ACCESS_TOKEN || process.env.SGRAPH_SEND__ACCESS_TOKEN || '';
+    if (!token) throw new Error('SG_API_URL is set but no SG_ACCESS_TOKEN / SGRAPH_SEND__ACCESS_TOKEN');
+    return { url: url.replace(/\/$/, ''), token, remote: true, proc: null, stop() { return Promise.resolve(); } };
+}
+
 export function startApiServer({ timeoutMs = 60_000 } = {}) {
+    const remote = remoteApiFromEnv();
+    if (remote) return Promise.resolve(remote);
     return new Promise((resolve, reject) => {
         const script = path.join(__dirname, 'api-server.py');
         const env    = Object.assign({}, process.env, { SEND__STORAGE_MODE: 'memory', PYTHONUNBUFFERED: '1' });
