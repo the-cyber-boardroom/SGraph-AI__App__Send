@@ -467,7 +467,11 @@
         // The .vault/ folder is read_key-encrypted like the rest of the tree, so a writable open
         // can decrypt it. Returns the token string or null when the file is absent / malformed.
         async _readEmbeddedAccessToken(vault) {
+            // ONE implementation (SGVault.readEmbeddedAccessToken) shared with /app and the
+            // child kernel; the inline copy below only serves vault-likes that lack it.
+            if (vault && typeof vault.readEmbeddedAccessToken === 'function') return vault.readEmbeddedAccessToken();
             try {
+                if (!vault) return null;
                 // `.vault` is a LAZY sub-tree right after open (_loadTreeFromCommit marks every
                 // top-level folder _loaded:false). listFolder('/.vault') therefore returns [] —
                 // and the token is never found — until the sub-tree is expanded. This was the

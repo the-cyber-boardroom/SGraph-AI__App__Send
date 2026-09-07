@@ -53,6 +53,9 @@ node tests/unit/vault_ui/loader/test__kernel_relay.js
 node tests/unit/vault_ui/loader/test__kernel_app_handlers.js
 node tests/unit/vault_ui/loader/test__kernel_bootstrap.js
 node tests/unit/vault_ui/loader/test__kernel_parent.js
+node tests/unit/vault_ui/loader/test__declared_mounts.js
+node tests/unit/vault_ui/loader/test__mount_lanes.js
+node tests/unit/vault_ui/loader/test__kernel_declared_mounts.js
 node tests/unit/vault_ui/loader/test__viv_mounts_view.js
 node tests/unit/vault_ui/loader/test__viv_audit_view.js
 node tests/unit/vault_ui/loader/test__vault_subvaults_view.js
