@@ -11,6 +11,9 @@
     "test:vault-chat-unit": "bash tests/unit/vault_ui/vault-chat/run-all.sh",
     "test:vault-integration": "bash tests/integration/vault_ui/loader/run-all.sh",
     "test:vault-e2e": "npx playwright test tests/e2e/vault_ui/",
+    "test:vault-live": "node tests/integration/vault_ui/live/test__child_kernel_sync_live.js",
+    "test:vault-e2e-declared-mounts": "npx playwright test tests/e2e/vault_ui/test__declared_mounts_e2e.spec.js",
+    "probe:vault-ui": "node scripts/probe_vault_ui_capabilities.mjs",
     "test:vault-browser-integration": ".venv/bin/python3 -m pytest tests/integration/vault_ui/browser/ -v"
   },
   "engines": {

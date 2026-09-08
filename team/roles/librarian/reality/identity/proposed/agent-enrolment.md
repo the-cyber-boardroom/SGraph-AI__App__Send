@@ -1,11 +1,11 @@
 # Identity — Proposed: Agent Enrolment Architecture
 
-**Domain:** identity/proposed/agent-enrolment | **Last updated:** 2026-08-22 | **Maintained by:** Librarian (daily run)
+**Domain:** identity/proposed/agent-enrolment | **Last updated:** 2026-08-31 | **Maintained by:** Librarian (daily run)
 **Parent index:** [`index.md`](index.md)
 
 All items below are PROPOSED. None have been code-verified. Do not describe any of these as existing features.
 
-Source briefs: docs 956–958, 960 (19 August 2026, v0.33.60)
+Source briefs: docs 956–958, 960 (19 August 2026, v0.33.60); docs 963–979 (20 August 2026, v0.33.61)
 
 ---
 
@@ -183,3 +183,81 @@ Each registry must declare which roots it accepts. An unresolvable trust chain i
 | No directory, no revocation, no chain | All three |
 
 **Effort estimate:** 2–3 weeks for registry MVP (after P-ENR-002 Phases 1–5).
+
+---
+
+## P-KRG-001 — Fixture Class: Named, Bounded, Schema Field
+
+**Status:** PROPOSED — no code
+**Source:** `v0.33.61__arch-brief__register-was-designed-in-june-published-keypairs-are-fixtures-not-identities.md` (20 August 2026)
+
+A keypair whose private half is published provides **no authentication, permanently**. These objects are a distinct class — "fixtures" — whose purpose is to exercise the plumbing, not to create trust.
+
+Five rules that must be written before any key is generated:
+1. A fixture keypair has its private half published; anybody may sign as it
+2. A fixture never appears in the real trust graph (no real key vouches for it; self-declared upward links stay pending)
+3. `private_key_published: true|false` is a **required field** with no default in every register entry schema
+4. A fixture's append lane is a public inbox — anyone holding the published private key can decrypt
+5. A fixture is retired by republishing the persona under a fresh key; register revocation does not apply (revocation is a signed append; anybody holding the published key can reverse it)
+
+The `private_key_published` field is the most consequential evidence an entry can carry. A consumer that verifies signatures without reading this flag will pass a fixture, because the verification succeeds. Only the flag distinguishes a signature that proves possession from one that proves nothing.
+
+**Blocked on:** Architecture decision — does fixture material live in the main register (with flag) or in a separate, clearly-marked vault?
+
+---
+
+## P-KRG-002 — Agent Card Personas with Workflow Signing
+
+**Status:** PROPOSED — no code
+**Source:** `v0.33.61__arch-brief__register-was-designed-in-june-published-keypairs-are-fixtures-not-identities.md` (20 August 2026)
+
+The A2A v1.0 agent card (JSON manifest at `/.well-known/agent.json`) is identified as the correct persona format:
+- Declares identity, capabilities, skills, endpoint, and authentication requirements
+- Version 1.0 added signed cards via JSON Web Signature
+- Specification states: a card **should not include sensitive credentials**
+- A curated registry is a legitimate discovery route per the specification
+
+Fixture keypairs ship as a deliberately non-conforming, clearly marked companion object — separate from the card's identity claim.
+
+Signing mechanism: keyless sigstore (workflow identity). Certificates expire in minutes; no revocation list needed. Verification reveals repository and workflow, not a held key. **The notary must be an agent you run** — a hosted session cannot be attested.
+
+**Note:** The canonical A2A discovery path changed once already. Confirm current well-known path before building discovery.
+
+---
+
+## P-KRG-003 — Grant/Mandate Measurement Infrastructure
+
+**Status:** PROPOSED — strategic/instrumentation; no code
+**Source:** `v0.33.61__strategy-brief__grant-is-not-the-mandate-the-gap-between-them-is-the-exposure-nobody-accepted.md` (20 August 2026)
+
+Corrects a July claim. Key vocabulary:
+- **Grant** = union of capabilities conferred when a credential is assigned (a fact; set by the credential issuer)
+- **Mandate** = what the holder is authorised and expected to do (a statement; may contain allow-list permissions and prohibitions)
+- **Excess authority** = grant minus mandate = blast radius from the other end
+
+Rules:
+- A deny-list mandate widens silently when a provider adds capabilities; only allow-list mandates are enforceable
+- A mandate needs 5 fields: issuer, subject, scope, interval, revocation path
+- A mandate with no interval is a grant under another name
+- Declared mandates are instrumentation, not enforcement; an execution broker makes grant and mandate coincide by construction
+- Excess authority is unaccepted by construction → defaults to critical → escalates without anybody escalating it
+
+A measurement experiment: issue a mandate narrower than the grant, instrument every action, count four numbers — honoured, exceeded, necessary excess, reported excess. The result describes a cooperative agent (not an injected one).
+
+---
+
+## P-KRG-004 — Path-Scoped History Command
+
+**Status:** PROPOSED — not built
+**Source:** Day index parked items (20 August 2026)
+
+The register's central query — "what was the trust state of this path at time T?" — has no command. Required for audit and for the register UI.
+
+---
+
+## P-KRG-005 — Lane Anchor Behavior Clarification
+
+**Status:** PROPOSED — interface gap
+**Source:** Day index parked items (20 August 2026)
+
+Does a lane with no anchors accept any token holder? This is absent from the interface reference and gates observability coverage. A lane address derivation from a public key is also PROPOSED (not shipped — see sgit.ai/docs/limitations).

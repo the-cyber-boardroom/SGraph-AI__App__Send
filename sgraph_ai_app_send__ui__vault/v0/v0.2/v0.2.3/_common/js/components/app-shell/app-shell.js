@@ -583,6 +583,11 @@
 
         async _checkBehind() {
             if (!this._vault) return;
+            // Children first: a mounted child kernel is headless, so this tab-focus check is
+            // its only unprompted chance to fast-forward / merge with what others published.
+            if (this._kernelParent && typeof this._kernelParent.syncAll === 'function') {
+                try { await this._kernelParent.syncAll(); } catch (_) {}
+            }
             // Pinned to a published release: auto-sync must NOT drag the viewer forward.
             // Silently remounting someone mid-demo onto HEAD is the exact failure release
             // channels exist to prevent. Keep checking, but surface it passively instead.
@@ -671,9 +676,14 @@
                 this._scheduleAppendCheck(0, 'app-remount');
                 return;
             }
+            var self = this;
+            // Lanes of DECLARED mounts (the monitoring pattern: data vaults that RECEIVE appends,
+            // watched from the parent). One checker per mount, its own seen-set, events tagged
+            // with the mount so the app knows which vault spoke. A mount whose credential
+            // yields no read key is skipped (event only) — never fatal to the root checker.
+            await this._initLaneCheckers();
             var inbox = await this._getAppendClient();
             if (!inbox) { this._appendChecker = null; return; }
-            var self = this;
             var bus = { emit: function (name, payload) { self._pushHostEvent(name, payload); } };
             this._appendChecker = new SGAppendChecker(inbox, bus, function () {
                 return { enabled: AppHostEvents.allows(self._hostEvents, 'append.new-messages'), auto_fetch: false };
@@ -682,8 +692,34 @@
             this._scheduleAppendCheck(0, 'app-open');
         }
 
+        async _initLaneCheckers() {
+            this._laneCheckers = this._laneCheckers || {};
+            var mounts = (this._mounts && typeof this._mounts.list === 'function') ? this._mounts.list() : [];
+            var self = this;
+            for (var i = 0; i < mounts.length; i++) {
+                var m = mounts[i];
+                if (!m || !m.meta || !m.meta.declared) continue;
+                if (this._laneCheckers[m.mountId]) continue;                      // keep its seen-set across remounts
+                try {
+                    var client = await this._laneClientFor(m.mountId);
+                    this._laneCheckers[m.mountId] = new SGAppendChecker(client, {
+                        emit: (function (mount) {
+                            return function (name, payload) {
+                                self._pushHostEvent(name, Object.assign({ mount: mount.prefix, mountId: mount.mountId }, payload || {}));
+                            };
+                        })(m)
+                    }, function () {
+                        return { enabled: AppHostEvents.allows(self._hostEvents, 'append.new-messages'), auto_fetch: false };
+                    });
+                } catch (err) {
+                    this._emitVaultEvent('append-lane-skipped', { label: 'Append lane skipped: ' + (m.prefix || m.mountId), mountId: m.mountId, err: (err && (err.code || err.message)) || 'error' });
+                }
+            }
+        }
+
         _scheduleAppendCheck(delayMs, trigger) {
-            if (!this._appendChecker) return;
+            var hasLanes = !!(this._laneCheckers && Object.keys(this._laneCheckers).length);
+            if (!this._appendChecker && !hasLanes) return;
             var DEBOUNCE_MS = 1000;
             var since = Date.now() - (this._lastAppendCheckTime || 0);
             var wait  = Math.max(delayMs || 0, DEBOUNCE_MS - since);
@@ -692,6 +728,8 @@
             this._appendCheckTimer = setTimeout(() => {
                 this._lastAppendCheckTime = Date.now();
                 if (this._appendChecker) this._appendChecker.check(label);
+                var lanes = this._laneCheckers || {};
+                Object.keys(lanes).forEach(function (id) { try { lanes[id].check(label); } catch (_) {} });
             }, Math.max(0, wait));
         }
 
@@ -846,6 +884,31 @@
         // Make `appJson` the active app manifest — its permissions, host_events, consent identity
         // and title govern the running app. Used when a folder app.json takes over from the root.
         async _setActiveManifest(appJson) {
+            // A folder app.json REPLACES the root manifest wholesale — AppNavHelpers
+            // .resolveFolderManifest does Object.assign({}, folderJson), so nothing is
+            // inherited. Grants declared at the vault root then stop applying, silently, and
+            // the app fails with a bare "Permission denied" that points nowhere near the
+            // cause. Say so once, loudly, naming the groups that were dropped.
+            try {
+                var rootPerms   = (this._appJson && this._appJson.permissions) || null;
+                var folderPerms = (appJson       && appJson.permissions)       || null;
+                if (rootPerms && appJson !== this._appJson) {
+                    var dropped = Object.keys(rootPerms).filter(function (k) {
+                        return !folderPerms || !(k in folderPerms);
+                    });
+                    if (dropped.length) {
+                        var msg = 'This folder\'s app.json replaces the vault-root manifest, so these root '
+                                + 'permission groups no longer apply: ' + dropped.join(', ')
+                                + '. Re-declare them in the folder app.json if the app needs them.';
+                        console.warn('[app-shell] ' + msg);
+                        this._emitVaultEvent('app-json-permissions-dropped', { label: 'Root permissions dropped by folder app.json', dropped: dropped });
+                        var hudEl = document.getElementById('app-hud') || document.querySelector('app-hud');
+                        if (hudEl && typeof hudEl.showMessage === 'function') {
+                            try { hudEl.showMessage('permissions', msg, 'warn', 10000); } catch (_) {}
+                        }
+                    }
+                }
+            } catch (_) {}
             this._appJson = appJson;
             this._perm    = AppPermissions.parsePermissions(appJson);
             this._appId   = '';
@@ -1153,10 +1216,11 @@
         // the vault key (reads), the embedded token upgrades to writes. The token is NEVER in the
         // URL. A vault without this file opens read-only from a key-only link (today's behaviour).
         async _readEmbeddedAccessToken(vault) {
+            // ONE implementation (SGVault.readEmbeddedAccessToken) shared with /vault and the
+            // child kernel; the inline copy below only serves vault-likes that lack it.
+            if (vault && typeof vault.readEmbeddedAccessToken === 'function') return vault.readEmbeddedAccessToken();
             try {
-                // `.vault` is a lazy sub-tree after open (listFolder returns [] until expanded),
-                // so expand it on demand before reading — otherwise the token is missed and the
-                // app opens read-only despite the embedded token being present.
+                if (!vault) return null;
                 if (vault.needsLoading && vault.needsLoading('/.vault')) {
                     await vault.loadSubTreeOnDemand('/.vault');
                 }
@@ -1239,6 +1303,39 @@
             });
             this._appendVaultId = vault._vaultId;
             return this._append;
+        }
+
+        // Lane client for a DECLARED mount: an SGAppend bound to the CHILD's vault id and enum
+        // key, derived from the credential the parent already resolved for that mount. Lazy
+        // and cached per mountId. The child vault is never opened (MountLanes derives keys
+        // from the credential string alone), and no write key is carried — purge/configure
+        // are parent-only by construction, not just by gate. Runtime (sg.vault.mount) mounts
+        // are refused: an app-chosen mount is not an owner declaration, and the declared
+        // path is the trust anchor here (07 Sep analysis §6, "declared mounts are top-kernel-only").
+        async _laneClientFor(mountId) {
+            if (!this._laneClients) this._laneClients = {};
+            if (this._laneClients[mountId]) return this._laneClients[mountId];
+            var m = this._mounts && this._mounts.get(mountId);
+            if (!m)                                     throw Object.assign(new Error('no such mount: ' + mountId), { code: 'ENOENT' });
+            if (!m.meta || !m.meta.declared)            throw Object.assign(new Error('append lanes cross only DECLARED mounts (owner *.link.json), not runtime mounts'), { code: 'ENOLANE' });
+            if (typeof MountLanes === 'undefined' || typeof SGAppend === 'undefined' || typeof SGVaultCrypto === 'undefined') {
+                throw Object.assign(new Error('append transport unavailable'), { code: 'ENOTRANSPORT' });
+            }
+            var spec  = (this._declaredSpecs || []).find(function (d) { return d.ref === m.ref; }) || null;
+            var creds = await this._resolveChildCredentials(m.ref);
+            var bind  = await MountLanes.laneBinding(creds, spec && spec.vaultId, SGVaultCrypto);
+            if (!bind) throw Object.assign(new Error('no read credential for mount ' + (m.prefix || mountId) + ' — the lane cannot be derived'), { code: 'ENOLANE' });
+            var vault    = this._vault;
+            var sgSend   = (vault && vault._sgSend) || null;
+            var endpoint = (sgSend && sgSend.endpoint)
+                || (window.SG_ENDPOINT
+                    || (function () { try { return sessionStorage.getItem('sg-vault-endpoint'); } catch (_) { return null; } })()
+                    || 'https://dev.send.sgraph.ai');
+            var enumKey = await SGAppend.deriveEnumKey(bind.readKeyBytes);
+            var client  = new SGAppend({ endpoint: endpoint, vaultId: bind.vaultId, enumKey: enumKey, writeKeyHex: null, accessToken: null });
+            client._laneMount = { mountId: mountId, prefix: m.prefix, tier: bind.tier };
+            this._laneClients[mountId] = client;
+            return client;
         }
 
         // ── Release channels ("pin a version") ─────────────────────────────────────────
@@ -1959,8 +2056,14 @@
             // (no allow-same-origin), so VivCustody classifies App-A as 'null-origin' and
             // the gate no longer refuses parent-held mounts (null-origin App-A cannot read
             // the parent's secrets — that was the whole point of the coupling rule).
-            var sandboxSpec = (this._iframeEl && this._iframeEl.getAttribute && this._iframeEl.getAttribute('sandbox')) || null;
-            var appOrigin   = VivCustody.classifyAppFrameOrigin(sandboxSpec);
+            // Evaluated at each gate (a function): declared mounts register just BEFORE the
+            // app iframe exists, so classify the sandbox the frame is ABOUT to get
+            // (_appSandbox()) when there is no element yet, and the live element after.
+            var appOrigin = function () {
+                var spec = (self._iframeEl && self._iframeEl.getAttribute && self._iframeEl.getAttribute('sandbox'))
+                        || (typeof self._appSandbox === 'function' ? self._appSandbox() : null);
+                return VivCustody.classifyAppFrameOrigin(spec);
+            };
             // Synthetic-only escape hatch. NEVER set this for real-data trials. The
             // pack §05 invariant is fail-closed by design; this is the one named opt-in.
             var unsafeOk = (window.SG_VIV_ALLOW_UNSAFE_SYNTHETIC === true);
@@ -2039,22 +2142,43 @@
             var iframe = document.createElement('iframe');
             iframe.sandbox = 'allow-scripts';            // null origin
             iframe.style.cssText = 'display:none;';      // headless mount; visible UI mounts are Phase 5
+            // srcdoc navigation is asynchronous: the moment the element is in the DOM its
+            // contentWindow is the initial about:blank document, so a port posted before
+            // `load` reaches a window with no listener and the boot hangs forever (the
+            // broker entry stayed 'pending' — found by the declared-mounts browser e2e).
+            // Arm the load promise BEFORE setting srcdoc, wait for it, then bootstrap.
+            var loaded = new Promise(function (resolve) { iframe.addEventListener('load', resolve, { once: true }); });
             iframe.srcdoc = KERNEL_SHELL_HTML;
             document.body.appendChild(iframe);
 
             var channel;
             try {
-                channel = await SecureChannel.create(iframe, { sensitiveKey: true, cid: 'ch-' + ref });
+                await Promise.race([loaded, new Promise(function (_, reject) {
+                    setTimeout(function () { reject(Object.assign(new Error('child kernel load timeout'), { code: 'EUNREACH' })); }, 10000);
+                })]);
+                channel = await SecureChannel.create(iframe, { sensitiveKey: true, cid: 'ch-' + ref, timeoutMs: 10000 });
                 // M5: tell the child WHICH server to hit — its own Edge 1. Without this the
                 // child falls back to the hardcoded dev endpoint regardless of where we are.
                 await channel.send('secrets', {
                     vaultKey:    creds.vaultKey,
                     accessToken: creds.accessToken || null,
-                    endpoint:    this._sendEndpoint()
+                    endpoint:    this._sendEndpoint(),
+                    // Per-parent clone branch in the child (07 Sep §6.3): two parents mounting the
+                    // same child must not share one clone ref. HMAC-derived — the parent id never
+                    // appears on the server. Label/kind feed the child's Via-Mount commit trailer.
+                    cloneBranch: 'viv:' + ((this._vault && this._vault._vaultId) || 'top'),
+                    mountLabel:  creds.label || ref,
+                    mountKind:   creds.kind  || 'runtime'
                 }, { sensitive: true });
                 await new Promise(function (resolve, reject) {
                     var t = setTimeout(function () { reject(Object.assign(new Error('child kernel boot timeout'), { code: 'EUNREACH' })); }, 10000);
                     channel.on('ready', function (p) { clearTimeout(t); resolve(p); });
+                    // The child reports a failed boot (vault open, policy read…) instead of
+                    // leaving the parent to time out: fail fast with the real cause.
+                    channel.on('boot-error', function (p) {
+                        clearTimeout(t);
+                        reject(Object.assign(new Error('child kernel boot failed: ' + ((p && p.message) || 'unknown')), { code: (p && p.code) || 'EUNREACH' }));
+                    });
                 });
             } catch (err) {
                 if (channel) { try { channel.close(); } catch (_) {} }
@@ -2068,12 +2192,62 @@
 
         async _mountChildVault(opts) {
             var kp = this._ensureKernelParent();
-            return kp.mount({ prefix: opts.prefix, ref: opts.ref, label: opts.label });
+            return kp.mount({ prefix: opts.prefix, ref: opts.ref, label: opts.label, meta: opts.meta || {} });
         }
 
-        async _unmountChildVault(mountId) {
+        // Declared mounts (07 Sep analysis §5): every `<name>.link.json` the OWNER put in the
+        // vault becomes an ordinary KernelParent mount before the app runs, so the app reads
+        // and writes `/<name>/…` without ever calling sg.vault.mount — it has no idea the path
+        // is another vault. Register eager (the path resolves from the first bridge call),
+        // spawn lazy (no child kernel until first use). Idempotent per vault. Never fatal: a
+        // link with no resolvable credentials stays a read-only composite link exactly as
+        // before. Top-kernel only by construction — child kernels run kernel-bootstrap, not
+        // this shell, so a child never auto-mounts (no cycles, non-transitive reach holds).
+        async _mountDeclaredVaults() {
+            if (this._declaredMountsDone) return this._declaredMountsResult || [];
+            this._declaredMountsDone = true;
+            var out = [];
+            if (typeof DeclaredMounts === 'undefined' || typeof VaultLinks === 'undefined') return out;
+            if (!this._dataSource || !this._vault) return out;
+            var self = this, specs = [];
+            try {
+                specs = await DeclaredMounts.scan(this._dataSource.getFileList(), function (p) { return self._dataSource.getFileBytes(p); });
+            } catch (_) { specs = []; }
+            if (!specs.length) return out;
+            this._declaredSpecs = specs;
+            var kp = null;
+            try { kp = this._ensureKernelParent(); } catch (_) { return out; }
+            for (var i = 0; i < specs.length; i++) {
+                var spec = specs[i];
+                if (spec.duplicateOf) {
+                    // Same child already declared at another path in THIS vault — one mount per child.
+                    this._emitVaultEvent('declared-mount-skipped', { label: 'Declared mount skipped (duplicate child): ' + spec.prefix, prefix: spec.prefix, ref: spec.ref, err: 'EEXIST', duplicateOf: spec.duplicateOf });
+                    continue;
+                }
+                try {
+                    var res = await kp.mount({ prefix: spec.prefix, ref: spec.ref, label: spec.label, lazy: true,
+                                               meta: { declared: true, linkPath: spec.linkPath } });
+                    // The broker's per-mount 'ask' is for RUNTIME mounts an app requested itself.
+                    // A declared mount is the owner's decision, the app's grant on that prefix is
+                    // still checked by _can, the app-level consent flow (fs.write 'once'…) still
+                    // runs, and the child's own policy still gates every op. A second prompt naming
+                    // a mount id would only reveal the mount the design hides. → auto.
+                    ['fs.read', 'fs.write', 'fs.delete', 'fs.mkdir', 'fs.move'].forEach(function (cap) {
+                        try { kp.broker.setPolicy(res.mountId, cap, 'auto'); } catch (_) {}
+                    });
+                    out.push({ prefix: spec.prefix, ref: spec.ref, mountId: res.mountId, access: res.access });
+                    this._emitVaultEvent('declared-mount', { label: 'Declared mount ' + spec.prefix + ' (' + res.access + ')', prefix: spec.prefix, ref: spec.ref, access: res.access });
+                } catch (err) {
+                    this._emitVaultEvent('declared-mount-skipped', { label: 'Declared mount skipped: ' + spec.prefix, prefix: spec.prefix, ref: spec.ref, err: (err && (err.code || err.message)) || String(err) });
+                }
+            }
+            this._declaredMountsResult = out;
+            return out;
+        }
+
+        async _unmountChildVault(mountId, opts) {
             if (!this._kernelParent) return { unmounted: false };
-            var res = await this._kernelParent.unmount(mountId);
+            var res = await this._kernelParent.unmount(mountId, opts || {});
             // Tear down the iframe stashed on the channel (DOM cleanup KernelParent can't do).
             try {
                 var iframe = res && res.channel && res.channel._mountIframe;
@@ -2087,13 +2261,34 @@
             return this._kernelParent.list();
         }
 
-        // Trial-only stub. The clinic vault's app.json + an owner record (clinic.json)
-        // can provide child credentials. Real production: Kernel-A holds them
-        // (port-transfer model — architect pack §3 "Cleaner future variant").
-        // Resolved creds are tagged custody:'parent-held' so the B10 gate can refuse
-        // the unsafe combination (this resolver + a same-origin App-A) by default.
+        // Production credential resolver for a mount ref (07 Sep analysis §5.2). Order:
+        //   1. owner-secret store (.vault/owner/secrets/<ref>, parent WRITE-key tier) → full key → rw
+        //   2. ro-links record   (.vault/owner/ro-links.json, parent READ-key tier)  → read cred → ro
+        //   3. a key saved on this device (VaultLinks localStorage)                    → full key → rw
+        //   4. the clinic.json trial stub (kept for the synthetic trial)
+        // In a read-only parent session step 1 cannot decrypt and falls through to 2 —
+        // never throws, never opens rw. The pure ordering lives in DeclaredMounts so it is
+        // unit-tested; this method only wires the sources.
         async _resolveChildCredentials(ref) {
             if (this._resolveChildCredentialsImpl) return this._resolveChildCredentialsImpl(ref);
+            var self = this;
+            if (typeof DeclaredMounts !== 'undefined') {
+                var spec    = (this._declaredSpecs || []).find(function (d) { return d.ref === ref; }) || null;
+                var vaultId = spec ? spec.vaultId : null;
+                return DeclaredMounts.resolveCredentials(ref, vaultId, {
+                    ownerSecret: function (r)   { return self._ownerSecretGet(String(r)); },
+                    roRecord:    function (r)   { return (typeof VaultLinks !== 'undefined') ? VaultLinks.resolveRef(self._vault, r) : null; },
+                    storedKey:   function (vid) { return (typeof VaultLinks !== 'undefined') ? VaultLinks.getStoredChildKey(vid) : null; },
+                    legacy:      function (r)   { return self._resolveChildCredentialsLegacy(r); }
+                });
+            }
+            return this._resolveChildCredentialsLegacy(ref);
+        }
+
+        // Trial-only stub (pre-07-Sep behaviour): clinic.json in the vault tree, PLAINTEXT
+        // credentials. Now the LAST fallback, kept only so the synthetic clinic trial keeps
+        // working. Tagged custody:'parent-held' so the B10 gate applies.
+        async _resolveChildCredentialsLegacy(ref) {
             try {
                 var bytes = await this._dataSource.getFileBytes('clinic.json');
                 var clinic = JSON.parse(new TextDecoder().decode(bytes));
@@ -2323,6 +2518,7 @@
             // Dropping `allow-same-origin` means app code can no longer read
             // localStorage / window.parent / ambient-fetch vault paths; every vault
             // access goes through the postMessage bridge (sg.*), which never needed it.
+            await this._mountDeclaredVaults();         // owner-declared sub-vaults, before the app frame can send a message
             var iframe         = document.createElement('iframe');
             iframe.sandbox     = this._appSandbox();
             iframe.style.cssText = 'border:none;width:100%;height:100%;display:block;flex:1;';
@@ -2401,6 +2597,7 @@
             });
 
             // Phase 3: null-origin frame — srcdoc, no allow-same-origin (see _mountApp).
+            await this._mountDeclaredVaults();         // owner-declared sub-vaults, before the app frame can send a message
             var iframe         = document.createElement('iframe');
             iframe.sandbox     = this._appSandbox();
             iframe.style.cssText = 'border:none;width:100%;height:100%;display:block;flex:1;';
@@ -2455,6 +2652,7 @@
                 var htmlText  = new TextDecoder().decode(htmlBytes);
                 var injected  = AppFrameBootstrap.build({ kind: 'html', htmlText: htmlText, bridgeScript: bridgeScript });
                 // Phase 3: null-origin frame — srcdoc, no allow-same-origin (see _mountApp).
+                await this._mountDeclaredVaults();
                 var iframe         = document.createElement('iframe');
                 iframe.sandbox     = this._appSandbox();
                 iframe.style.cssText = 'border:none;width:100%;height:100%;display:block;flex:1;';
@@ -2496,6 +2694,7 @@
                 });
 
                 // Phase 3: null-origin frame — srcdoc, no allow-same-origin (see _mountApp).
+                await this._mountDeclaredVaults();
                 var iframe         = document.createElement('iframe');
                 iframe.sandbox     = this._appSandbox();
                 iframe.style.cssText = 'border:none;width:100%;height:100%;display:block;flex:1;';
@@ -2856,6 +3055,19 @@
         }
 
         _buildVfsBridgeScript(currentPath) {
+            // Every runtime value spliced into the bridge lands inside a <script> in a srcdoc
+            // document. JSON.stringify is a valid JS literal but NOT HTML-safe: a value holding
+            // '</script>' closes the bridge early, kills every sg.* call, and runs whatever
+            // follows. vaultName and release.label are owner-authored free text, so escape
+            // the one sequence the HTML parser cares about (and the two JS line terminators
+            // JSON leaves raw). Confirmed by test: a label of '</script>' used to yield three
+            // raw closers in the built bridge instead of one.
+            var _jsLit = function (v) {
+                return JSON.stringify(v === undefined ? null : v)
+                    .replace(/<\//g, '<\\/')
+                    .replace(/\u2028/g, '\\u2028')
+                    .replace(/\u2029/g, '\\u2029');
+            };
             // EFFECTIVE writability — match what the bridge ACTUALLY enforces (and what the
             // SG/Vault editor preview reports via send-browse). Two distinct gates:
             //   • this._writable      = read_key tier: do we have a full key (not an ro-token)?
@@ -2865,6 +3077,18 @@
             // as TRUE; the app then tried to write, the host rejected, and the user saw a
             // red "Read-only vault" error — exactly the parity bug vs the Vault UI preview.
             var writable  = !!(this._writable && this._dataSource && this._dataSource.writable);
+            // Release pin, surfaced read-only to the app (see sg.app.pinned / sg.app.release).
+            // this._release is SGReleases.resolve()'s result: {live, name, commit, label, ...},
+            // or null when the vault publishes no releases at all — both mean "not pinned".
+            var releaseInfo = { pinned: false, release: null };
+            try {
+                if (this._release && this._release.live === false) {
+                    releaseInfo.pinned  = true;
+                    releaseInfo.release = { name  : this._release.name  || null,
+                                            label : this._release.label || null,
+                                            commit: this._release.commit || null };
+                }
+            } catch (_) {}
             // External-link handling (Options C/D). When the app has the externalLinks grant,
             // its sandbox carries allow-popups-to-escape-sandbox, so links open in-frame via
             // window.open (frictionless). Without it, links are posted to the host for a
@@ -2913,9 +3137,9 @@
                 // The frame also logs it itself, prefixed, because the browser's own uncaught
                 // error line says nothing about WHOSE code threw — and a syntax error in an
                 // app's script reads exactly like a fault in the vault to anyone debugging.
-                'function _sgAppErr(msg){try{console.error("[vault-app] " + ' + JSON.stringify(currentPath) +
+                'function _sgAppErr(msg){try{console.error("[vault-app] " + ' + _jsLit(currentPath) +
                   ' + " — this error is from the APP\'s own JavaScript, not the vault platform:\\n" + msg);}catch(_){}' +
-                  'try{window.parent.postMessage({type:"sg-app-error",message:msg,appPath:' + JSON.stringify(currentPath) + '},"*");}catch(_){}}' +
+                  'try{window.parent.postMessage({type:"sg-app-error",message:msg,appPath:' + _jsLit(currentPath) + '},"*");}catch(_){}}' +
                 'window.onerror=function(m,s,l,c){_sgAppErr(String(m)+(l?" (line "+l+(c?":"+c:"")+")":""));return false;};' +
                 'window.addEventListener("unhandledrejection",function(e){var r=e&&e.reason;_sgAppErr("Unhandled rejection: "+String((r&&r.message)||r));});' +
 
@@ -3054,7 +3278,10 @@
                       'payload[type]=id;' +
                       'var rk=type==="__sgVfsWriteReq"?"__sgVfsWriteReply":"__sgVfsListReply";' +
                       'function h(e){if(!e.data||e.data[rk]!==id)return;window.removeEventListener("message",h);' +
-                        'if(e.data.ok)res(e.data);else rej(new Error(e.data.err||"VFS error"));}' +
+                        'if(e.data.ok){res(e.data);return;}' +
+                        'var er=new Error(e.data.err||"VFS error");' +
+                        'var c=e.data.code||(/^E[A-Z0-9]+$/.test(e.data.err||"")?e.data.err:null);' +   // ENOENT arrives in `err`
+                        'if(c)er.code=c;rej(er);}' +
                       'window.addEventListener("message",h);window.parent.postMessage(payload,"*");' +
                     '});' +
                   '}' +
@@ -3078,7 +3305,8 @@
                       'var id=(Math.random()*1e9|0).toString(36)+Date.now().toString(36);' +
                       'function h(e){if(!e.data||e.data.__sgVfsReadReply!==id)return;window.removeEventListener("message",h);' +
                         'if(e.data.ok)res(e.data.buf);' +
-                        'else rej(new Error(e.data.err==="ENOENT"?"No such file: "+e.data.path:(e.data.err||"Read failed")));' +
+                        'else{var er=new Error(e.data.err==="ENOENT"?"No such file: "+e.data.path:(e.data.err||"Read failed"));' +
+                        'var c=e.data.code||(e.data.err==="ENOENT"?"ENOENT":null);if(c)er.code=c;rej(er);}' +
                       '}' +
                       'window.addEventListener("message",h);window.parent.postMessage({__sgVfsReadReq:id,path:path},"*");' +
                     '});' +
@@ -3105,7 +3333,14 @@
                       'var id=(Math.random()*1e9|0).toString(36)+Date.now().toString(36);' +
                       'payload.__sgCmdId=id;payload.__sgCmdType=cmdType;' +
                       'function h(e){if(!e.data||e.data.__sgCmdReply!==id)return;window.removeEventListener("message",h);' +
-                        'if(e.data.ok)res(e.data.result);else rej(new Error(e.data.err||"Command failed"));}' +
+                        // cmdReply has always sent a `code`; it used to be dropped here, so every
+                        // bridge error reached the app as a bare Error with no enumerable keys and
+                        // apps had to string-match `message`. Carry it (and any HTTP status) across.
+                        'if(e.data.ok){res(e.data.result);return;}' +
+                        'var er=new Error(e.data.err||"Command failed");' +
+                        'if(e.data.code)er.code=e.data.code;' +
+                        'if(e.data.status!=null)er.status=e.data.status;' +
+                        'rej(er);}' +
                       'window.addEventListener("message",h);window.parent.postMessage(payload,"*");' +
                     '});' +
                   '}' +
@@ -3185,9 +3420,9 @@
                     'append:{' +
                       'configure:function(o){o=o||{};return _sgCmd("append",{action:"configure",append_anchors:o.append_anchors});},' +
                       'write:function(o){o=o||{};return _sgCmd("append",{action:"write",vault_id:o.vault_id,append_token:o.append_token,payload:o.payload});},' +
-                      'list:function(o){o=o||{};return _sgCmd("append",{action:"list",inbox:o.inbox,after_file_id:o.after_file_id,limit:o.limit,include_content:o.include_content});},' +
-                      'fetch:function(o){o=o||{};return _sgCmd("append",{action:"fetch",inbox:o.inbox,file_ids:o.file_ids});},' +
-                      'markProcessed:function(o){o=o||{};return _sgCmd("append",{action:"markProcessed",inbox:o.inbox,file_ids:o.file_ids});},' +
+                      'list:function(o){o=o||{};return _sgCmd("append",{action:"list",inbox:o.inbox,after_file_id:o.after_file_id,limit:o.limit,include_content:o.include_content,path:o.path});},' +
+                      'fetch:function(o){o=o||{};return _sgCmd("append",{action:"fetch",inbox:o.inbox,file_ids:o.file_ids,path:o.path});},' +
+                      'markProcessed:function(o){o=o||{};return _sgCmd("append",{action:"markProcessed",inbox:o.inbox,file_ids:o.file_ids,path:o.path});},' +
                       'purge:function(o){o=o||{};return _sgCmd("append",{action:"purge",folder:o.folder,inbox:o.inbox,file_ids:o.file_ids});}' +
                     '},' +
                     // sg.on / sg.off — kernel→app events (see the _sgEvtH registry above).
@@ -3206,11 +3441,18 @@
                       // inline preview should set 'preview' so apps can feature-detect deliberately
                       // (cross-repo parity work — see brief v0.33.5__brief__vault-preview-app-parity).
                       'context:"app",' +
-                      'selfPath:'  + JSON.stringify(currentPath) + ',' +
+                      'selfPath:'  + _jsLit(currentPath) + ',' +
                       'writable:'  + (writable  ? 'true' : 'false') + ',' +
-                      'vaultName:' + JSON.stringify(vaultName) + ',' +
-                      'vaultId:'   + JSON.stringify(vaultId)   + ',' +
+                      'vaultName:' + _jsLit(vaultName) + ',' +
+                      'vaultId:'   + _jsLit(vaultId)   + ',' +
                       'fileCount:' + fileCount + ',' +
+                      // Which version the app is running as. `.vault/releases.json` is inside the
+                      // permission floor, so an app cannot read it and previously had no way to tell
+                      // it was mounted from a pinned commit rather than HEAD — the one fact that
+                      // explains "I pushed a new app.json and nothing changed", and a pinned mount is
+                      // read-only for everyone, owner included. Read-only mirror of the host's state.
+                      'pinned:'    + (releaseInfo.pinned ? 'true' : 'false') + ',' +
+                      'release:'   + _jsLit(releaseInfo.release)     + ',' +
                       'totalSize:0' +
                     '},' +
                     'sync:{' +
@@ -3318,7 +3560,7 @@
                   // The resolved path is sent to the parent via _read() which postMessages
                   // {__sgVfsReadReq, path} — this call will appear in the Bridge debug tab.
                   '(function(){' +
-                    'var _hd=' + JSON.stringify(htmlDir) + ';' +
+                    'var _hd=' + _jsLit(htmlDir) + ';' +
                     'function _rp(b,r){if(!b)return r;var p=(b+r).split("/"),o=[];' +
                       'for(var i=0;i<p.length;i++){if(p[i]==="..")o.pop();' +
                       'else if(p[i]!=="."&&p[i]!=="")o.push(p[i]);}return o.join("/");}' +
@@ -3355,7 +3597,10 @@
                     '}catch(e){console.warn("[sg-vfs] img.src patch failed:",e.message);}' +
                   '})();' +
 
-                  'console.log("[sg-vfs] ready | writable=' + (writable ? 'true' : 'false') + ' | vaultName=' + vaultName.replace(/'/g, "\\'") + ' | page: /en-gb/app");' +
+                  // The name is spliced into a double-quoted literal, so escaping only the single
+                  // quote left `"` and newlines as syntax errors that took the whole bridge down —
+                  // every app in a vault named `Q3 "final"` died on mount. Emit it as a JS literal.
+                  'console.log("[sg-vfs] ready | writable=' + (writable ? 'true' : 'false') + ' | vaultName=" + ' + _jsLit(vaultName) + ' + " | page: /en-gb/app");' +
                 '})();' +
               '})();<\/script>';
         }
@@ -3464,7 +3709,7 @@
                     function wReply(ok, payload) {
                         try { writeSrc.postMessage(Object.assign({ __sgVfsWriteReply: writeId, ok: ok }, payload), '*'); } catch (_) {}
                     }
-                    if (!dataSource.writable) { wReply(false, { err: 'Read-only vault' }); return; }
+                    if (!dataSource.writable) { wReply(false, { err: 'Read-only vault', code: 'EREADONLY' }); return; }   // the code AUTHORING.md/skill already promise
                     var wBytes;
                     try {
                         var bin = atob(e.data.data || '');
@@ -3626,8 +3871,8 @@
                     // `code` is optional and carries a machine-readable error class
                     // (EPERM / ECONSENT / ENOKEY / EBUDGET / EMODEL / EABORT / EPROTO) so an
                     // app can branch on the reason instead of string-matching a message.
-                    function cmdReply(ok, result, errMsg, code) {
-                        try { cmdSrc.postMessage({ __sgCmdReply: cmdId, ok: ok, result: result || null, err: errMsg || null, code: code || null }, '*'); } catch (_) {}
+                    function cmdReply(ok, result, errMsg, code, status) {         // status: HTTP status when the transport saw one (else omitted)
+                        try { cmdSrc.postMessage({ __sgCmdReply: cmdId, ok: ok, result: result || null, err: errMsg || null, code: code || null, status: (status == null ? null : status) }, '*'); } catch (_) {}
                     }
                     var vault    = self._vault;
                     var endpoint = (window.SG_ENDPOINT
@@ -3663,11 +3908,42 @@
                         var ibAct = e.data.action;
                         var ibCap = { configure: 'append.configure', write: 'append.write', list: 'append.list',
                                       fetch: 'append.read', markProcessed: 'append.markProcessed', purge: 'append.purge' }[ibAct];
-                        if (!ibCap) { cmdReply(false, null, 'Unknown append action: ' + ibAct); return; }
-                        if (!self._can(ibCap, '')) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('append.' + ibAct, { ok: false, err: 'EPERM' }); return; }
+                        if (!ibCap) { cmdReply(false, null, 'Unknown append action: ' + ibAct, 'ENOSYS'); return; }
+                        if (!self._can(ibCap, '')) {
+                            // Name the grant that is missing. 'Permission denied' alone sent one
+                            // integrator hunting a read-only gate that does not exist on this branch
+                            // (there is no writable check here — the grant is the only gate).
+                            cmdReply(false, null, 'Permission denied: app.json needs "permissions": { "append": { "'
+                                     + ibCap.slice(7) + '": true } }', 'EPERM');
+                            self._emitBridgeCall('append.' + ibAct, { ok: false, err: 'EPERM' }); return;
+                        }
                         var ibData = e.data;
-                        self._getAppendClient().then(function (inbox) {
-                            if (!inbox) throw new Error('append transport unavailable');
+                        // `path` — drain ANOTHER vault's lane: the path must sit under a DECLARED
+                        // mount (an owner-declared *.link.json, never a runtime sg.vault.mount),
+                        // and only the read verbs cross (owner verbs need the child's write key,
+                        // which the lane binding never carries). The parent holds the child's
+                        // credential already; the read key IS the enum key, so this grants the
+                        // app nothing the parent could not compute. See MountLanes.
+                        var ibPath   = (ibData.path != null && ibData.path !== '') ? String(ibData.path) : null;
+                        var clientP;
+                        if (ibPath) {
+                            if (typeof MountLanes === 'undefined' || !MountLanes.allowsVerb(ibAct)) {
+                                cmdReply(false, null, ibAct + ' cannot target a mounted vault — owner verbs (purge/configure) stay on the open vault', 'EPERM');
+                                self._emitBridgeCall('append.' + ibAct, { ok: false, err: 'EPERM', path: ibPath }); return;
+                            }
+                            var hit = self._mounts ? self._mounts.resolve(ibPath) : null;
+                            if (!hit) {
+                                cmdReply(false, null, 'No mounted vault at ' + ibPath, 'ENOENT');
+                                self._emitBridgeCall('append.' + ibAct, { ok: false, err: 'ENOENT', path: ibPath }); return;
+                            }
+                            clientP = self._laneClientFor(hit.mount.mountId);
+                        } else {
+                            clientP = self._getAppendClient();
+                        }
+                        clientP.then(function (inbox) {
+                            if (!inbox) {                                        // SGAppend absent, or no vault open
+                                throw Object.assign(new Error('append transport unavailable'), { code: 'ENOTRANSPORT' });
+                            }
                             switch (ibAct) {
                                 case 'configure':     return inbox.configure({ append_anchors: ibData.append_anchors });
                                 case 'write':         return inbox.write({ vault_id: ibData.vault_id, append_token: ibData.append_token, payload: ibData.payload });
@@ -3679,7 +3955,7 @@
                         }).then(function (r) {
                             cmdReply(true, r); self._emitBridgeCall('append.' + ibAct, { ok: true });
                         }).catch(function (err) {
-                            cmdReply(false, null, (err && err.message) || String(err));
+                            cmdReply(false, null, (err && err.message) || String(err), (err && err.code) || 'EAPPEND', err && err.http);
                             self._emitBridgeCall('append.' + ibAct, { ok: false, err: (err && err.code) || (err && err.message) || 'error' });
                         });
                         return;
@@ -4060,6 +4336,37 @@
                     // ── vault lifecycle (create / unlink / delete) ────────────────
                     if (e.data.__sgCmdType === 'vault') {
                         var vAct  = e.data.action;
+                        // Read-only-safe actions FIRST. `notify` runs a lane check (a list on the
+                        // child's append lane) — it mutates nothing, and a parent opened with only
+                        // its read key still resolves child lanes through ro-links, so it must not
+                        // sit behind the writability gate the mutating verbs need.
+                        // sg.vault.notify(mountId, name, payload) — the C6 "peer wake". Documented
+                        // and permission-parsed since v0.33.5, but no host branch existed: every
+                        // call fell through to "Unsupported vault action". Semantics now: run the
+                        // named DECLARED mount's lane check immediately (the child kernel has no
+                        // checker of its own — see MountLanes). `name`/`payload` are accepted for
+                        // the documented signature and recorded, not forwarded anywhere.
+                        if (vAct === 'notify') {
+                            if (!self._can('vault.notify', '')) {
+                                cmdReply(false, null, 'Permission denied: app.json needs "permissions": { "vault": { "notify": true } }', 'EPERM');
+                                self._emitBridgeCall('vault.notify', { ok: false, err: 'EPERM' }); return;
+                            }
+                            var nId = String(e.data.mountId || '');
+                            var nM  = nId && self._mounts ? self._mounts.get(nId) : null;
+                            if (!nM) { cmdReply(false, null, 'No such mount: ' + nId, 'ENOENT'); self._emitBridgeCall('vault.notify', { mountId: nId, ok: false, err: 'ENOENT' }); return; }
+                            self._initLaneCheckers().then(function () {
+                                var ck = self._laneCheckers && self._laneCheckers[nId];
+                                if (!ck) { cmdReply(false, null, 'Mount ' + nId + ' has no derivable append lane', 'ENOLANE'); self._emitBridgeCall('vault.notify', { mountId: nId, ok: false, err: 'ENOLANE' }); return; }
+                                return Promise.resolve(ck.check('peer:' + String(e.data.name || 'notify'))).then(function () {
+                                    cmdReply(true, { mountId: nId, checked: true });
+                                    self._emitBridgeCall('vault.notify', { mountId: nId, ok: true });
+                                });
+                            }).catch(function (err) {
+                                cmdReply(false, null, (err && err.message) || String(err), (err && err.code) || 'EAPPEND');
+                                self._emitBridgeCall('vault.notify', { mountId: nId, ok: false, err: (err && err.code) || 'error' });
+                            });
+                            return;
+                        }
                         if (!dataSource.writable) { cmdReply(false, null, 'Read-only vault'); return; }   // EREADONLY
                         var vPath = AppPermissions.normalizePath(e.data.path || '');
                         if (vAct === 'create') {
@@ -4178,7 +4485,7 @@
                         }
                         if (vAct === 'unmount') {
                             var uMountId = String(e.data.mountId || '');
-                            self._unmountChildVault(uMountId)
+                            self._unmountChildVault(uMountId, { byApp: true })
                                 .then(function (res) { cmdReply(true, res); self._emitBridgeCall('vault.unmount', { mountId: uMountId, ok: true }); })
                                 .catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('vault.unmount', { mountId: uMountId, ok: false, err: err.message }); });
                             return;
