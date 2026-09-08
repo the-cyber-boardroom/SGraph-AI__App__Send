@@ -2,8 +2,10 @@
 /* =================================================================================
    probe_vault_ui_capabilities.mjs — "is the declared-mounts / child-kernel sync code live?"
 
-   Fetches the deployed vault UI's shipped JS and checks for the capability markers that
-   only exist in the 2026-09-07 change, plus the deployed build info and the API's health.
+   Fetches the deployed vault UI's shipped JS and checks two groups of capability markers —
+   A: the 2026-09-07 change (declared mounts + child-kernel sync discipline), B: the
+   2026-09-08 change (write receipts, fs.* through the mount, mount projection, relay
+   timeout) — plus the deployed build info and the API's health.
    Zero deps, read-only, no token needed.
 
      node scripts/probe_vault_ui_capabilities.mjs https://dev.vault.sgraph.ai https://dev.send.sgraph.ai
@@ -26,8 +28,8 @@ const UI  = (process.argv[2] || 'https://dev.vault.sgraph.ai').replace(/\/$/, ''
 const API = (process.argv[3] || 'https://dev.send.sgraph.ai').replace(/\/$/, '');
 const JS  = UI + '/_common/js';
 
-// [file, marker, what it proves]
-const MARKERS = [
+// [file, marker, what it proves] — group A: the 7 Sep change (declared mounts + sync discipline)
+const MARKERS_A = [
     ['/components/app-shell/kernel-app-handlers.js', "channel.handle('vfs.status'",  'vfs.status verb (child kernel)'],
     ['/components/app-shell/kernel-app-handlers.js', "channel.handle('vfs.sync'",    'vfs.sync verb (child kernel)'],
     ['/components/app-shell/kernel-app-handlers.js', 'async function _reconcile',    'reconcile-before-write'],
@@ -46,6 +48,25 @@ const MARKERS = [
     ['/components/app-shell/kernel-shell-bundle.js',   'async writeRefIfMatch',        'bundle carries the CAS ref manager'],
     ['/components/app-shell/viv-mounts-view.js',       'function syncTag',             'HUD Mounts tab sync column'],
 ];
+// group B: the 8 Sep change (receipts, fs.* through the mount, projection, relay timeout)
+const MARKERS_B = [
+    ['/components/app-shell/app-shell.js',             'commit_id:d.commit_id||null,published:!!d.published', 'write receipt reaches the app (commit_id, published)'],
+    ['/components/app-shell/app-shell.js',             "_pushHostEvent('vfs.published'", 'vfs.published host event after auto-push'],
+    ['/components/app-shell/app-shell.js',             '_listMountsForApps',           'sg.vault.mounts() returns the projection'],
+    ['/components/app-shell/app-shell.js',             "'EXDEV'",                      'cross-boundary move refused (EXDEV)'],
+    ['/components/app-shell/app-shell.js',             "'EUNDERPRIVILEGED')",          'delete across a mount → tier code, not EMOUNT_RO'],
+    ['/components/app-shell/app-shell.js',             'declared-mount-shadows-folder', 'shadow pre-flight event'],
+    ['/components/app-shell/app-shell.js',             'parentVaultId:',               'parent id sent to the child for the trailer'],
+    ['/components/app-shell/kernel-parent.js',         'listForApps()',                'KernelParent.listForApps projection'],
+    ['/components/app-shell/kernel-parent.js',         '_relayTimeoutMs',              'relay timeout (no hanging relays)'],
+    ['/components/app-shell/secure-channel.js',        'timed out after',              'SecureChannel.request({ timeoutMs })'],
+    ['/components/app-shell/kernel-app-handlers.js',   "channel.handle('vfs.move'",    'child vfs.move handler'],
+    ['/components/app-shell/kernel-app-handlers.js',   'function _receipt',            'child receipts on every mutation'],
+    ['/components/app-shell/kernel-bootstrap.js',      "' parent='",                   'Via-Mount trailer carries parent='],
+    ['/components/app-shell/kernel-shell-bundle.js',   "channel.handle('vfs.move'",    'bundle carries vfs.move + receipts'],
+];
+const GROUPS = [['A · 7 Sep — declared mounts + sync discipline', MARKERS_A], ['B · 8 Sep — receipts, fs.* through the mount, projection', MARKERS_B]];
+const MARKERS = MARKERS_A.concat(MARKERS_B);
 
 // Fetch → { text } | { error }. Never throws: the caller distinguishes an unreachable host
 // from a fetched-but-stale one, so a transport failure must stay visible as itself.
@@ -82,18 +103,23 @@ const health = await fetchText(API + '/api/info/health');
 console.log('API health         ' + (health.text ? health.text.trim().slice(0, 120) : '✗ ' + health.error));
 console.log('');
 
-// ── Capability markers ─────────────────────────────────────────────────────────────
+// ── Capability markers, per group ──────────────────────────────────────────────────
 let missing = 0, unreachable = 0;
-for (const [rel, marker, proves] of MARKERS) {
-    const body = await fileText(rel);
-    if (body.error) {
-        unreachable++;
-        console.log('  ? ' + proves.padEnd(52) + rel + '  (unreachable: ' + body.error + ')');
-        continue;
+for (const [title, list] of GROUPS) {
+    console.log(title);
+    let gm = 0;
+    for (const [rel, marker, proves] of list) {
+        const body = await fileText(rel);
+        if (body.error) {
+            unreachable++;
+            console.log('  ? ' + proves.padEnd(52) + rel + '  (unreachable: ' + body.error + ')');
+            continue;
+        }
+        const ok = body.text.includes(marker);
+        if (!ok) { missing++; gm++; }
+        console.log((ok ? '  ✓ ' : '  ✗ ') + proves.padEnd(52) + rel);
     }
-    const ok = body.text.includes(marker);
-    if (!ok) missing++;
-    console.log((ok ? '  ✓ ' : '  ✗ ') + proves.padEnd(52) + rel);
+    console.log('  → ' + (gm ? gm + ' missing' : 'all present') + '\n');
 }
 
 // ── Verdict ────────────────────────────────────────────────────────────────────────
@@ -110,9 +136,9 @@ if (unreachable) {
     process.exit(2);
 }
 if (missing) {
-    console.log(missing + ' marker(s) missing — the 2026-09-07 change is NOT (fully) live at ' + UI + '.');
+    console.log(missing + ' marker(s) missing — see the per-group lines above for WHICH change is not (fully) live at ' + UI + '.');
     console.log('An older build is deployed, or the deploy has not finished (CloudFront can lag a few minutes).');
     process.exit(1);
 }
-console.log('LIVE — declared mounts + child-kernel sync discipline are deployed at ' + UI + '.');
+console.log('LIVE — both changes (7 Sep declared mounts + sync discipline; 8 Sep receipts + fs.* through the mount) are deployed at ' + UI + '.');
 process.exit(0);

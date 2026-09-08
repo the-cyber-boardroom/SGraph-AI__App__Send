@@ -197,6 +197,15 @@
         }
     }
 
+    // Receipt fields for a mutation the app just made (S1, AppSec decision 09/08). The child
+    // kernel holds the commit id and knows the CAS publish outcome at this instant; before,
+    // both were discarded. `published` is true only when a push actually ran and returned —
+    // it witnesses THIS publish, not survival against a later blind push by another clone.
+    function _receipt(vault, extra) {
+        const published = !!(vault && typeof vault.push === 'function');
+        return Object.assign({ ok: true, commit_id: (vault && vault._headCommitId) || null, published }, extra);
+    }
+
     async function _safePush(vault, ds) {
         if (!vault || typeof vault.push !== 'function') return;
         const cas = _syncable(vault) && typeof vault.pushIfMatch === 'function';
@@ -291,7 +300,7 @@
             await ds.saveFile(dir, name, data);
             await _safePush(vault, ds);
             if (onUpdate) { try { onUpdate(path); } catch (_) {} }
-            return { ok: true, size: data.length, path };
+            return _receipt(vault, { size: data.length, path });
         });
 
         channel.handle('vfs.delete', async function (p) {
@@ -303,7 +312,31 @@
             await ds.deleteFile(dir, name);
             await _safePush(vault, ds);
             if (onUpdate) { try { onUpdate(path); } catch (_) {} }
-            return { ok: true, path };
+            return _receipt(vault, { path });
+        });
+
+        // Move / rename INSIDE this vault (S3). `to` is child-relative like `path`. The parent
+        // refuses cross-boundary moves before they get here (EXDEV) — a move between two
+        // vaults is a copy plus a delete on two stores and can only leave partial state.
+        channel.handle('vfs.move', async function (p) {
+            const from = p && p.path, to = p && p.to;
+            _gate('move', from, perm);
+            _gate('move', to,   perm);
+            if (!ds.writable) throw codeError('EREADONLY', 'Read-only vault');
+            if (typeof ds.renameFile !== 'function' || typeof ds.moveFile !== 'function') {
+                throw codeError('ENOSYS', 'move not supported by this data source');
+            }
+            await _reconcile(vault, ds);
+            const f = _splitPath(from), t = _splitPath(to);
+            if (f.dir === t.dir) {
+                await ds.renameFile(f.dir, f.name, t.name);
+            } else {
+                await ds.moveFile(f.dir, f.name, t.dir);
+                if (t.name !== f.name) await ds.renameFile(t.dir, f.name, t.name);
+            }
+            await _safePush(vault, ds);
+            if (onUpdate) { try { onUpdate(from); onUpdate(to); } catch (_) {} }
+            return _receipt(vault, { from, to });
         });
 
         channel.handle('vfs.mkdir', async function (p) {
@@ -314,7 +347,8 @@
             const target = path.charAt(0) === '/' ? path : '/' + path;
             await ds.createFolder(target);
             await _safePush(vault, ds);
-            return { ok: true, path };
+            if (onUpdate) { try { onUpdate(path); } catch (_) {} }
+            return _receipt(vault, { path });
         });
 
         // Parent-side visibility (KernelParent.status / sync). No app-level gate: these

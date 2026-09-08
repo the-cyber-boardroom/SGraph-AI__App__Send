@@ -113,6 +113,9 @@ child's identity).
 
 ![After saving, report.json appears under /data and the status reads "saved 62 bytes"](images/declared-mounts-e2e/02-owner-app-saved-report.png)
 
+Since 8 Sep the write resolves with a **receipt** — `{ path, size, commit_id, published: true }` —
+the child's commit id and the outcome of its compare-and-swap publish, which the kernel used to discard.
+
 `sg.vfs.write('data/report.json', bytes)` → top kernel: floor + app grant (`write: ['data/']`) →
 broker → custody gate → tier gate → relay → **child kernel**: floor + the child's own grant →
 `reconcile` (re-read the named ref; unchanged) → `saveFile` (commit on the `viv:<parent>` clone
@@ -167,7 +170,11 @@ that the child's head did not move.
 | `vfs.read` / `vfs.list` | throttled **refresh-before-read** (`REFRESH_MS`, default 5 s): re-read the named ref; if it moved and the view is clean, fast-forward (or reload, read-only) and notify `/` |
 | `vfs.write` / `delete` / `mkdir` | **reconcile-before-write**: re-read the named ref; moved → merge (FF or three-way); then mutate + commit; then **CAS push**. `ECAS` → reconcile + retry once → `EDIVERGED` |
 | `vfs.status` | `{ syncable, writable, head, named, serverHead, ahead, behind, diverged, lastPush, lastMerge, lastError, state }` — one ref read |
+| `vfs.move` (8 Sep) | reconcile-before-write; rename or move **inside** the child; receipt. The parent refuses cross-boundary moves with `EXDEV` before they get here |
 | `vfs.sync` | reconcile; publish anything a failed push left behind; notify `/`; return status + `changed` |
+
+`vfs.status` and `vfs.sync` are **kernel-internal** verbs (parent ↔ child). Apps never call them;
+apps get the write's receipt (`{ commit_id, published }`) and the `sg.vault.mounts()` projection.
 
 Parent side: `KernelParent.status(mountId)`, `sync(mountId)`, `syncAll()`; `list()` carries the last
 result as `sync`, rendered by the Mounts tab. `app-shell._checkBehind` (tab focus) calls `syncAll()`.

@@ -130,8 +130,23 @@
             const reply = new Promise((resolve, reject) => {
                 this._pending.set(id, { resolve, reject });
             });
-            await this._post({ type, payload, dir: 'down', id, enc: !!opts.sensitive });
-            return reply;
+            // opts.timeoutMs — a responder with no handler for `type` drops the envelope
+            // silently, so without this the promise never settles (found by the fs.move
+            // review: no child handler → the app's call would hang forever). On timeout the
+            // pending entry is removed so a late reply is ignored, not mis-delivered.
+            let timer = null;
+            const guarded = (opts.timeoutMs > 0)
+                ? Promise.race([reply, new Promise((_, reject) => {
+                    timer = setTimeout(() => {
+                        this._pending.delete(id);
+                        reject(codeError('EUNREACH', 'request ' + type + ' timed out after ' + opts.timeoutMs + 'ms'));
+                    }, opts.timeoutMs);
+                })])
+                : reply;
+            try {
+                await this._post({ type, payload, dir: 'down', id, enc: !!opts.sensitive });
+                return await guarded;
+            } finally { if (timer) clearTimeout(timer); }
         }
 
         handle(type, fn) { this._handlers.set(type, fn); return this; }

@@ -46,5 +46,23 @@ console.log('\n[suite] create() with a real responder still completes (timeout a
     ch.close(); resp.close();
 }
 
+console.log('\n[suite] request({ timeoutMs }) — a responder with no handler must not hang the caller');
+{
+    const { port1, port2 } = new MessageChannel();
+    const [ch, resp] = await Promise.all([
+        SecureChannel.create(port1, { sensitiveKey: true, cid: 'ch-r' }),
+        SecureChannel.accept(port2, { expectSensitive: true, cid: 'ch-r' })
+    ]);
+    resp.handle('ping', async () => 'pong');
+    const t0 = Date.now();
+    let err = null;
+    try { await ch.request('vfs.move', { path: 'a', to: 'b' }, { timeoutMs: 300 }); } catch (e) { err = e; }
+    ok('unknown verb + timeout → EUNREACH', err && err.code === 'EUNREACH', err && (err.code || err.message));
+    ok('…within the window', Date.now() - t0 < 3000);
+    ok('the channel is still usable afterwards', (await ch.request('ping', {}, { timeoutMs: 1000 })) === 'pong');
+    ok('no timeout by default (pending map holds the request)', ch._pending.size === 0);
+    ch.close(); resp.close();
+}
+
 console.log('\n' + pass + ' pass, ' + fail + ' fail');
 process.exit(fail ? 1 : 0);

@@ -56,12 +56,23 @@ function makeRealShapedDs(files, { writable = true } = {}) {
         },
         async saveFile(dir, name, data) { store.set((dir.replace(/^\//, '').replace(/\/$/, '') + '/' + name).replace(/^\//, ''), data); },
         async deleteFile(dir, name) { store.delete((dir.replace(/^\//, '').replace(/\/$/, '') + '/' + name).replace(/^\//, '')); },
+        async renameFile(dir, oldName, newName) {
+            const d = dir.replace(/^\//, '').replace(/\/$/, ''); const a = (d ? d + '/' : '') + oldName, b = (d ? d + '/' : '') + newName;
+            if (!store.has(a)) throw new Error('File not found: ' + oldName);
+            store.set(b, store.get(a)); store.delete(a);
+        },
+        async moveFile(srcDir, name, destDir) {
+            const sd = srcDir.replace(/^\//, '').replace(/\/$/, ''), dd = destDir.replace(/^\//, '').replace(/\/$/, '');
+            const a = (sd ? sd + '/' : '') + name, b = (dd ? dd + '/' : '') + name;
+            if (!store.has(a)) throw new Error('File not found: ' + name);
+            store.set(b, store.get(a)); store.delete(a);
+        },
         async createFolder() {},
         _store: store
     };
 }
 
-const PERM_ALL = AppPermissions.parsePermissions({ permissions: { fs: { read: true, write: true, delete: true, mkdir: true } } });
+const PERM_ALL = AppPermissions.parsePermissions({ permissions: { fs: { read: true, write: true, delete: true, mkdir: true, move: true } } });
 
 console.log('\n[suite] vfs.list on a real-shaped data source (getFileList, no listFolder)');
 {
@@ -170,6 +181,55 @@ console.log('\n[suite] refresh-before-read throttle');
     registerKernelVfsHandlers.REFRESH_MS = undefined;
     const st = await ch.request('vfs.status');
     ok('status shape', ['syncable', 'writable', 'head', 'named', 'serverHead', 'ahead', 'behind', 'diverged', 'lastPush', 'lastMerge', 'lastError', 'state'].every(k => k in st), Object.keys(st).join(','));
+}
+
+console.log('\n[suite] receipts (S1): commit_id + published on every mutation');
+{
+    const ds = makeRealShapedDs({ 'a.txt': 'a' });
+    const noPush = {};                                                   // no vault at all → nothing published
+    const ch = makeChannel();
+    registerKernelVfsHandlers(ch, { dataSource: ds, perm: PERM_ALL, vault: noPush });
+    const w = await ch.request('vfs.write', { path: 'b.txt', data: enc('b') });
+    ok('write receipt shape', w.ok === true && 'commit_id' in w && 'published' in w && w.size === 1 && w.path === 'b.txt', JSON.stringify(w));
+    ok('no push function → published:false, commit_id:null', w.published === false && w.commit_id === null);
+    const ds2 = makeRealShapedDs({ 'a.txt': 'a' });
+    const vault2 = makeSyncableVault();
+    const ch2 = makeChannel();
+    registerKernelVfsHandlers(ch2, { dataSource: ds2, perm: PERM_ALL, vault: vault2 });
+    const w2 = await ch2.request('vfs.write', { path: 'b.txt', data: enc('b') });
+    ok('syncable vault → published:true with the kernel head as commit_id', w2.published === true && w2.commit_id === vault2._headCommitId && !!w2.commit_id, JSON.stringify(w2));
+    const mk = await ch2.request('vfs.mkdir', { path: 'sub' });
+    ok('mkdir carries a receipt too', mk.ok === true && mk.published === true && mk.commit_id === vault2._headCommitId);
+    const del = await ch2.request('vfs.delete', { path: 'a.txt' });
+    ok('delete carries a receipt too', del.ok === true && del.published === true);
+}
+
+console.log('\n[suite] vfs.move (S3): rename in place, move across folders, gates, ENOSYS');
+{
+    const ds = makeRealShapedDs({ 'notes/a.md': 'A', 'notes/b.md': 'B', 'other/c.md': 'C' });
+    const vault = makeSyncableVault();
+    const ch = makeChannel();
+    registerKernelVfsHandlers(ch, { dataSource: ds, perm: PERM_ALL, vault });
+    const r1 = await ch.request('vfs.move', { path: 'notes/a.md', to: 'notes/a2.md' });
+    ok('rename in place', r1.ok === true && r1.from === 'notes/a.md' && r1.to === 'notes/a2.md' && ds._store.has('notes/a2.md') && !ds._store.has('notes/a.md'), JSON.stringify(r1));
+    const r2 = await ch.request('vfs.move', { path: 'notes/b.md', to: 'other/b2.md' });
+    ok('move across folders + rename', r2.ok === true && ds._store.has('other/b2.md') && !ds._store.has('notes/b.md'));
+    ok('move receipt carries commit_id/published', 'commit_id' in r2 && r2.published === true);
+    ok('pushed once per move', vault.calls.pushIfMatch === 2, vault.calls.pushIfMatch);
+    const eFloor = await errOf(() => ch.request('vfs.move', { path: 'other/c.md', to: '.vault/c.md' }));
+    ok('move INTO the floor → EPROTECTED', eFloor && eFloor.code === 'EPROTECTED', eFloor && eFloor.code);
+    const roDs = makeRealShapedDs({ 'x.md': 'x' }, { writable: false });
+    const roCh = makeChannel(); registerKernelVfsHandlers(roCh, { dataSource: roDs, perm: PERM_ALL, vault: makeSyncableVault() });
+    const eRo = await errOf(() => roCh.request('vfs.move', { path: 'x.md', to: 'y.md' }));
+    ok('read-only → EREADONLY', eRo && eRo.code === 'EREADONLY', eRo && eRo.code);
+    const permRead = AppPermissions.parsePermissions({ permissions: { fs: { read: true, write: true } } });   // no move grant
+    const pCh = makeChannel(); registerKernelVfsHandlers(pCh, { dataSource: makeRealShapedDs({ 'x.md': 'x' }), perm: permRead, vault: makeSyncableVault() });
+    const ePerm = await errOf(() => pCh.request('vfs.move', { path: 'x.md', to: 'y.md' }));
+    ok('no fs.move grant → EPERM (child policy is the second gate)', ePerm && ePerm.code === 'EPERM', ePerm && ePerm.code);
+    const bare = makeRealShapedDs({ 'x.md': 'x' }); delete bare.renameFile; delete bare.moveFile;
+    const bCh = makeChannel(); registerKernelVfsHandlers(bCh, { dataSource: bare, perm: PERM_ALL, vault: makeSyncableVault() });
+    const eSys = await errOf(() => bCh.request('vfs.move', { path: 'x.md', to: 'y.md' }));
+    ok('data source without move → ENOSYS, never a hang', eSys && eSys.code === 'ENOSYS', eSys && eSys.code);
 }
 
 console.log('\n' + pass + ' pass, ' + fail + ' fail');

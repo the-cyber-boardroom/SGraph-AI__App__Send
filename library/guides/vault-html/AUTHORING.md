@@ -1511,3 +1511,62 @@ If a typo accidentally introduces a declarative `<link>` or `<script src>`, the 
 - [Creating vaults-in-vaults and external-resource links](./SUB-VAULTS-AND-LINKS.md) — the `*.link.json` + `.vault/owner/ro-links.json` file formats and how to set them up from `sgit`
 - [Driving a vault app's `sg.*` from Playwright](./PLAYWRIGHT-VAULT-APP-ACCESS.md) — open a vault by key, reach the app iframe, call `sg.vfs`/`sg.history` headless
 - [Service Worker future architecture](./service-worker-future.md) — the planned upgrade that will lift the declarative-tag restriction
+
+---
+
+## Writing through a declared mount: receipts, `sg.fs.*`, and what is refused (2026-09-08)
+
+A folder declared by the vault owner with `<name>.link.json` is another vault. Your app uses plain
+`sg.vfs.*` / `sg.fs.*` on `<name>/…` and does not need to know. What you get back, and the edges:
+
+**Every mutation resolves with a receipt** — local or mounted, one shape:
+
+```js
+const r = await sg.vfs.write('data/report.json', bytes);
+// { path, size, commit_id: 'obj-cas-imm-…', published: true|false }
+await sg.fs.mkdir('data/poc');            // { created: true, commit_id, published }
+await sg.fs.move('data/a.txt', 'data/b.txt');   // { moved: true, to, commit_id, published }
+```
+
+- `commit_id` is the commit your mutation produced. `published: true` means the vault that holds
+  the file publishes it to its named branch **before** the call resolves (a mounted child kernel
+  does this with a compare-and-swap). It witnesses *that* publish; it does **not** guarantee the
+  commit survives a later blind push by another clone that was behind. Treat it as necessary, not
+  sufficient, before an irreversible follow-up (purge lazily on your next run, after a read-back).
+- A write to the host vault itself resolves `published: false` — it is committed at once and
+  published by the debounced auto-push. Declare `"host_events": { "vfs.published": true }` and
+  subscribe with `sg.on('vfs.published', ({ commit_id, count }) => …)` to be told when it lands.
+
+**`sg.fs.*` across a mount**
+
+| Call | Result |
+|---|---|
+| `sg.fs.mkdir('<mount>/…')` | ✅ relayed to the child kernel; receipt as above |
+| `sg.fs.move(a, b)` with **both** inside the **same** mount | ✅ relayed; rename or move inside the child |
+| `sg.fs.move(a, b)` across a mount boundary (in↔out, mount↔mount) | ❌ `EXDEV` — a move between two vaults is a copy plus a delete on two stores and can only leave partial state |
+| `sg.fs.delete('<mount>/…')` | ❌ `EUNDERPRIVILEGED` — destructive verbs across a vault boundary require per-request elevation (credential tiers); the issuance path does not exist yet. This is a stated decision, not a gap |
+
+Both gates still apply to every relayed verb: your own manifest's grant on the parent path
+(`"fs": { "write": ["data/"], "mkdir": ["data/"], "move": ["data/"] }`) **and** the child's own
+`.vault/app.json`. **The child's manifest is the real bound** — grant narrowly there
+(`"write": ["events/"]`), not `true`.
+
+**`sg.vault.mounts()`** returns a projection, one row per mount:
+
+```js
+[{ prefix: 'data/', access: 'rw'|'ro', declared: true, state: 'idle'|'unknown'|'clean'|'ahead'|'behind'|'diverged', at: 1725800000000|null }]
+```
+
+`state` is as of the host's last behind-check (tab focus, 30 s debounce) — **a write does not
+update it.** Use the write's receipt for your own write; use `state` for the mount's health.
+The child's vault id is not in the row; the owner's `<name>.link.json` is where it lives, readable
+by your app only because the owner put it there.
+
+**Three things that cost other teams days**
+
+- `.vault/app.json` **replaces** the root `app.json`, and a folder-level manifest replaces both —
+  nothing merges. Adding `fs` grants in the new location silently drops `append.*`, `network`,
+  `llm.*` unless you copy them forward.
+- `permissions.network: true` is what lets the frame reach any network at all (see *Egress* above).
+- `sg.vfs.write` refuses bodies over **3 MB** with `EFBIG`.
+

@@ -73,7 +73,7 @@ try {
     // ── seed: one child vault with its own policy + embedded token ─────────────────
     const seedSg = sgSend(api);
     const seed   = await SGVault.create(seedSg, randomWord('child'), { name: 'Clinic Data' });
-    await putFile(seed, '/.vault/app.json', json({ permissions: { fs: { read: true, write: true, delete: true, mkdir: true } } }));
+    await putFile(seed, '/.vault/app.json', json({ permissions: { fs: { read: true, write: true, delete: true, mkdir: true, move: true } } }));
     await putFile(seed, '/.vault/access-token.json', json({ token: api.token }));
     await putFile(seed, '/records/seed.json', json([{ id: 1 }]));
     await seed.push();
@@ -104,6 +104,7 @@ try {
     suite('2. write publishes through CAS push');
     const w1 = await k.ch.request('vfs.write', { path: 'report.json', data: enc('{"v":1}') });
     ok('write ok', w1 && w1.ok === true);
+    ok('receipt: commit_id is the kernel head, published:true (S1)', w1.commit_id === k.vault._headCommitId && w1.published === true, JSON.stringify(w1));
     let v = await freshOpen(api, KEY);
     ok('fresh open sees report.json', v.files.includes('report.json'), v.files.join(','));
     ok('content v1', dec(await readFile(v.vault, '/report.json')) === '{"v":1}');
@@ -137,6 +138,19 @@ try {
     v = await freshOpen(api, KEY);
     ok('notes/ keeps other.md + second.md and gains mine.md',
        ['notes/other.md', 'notes/second.md', 'notes/mine.md'].every(f => v.files.includes(f)), v.files.join(','));
+
+    // ── 3c. mkdir + move through the child kernel (S2/S3), with receipts ───────────
+    suite('3c. vfs.mkdir and vfs.move: receipts, and the published tree agrees');
+    const mk = await k.ch.request('vfs.mkdir', { path: 'poc' });
+    ok('mkdir ok with a receipt', mk.ok === true && mk.published === true && mk.commit_id === k.vault._headCommitId, JSON.stringify(mk));
+    await k.ch.request('vfs.write', { path: 'poc/first.txt', data: enc('first') });
+    const mv = await k.ch.request('vfs.move', { path: 'poc/first.txt', to: 'notes/moved.txt' });
+    ok('move across folders ok with a receipt', mv.ok === true && mv.published === true && mv.from === 'poc/first.txt' && mv.to === 'notes/moved.txt', JSON.stringify(mv));
+    v = await freshOpen(api, KEY);
+    ok('published tree: moved.txt present, first.txt gone', v.files.includes('notes/moved.txt') && !v.files.includes('poc/first.txt'), v.files.join(','));
+    ok('receipt commit_id is the published head', mv.commit_id === v.vault._headCommitId);
+    const cm = await v.vault._commitManager.loadCommit(v.vault._headCommitId);
+    ok('Via-Mount trailer carries parent= when the parent id is known', /Via-Mount: Clinic Data \(declared\)/.test(cm.message || ''), cm.message);
 
     // ── 4. race: publish lands BETWEEN our commit and our push → ECAS → merge → retry
     suite('4. CAS conflict: other writer publishes between our commit and our push');

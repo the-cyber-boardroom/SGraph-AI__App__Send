@@ -77,6 +77,10 @@ const autoAllow = (kp, id) => { for (const c of ['fs.read', 'fs.write', 'fs.dele
         ok('lazy mount registers without spawning',       log.length === 0 && res.lazy === true && res.mountId === 'm-data');
         ok('path resolves immediately',                    !!kp.mounts.resolve('data/report.md'));
         ok('list() reports declared, access, spawned:false', (() => { const m = kp.list()[0]; return m.declared === true && m.access === 'rw' && m.spawned === false; })());
+        ok('listForApps() is the projection only (prefix/access/declared/state/at), state idle before spawn', (() => {
+            const a = kp.listForApps()[0];
+            return Object.keys(a).sort().join(',') === 'access,at,declared,prefix,state' && a.state === 'idle' && a.at === null && a.declared === true && a.access === 'rw';
+        })());
         autoAllow(kp, 'm-data');
         const [a, b] = await Promise.all([kp.relay('read', { path: 'data/report.md' }), kp.relay('read', { path: 'data/report.md' })]);
         ok('first relay spawns the child ONCE for two concurrent callers', log.length === 1);
