@@ -137,7 +137,10 @@
             const boot = {
                 cloneBranch: (payload && payload.cloneBranch) || null,
                 mountLabel:  (payload && payload.mountLabel)  || null,
-                mountKind:   (payload && payload.mountKind)   || null
+                mountKind:   (payload && payload.mountKind)   || null,
+                // S7: the parent's vault id, for the Via-Mount audit trailer. Sanitised to the
+                // vault-id alphabet so the trailer stays one line and cannot carry anything else.
+                parentVaultId: String((payload && payload.parentVaultId) || '').replace(/[^a-z0-9]/g, '').slice(0, 24) || null
             };
             let vault;
             try { vault = await vaultFactory(vaultKey, token || null, endpoint, boot); }
@@ -160,7 +163,8 @@
             // Provenance trailer for every commit this kernel makes on the parent's behalf.
             if (boot.mountLabel && vault && typeof vault === 'object') {
                 const label = String(boot.mountLabel).replace(/[\r\n]+/g, ' ').slice(0, 80);
-                vault._commitTrailer = 'Via-Mount: ' + label + ' (' + (boot.mountKind === 'declared' ? 'declared' : 'runtime') + ')';
+                vault._commitTrailer = 'Via-Mount: ' + label + ' (' + (boot.mountKind === 'declared' ? 'declared' : 'runtime') + ')'
+                                     + (boot.parentVaultId ? ' parent=' + boot.parentVaultId : '');
             }
 
             const dataSource = dataSourceFactory(vault, effectiveToken);

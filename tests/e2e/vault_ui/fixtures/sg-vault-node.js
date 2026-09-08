@@ -151,7 +151,7 @@ export async function seedDeclaredMounts(api, opts) {
     const child = await SGVault.create(sg, randomWord('child'), { name: opts.childName || 'Clinic Data' });
     await putFile(child, '/.vault/app.json', json({
         title: opts.childName || 'Clinic Data',
-        permissions: { fs: { read: true, write: true, delete: true, mkdir: true } }
+        permissions: { fs: { read: true, write: true, delete: true, mkdir: true, move: true } }
     }));
     await putFile(child, '/.vault/access-token.json', json({ token: api.token }));
     const childFiles = opts.childFiles || { '/records/seed.json': json([{ id: 1, patient: 'A. Example', note: 'seeded by test' }]) };
@@ -166,7 +166,7 @@ export async function seedDeclaredMounts(api, opts) {
     await putFile(parent, '/.vault/app.json', json({
         title: opts.parentName || 'Clinic App',
         entry: 'index.html',
-        permissions: { fs: { read: true, write: ['data/'], delete: ['data/'], mkdir: ['data/'] } }
+        permissions: { fs: { read: true, write: ['data/'], delete: ['data/'], mkdir: ['data/'], move: ['data/'] } }
     }));
     await putFile(parent, '/.vault/access-token.json', json({ token: api.token }));
     await putFile(parent, '/index.html', enc(opts.appHtml || '<!doctype html><title>app</title>'));

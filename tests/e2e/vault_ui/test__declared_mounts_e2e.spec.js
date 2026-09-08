@@ -123,6 +123,36 @@ test('1 · owner: the app lists and writes /data — bytes land in the CHILD vau
     await expect(frame.locator('#list')).toContainText('report.json');
     await shot(page, '02-owner-app-saved-report.png');
 
+    // S1 — the receipt: the app is TOLD the outcome of its own write (AppSec decision 09/08)
+    const receipt = await frame.evaluate(() => sg.vfs.write('data/receipt.json', new TextEncoder().encode('{"r":1}')));
+    expect(receipt.path).toBe('data/receipt.json');
+    expect(receipt.commit_id).toMatch(/^obj-cas-imm-[0-9a-f]+$/);
+    expect(receipt.published).toBe(true);
+    // S2 / S3 — mkdir and same-mount move through the mount; N4 — cross-boundary move → EXDEV;
+    // D1 — delete across a mount → the tier's own code, not EMOUNT_RO
+    const fsRes = await frame.evaluate(async () => {
+        const out = {};
+        out.mkdir = await sg.fs.mkdir('data/poc');
+        await sg.vfs.write('data/poc/one.txt', new TextEncoder().encode('one'));
+        out.move  = await sg.fs.move('data/poc/one.txt', 'data/records/one-moved.txt');   // records/ exists in the child seed
+        out.after = (await sg.vfs.list('data')).map(e => e.path).sort();
+        try { await sg.fs.move('data/records/one-moved.txt', 'escaped.txt'); out.xdev = 'NONE'; } catch (e) { out.xdev = e.code || e.message; }
+        try { await sg.fs.delete('data/records/one-moved.txt'); out.del = 'NONE'; } catch (e) { out.del = e.code || e.message; }
+        out.mounts = await sg.vault.mounts();
+        return out;
+    });
+    expect(fsRes.mkdir.created).toBe(true);
+    expect(fsRes.mkdir.published).toBe(true);
+    expect(fsRes.move.moved).toBe(true);
+    expect(fsRes.after).toContain('records/one-moved.txt');
+    expect(fsRes.after).not.toContain('poc/one.txt');
+    expect(fsRes.xdev).toBe('EXDEV');
+    expect(fsRes.del).toBe('EUNDERPRIVILEGED');
+    // S4 — apps get the projection, never the raw kernel row
+    expect(fsRes.mounts.length).toBe(1);
+    expect(Object.keys(fsRes.mounts[0]).sort()).toEqual(['access', 'at', 'declared', 'prefix', 'state']);
+    expect(fsRes.mounts[0]).toMatchObject({ prefix: 'data/', access: 'rw', declared: true });
+
     // Verify from OUTSIDE the browser, with a fresh open of each vault:
     const child = await childState();
     expect(child.files).toContain('report.json');

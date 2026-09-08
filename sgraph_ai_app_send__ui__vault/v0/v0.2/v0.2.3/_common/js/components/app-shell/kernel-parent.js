@@ -54,6 +54,7 @@
             }
             this._spawnChannel        = opts.spawnChannel;
             this._resolveCredentials  = opts.resolveCredentials || (async () => null);
+            this._relayTimeoutMs      = (opts.relayTimeoutMs > 0) ? opts.relayTimeoutMs : 30000;   // S10: no relay may hang the app
             this._appFrameOrigin      = opts.appFrameOrigin || 'null-origin';
             this._allowUnsafeSynthetic= opts.allowUnsafeSynthetic === true;
             this.mounts               = new KMounts();
@@ -202,6 +203,28 @@
             });
         }
 
+        // App-facing projection of the mount table (S4 / N3). The raw list() row carries commit
+        // ids, server error text (sync.lastError), custody and the link ref — HUD material, not
+        // an app contract. Apps get exactly this shape; spellings are stable:
+        //   state: 'idle' (never spawned) | 'unknown' (spawned, not yet checked)
+        //        | 'clean' | 'ahead' | 'behind' | 'diverged'
+        //   at:    ms timestamp of the check that produced `state`, or null.
+        // `state` is as of the last behind-check (tab focus, 30 s debounce); a write does NOT
+        // update it — the write's own receipt is the per-write signal.
+        listForApps() {
+            return this.mounts.list().map(function (m) {
+                const s = m._sync || null;
+                const state = !m.channel ? 'idle' : (s && s.state) ? s.state : 'unknown';
+                return {
+                    prefix:   m.prefix,
+                    access:   (m.meta && m.meta.access) || 'rw',
+                    declared: !!(m.meta && m.meta.declared),
+                    state,
+                    at:       (s && s.at) || null
+                };
+            });
+        }
+
         // Cross-mount relay. Returns null when the path is local (caller does the local op);
         // otherwise mediates via the broker and relays over the child channel (Edge 2).
         async relay(op, args) {
@@ -219,9 +242,10 @@
             }
             try {
                 const ch  = await this._ensureChannel(hit.mount);          // lazy spawn on first use
-                const res = await ch.request('vfs.' + op,
-                    { path: hit.rest, data: args.data, credential: args.credential },
-                    { sensitive: !!args.data || op === 'read' });
+                const req = { path: hit.rest, data: args.data, credential: args.credential };
+                if (args.to != null) req.to = args.to;                       // move: destination, child-relative
+                const res = await ch.request('vfs.' + op, req,
+                    { sensitive: !!args.data || op === 'read', timeoutMs: this._relayTimeoutMs });
                 this.broker.finalize(med.entryId, 'ok');
                 return res;
             } catch (err) {

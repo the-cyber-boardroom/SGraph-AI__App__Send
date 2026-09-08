@@ -565,6 +565,7 @@
                 if (diverged) { this._surfaceUnpushed('diverged'); return; }
                 await this._vault.push();
                 this._emitVaultEvent('auto-push', { label: 'Auto-pushed ' + ahead + ' commit(s)', count: ahead });
+                this._pushHostEvent('vfs.published', { commit_id: this._vault._headCommitId || null, count: ahead });
                 this._clearUnpushedNotice();
             } catch (e) {
                 console.warn('[app-shell] auto-push failed:', e && e.message);
@@ -2167,6 +2168,7 @@
                     // same child must not share one clone ref. HMAC-derived — the parent id never
                     // appears on the server. Label/kind feed the child's Via-Mount commit trailer.
                     cloneBranch: 'viv:' + ((this._vault && this._vault._vaultId) || 'top'),
+                    parentVaultId: (this._vault && this._vault._vaultId) || null,
                     mountLabel:  creds.label || ref,
                     mountKind:   creds.kind  || 'runtime'
                 }, { sensitive: true });
@@ -2209,9 +2211,10 @@
             var out = [];
             if (typeof DeclaredMounts === 'undefined' || typeof VaultLinks === 'undefined') return out;
             if (!this._dataSource || !this._vault) return out;
-            var self = this, specs = [];
+            var self = this, specs = [], fileList = [];
             try {
-                specs = await DeclaredMounts.scan(this._dataSource.getFileList(), function (p) { return self._dataSource.getFileBytes(p); });
+                fileList = this._dataSource.getFileList() || [];
+                specs = await DeclaredMounts.scan(fileList, function (p) { return self._dataSource.getFileBytes(p); });
             } catch (_) { specs = []; }
             if (!specs.length) return out;
             this._declaredSpecs = specs;
@@ -2219,6 +2222,12 @@
             try { kp = this._ensureKernelParent(); } catch (_) { return out; }
             for (var i = 0; i < specs.length; i++) {
                 var spec = specs[i];
+                // S6 pre-flight: a REAL folder at the mount path becomes unreachable (the mount wins
+                // the path; nothing is corrupted). Say so — the owner may have left content there.
+                var shadowed = fileList.some(function (f) { return f && f.dir && f.path === spec.prefix + '/'; });
+                if (shadowed) {
+                    this._emitVaultEvent('declared-mount-shadows-folder', { label: 'Declared mount ' + spec.prefix + '/ shadows a real folder in this vault', prefix: spec.prefix, ref: spec.ref });
+                }
                 if (spec.duplicateOf) {
                     // Same child already declared at another path in THIS vault — one mount per child.
                     this._emitVaultEvent('declared-mount-skipped', { label: 'Declared mount skipped (duplicate child): ' + spec.prefix, prefix: spec.prefix, ref: spec.ref, err: 'EEXIST', duplicateOf: spec.duplicateOf });
@@ -2259,6 +2268,12 @@
         _listMounts() {
             if (!this._kernelParent) return [];
             return this._kernelParent.list();
+        }
+
+        // What sg.vault.mounts() hands an app (S4): the projection, never the raw kernel row.
+        _listMountsForApps() {
+            if (!this._kernelParent) return [];
+            return this._kernelParent.listForApps();
         }
 
         // Production credential resolver for a mount ref (07 Sep analysis §5.2). Order:
@@ -3297,7 +3312,7 @@
                     // String.fromCharCode.apply argument limit on every browser we care about.
                     'var b64="",chunk=8190;' +
                     'for(var i=0;i<bytes.length;i+=chunk)b64+=btoa(String.fromCharCode.apply(null,bytes.subarray(i,i+chunk)));' +
-                    'return _vfsMsg("__sgVfsWriteReq",{path:path,data:b64,encoding:"base64"}).then(function(d){return{path:path,size:d.size};});' +
+                    'return _vfsMsg("__sgVfsWriteReq",{path:path,data:b64,encoding:"base64"}).then(function(d){return{path:path,size:d.size,commit_id:d.commit_id||null,published:!!d.published};});' +
                   '}' +
                   // sg.vfs.read (strict)
                   'function _read(path){' +
@@ -3760,7 +3775,7 @@
                     // which forced the parent app.json to add a path it has no business writing to.)
                     if (self._mounts && self._mounts.resolve(wResolved)) {
                         self._handleVfsViv('write', { path: wResolved, data: wBytes })
-                            .then(function () { wReply(true, { size: wBytes.byteLength, mounted: true }); self._emitBridgeCall('vfs.write', { path: wResolved, ok: true, mounted: true }); })
+                            .then(function (r) { wReply(true, { size: wBytes.byteLength, mounted: true, commit_id: (r && r.commit_id) || null, published: !!(r && r.published) }); self._emitBridgeCall('vfs.write', { path: wResolved, ok: true, mounted: true, commit_id: (r && r.commit_id) || null }); })
                             .catch(function (err) { wReply(false, { err: err.message || 'Write failed', code: err.code || 'EPROTO' }); self._emitBridgeCall('vfs.write', { path: wResolved, ok: false, err: err.code || err.message }); });
                         return;
                     }
@@ -3772,7 +3787,10 @@
                     var _t0w = performance.now();
                     dataSource.saveFile(wDir, wFile, wBytes.buffer)
                         .then(function () {
-                            wReply(true, { size: wSize });
+                            // Local write: committed on the clone branch now, published by the debounced
+                            // auto-push later → published:false here; the 'vfs.published' host event
+                            // (app.json host_events) closes the receipt when the push lands.
+                            wReply(true, { size: wSize, commit_id: (self._vault && self._vault._headCommitId) || null, published: false });
                             self._emitBridgeCall('vfs.write', { path: wResolved, bytes: wSize, ms: Math.round(performance.now() - _t0w), ok: true });
                             self._scheduleAutoPush();   // sync app writes to the server (debounced)
                         })
@@ -4252,9 +4270,52 @@
                     // ── fs mutations (move / delete / mkdir) ──────────────────────
                     if (e.data.__sgCmdType === 'fs') {
                         var fsAct = e.data.action;
-                        if (!dataSource.writable) { cmdReply(false, null, 'Read-only vault'); return; }   // EREADONLY (no token)
                         var _np = function (p) { return AppPermissions.normalizePath(p || ''); };
                         var _split = function (n) { var s = n.lastIndexOf('/'); return { dir: s > 0 ? '/' + n.slice(0, s) : '/', name: n.slice(s + 1) }; };
+                        // Declared / runtime mounts (S2, S3, D1 — AppSec decision 09/08). Same order as
+                        // vfs.write: floor, then mount resolve BEFORE the parent's own grant — across a
+                        // mount the parent's authorization is the broker + the child's policy.
+                        var _hit = function (p) { return (p && self._mounts && self._mounts.resolve(p)) || null; };
+                        var _fsRelayReply = function (verb, path, extra) {
+                            return function (r) {
+                                cmdReply(true, Object.assign({ mounted: true, commit_id: (r && r.commit_id) || null, published: !!(r && r.published) }, extra));
+                                self._emitBridgeCall(verb, Object.assign({ path: path, ok: true, mounted: true }, extra));
+                            };
+                        };
+                        var _fsRelayFail = function (verb, path) {
+                            return function (err) { cmdReply(false, null, err.message || (verb + ' failed'), err.code || 'EPROTO'); self._emitBridgeCall(verb, { path: path, ok: false, err: err.code || err.message }); };
+                        };
+                        if (fsAct === 'mkdir' && _hit(_np(e.data.path))) {
+                            var mkPath = _np(e.data.path);
+                            if (AppPermissions.isFloor('mkdir', mkPath)) { cmdReply(false, null, 'Protected path', 'EPROTECTED'); return; }
+                            self._handleVfsViv('mkdir', { path: mkPath }).then(_fsRelayReply('fs.mkdir', mkPath, { created: true })).catch(_fsRelayFail('fs.mkdir', mkPath));
+                            return;
+                        }
+                        if (fsAct === 'delete' && _hit(_np(e.data.path))) {
+                            // D1: destructive verbs across a vault boundary need per-request elevation
+                            // (VivCredentialTiers). The issuance path does not exist yet — say so with the
+                            // tier's own code instead of the composite adapter's EMOUNT_RO.
+                            var delPath = _np(e.data.path);
+                            cmdReply(false, null, 'delete across a mount needs per-request elevation (not available yet)', 'EUNDERPRIVILEGED');
+                            self._emitBridgeCall('fs.delete', { path: delPath, ok: false, err: 'EUNDERPRIVILEGED', mounted: true });
+                            return;
+                        }
+                        if (fsAct === 'move') {
+                            var hFrom = _hit(_np(e.data.from)), hTo = _hit(_np(e.data.to));
+                            if (hFrom || hTo) {
+                                var mvFrom = _np(e.data.from), mvTo = _np(e.data.to);
+                                if (AppPermissions.isFloor('move', mvFrom) || AppPermissions.isFloor('move', mvTo)) { cmdReply(false, null, 'Protected path', 'EPROTECTED'); return; }
+                                if (!hFrom || !hTo || hFrom.mount.mountId !== hTo.mount.mountId) {
+                                    // N4: a move between two vaults is a copy + delete on two stores.
+                                    cmdReply(false, null, 'move across a mount boundary is not supported (EXDEV)', 'EXDEV');
+                                    self._emitBridgeCall('fs.move', { from: mvFrom, to: mvTo, ok: false, err: 'EXDEV' });
+                                    return;
+                                }
+                                self._handleVfsViv('move', { path: mvFrom, to: hTo.rest }).then(_fsRelayReply('fs.move', mvFrom, { moved: true, to: mvTo })).catch(_fsRelayFail('fs.move', mvFrom));
+                                return;
+                            }
+                        }
+                        if (!dataSource.writable) { cmdReply(false, null, 'Read-only vault', 'EREADONLY'); return; }   // EREADONLY (no token)
                         if (fsAct === 'move') {
                             var mFrom = _np(e.data.from), mTo = _np(e.data.to);
                             if (!self._can('fs.move', mFrom) || !self._can('fs.move', mTo)) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('fs.move', { from: mFrom, to: mTo, ok: false, err: 'EPERM' }); return; }
@@ -4491,7 +4552,7 @@
                             return;
                         }
                         if (vAct === 'mounts') {
-                            cmdReply(true, self._listMounts());
+                            cmdReply(true, self._listMountsForApps());
                             return;
                         }
                         cmdReply(false, null, 'Unsupported vault action: ' + vAct);
