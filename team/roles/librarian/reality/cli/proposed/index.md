@@ -120,4 +120,15 @@ PROPOSED — does not exist yet. **Security-critical prerequisite** for the git+
 
 | # | Feature | One-Line Description | Source |
 |---|---------|---------------------|--------|
-| P-ACT-018 | Vault ignore file | Configuration file specifying which vault paths are excluded from operations (analogous to .gitignore); required to make git+sgit coexistence safe; without it, vault key material may enter the git working tree and git history, permanently violating zero-knowledge; AppSec co-owns this deliverable | doc 931 (v0.33.56) — see also vault/proposed/index.md |
+| P-ACT-018 / P-IGNORE-001 | Vault ignore file | Configuration file specifying which vault paths are excluded from operations (analogous to .gitignore); required to make git+sgit coexistence safe; without it, vault key material may enter the git working tree and git history, permanently violating zero-knowledge; AppSec co-owns this deliverable. **20 Aug 2026 update:** this is now a precondition for the shared drive (P-DRIVE-001) — absence blocks synced drive entirely. Defaults specified in March 2026 brief; still absent from site index. | doc 931 (v0.33.56); doc 978 (v0.33.61, 20 Aug) — see also vault/proposed/index.md |
+
+---
+
+## Path-Scoped History Command (20 Aug 2026, v0.33.61)
+
+**Status:** PROPOSED — no code. **Last updated:** 2026-09-07 (Librarian daily run, 20 Aug batch)
+**Source:** doc 963 — `v0.33.61__arch-brief__history-is-the-append-only-log-record-stays-clean-objects-are-immutable-and-the-reference-is-not.md`
+
+| # | Feature | One-Line Description |
+|---|---------|---------------------|
+| P-HIST-001 | Path-scoped history command | The register's central query: "what happened to this edge/path between these dates?" No command currently implements this. Required for the register history view (P-REG-UI-001). Objects are immutable and the reference is mutable — the commit graph holds the growth, the entry stays clean, but traversing that history by path is unimplemented. |

@@ -1,6 +1,6 @@
 # QA — Reality Index
 
-**Domain:** qa/ | **Last updated:** 2026-08-18 | **Maintained by:** Librarian (daily run)
+**Domain:** qa/ | **Last updated:** 2026-08-25 | **Maintained by:** Librarian (daily run)
 
 This domain covers the test suite, QA infrastructure (browser automation, Playwright), and test strategy. SGraph Send uses an all-real-implementations philosophy: no mocks, no patches. The full stack starts in-memory in ~100ms.
 
@@ -14,7 +14,7 @@ This domain covers the test suite, QA infrastructure (browser automation, Playwr
 
 **Python unit tests: 977 (confirmed via commit `66ce528`, 2026-06-29 — poetry.lock update to osbot-fast-api 0.39.0 + FastAPI 0.138.1).** Up from 957 (2026-06-05). The increase reflects new tests added with the `_IncludedRouter` fix and osbot-utils 3.74.0 additions.
 
-**Total ~3100+** = 977 Python + ~157 vault-UI JS (sub-vaults/public-previews/app-perms/VaultSubvaultsView) + ~1060+ ViV loader suite (373+ base + ~400 from LLM/voice/releases/send-browse-split sessions 08/02–08/03 + ~150 from vision/sync-safety/model-default sessions 08/04–08/07 + ~42 sg.llm hardening `test__llm_hardening.js` 08/15 + ~49 net vault read-key open/embed 08/15 + ~32 sg.llm P4 `test__llm_p4.js` 08/16 + ~9 vault settings `test__vault_settings_file_listing.js` 08/16; see table below) + ~78 app-shell JS + 37 embed-protocol + ~334 inbox/write-batch/owner-secrets suite + browser integration: 8 tests + 10 app-shell-nav-helpers inbox/folder-app.json tests + 19 from Phase A/B/C1 container/deploy tests (2026-08-15). Updated 2026-08-18.
+**Total ~3130+** = 977 Python + ~157 vault-UI JS (sub-vaults/public-previews/app-perms/VaultSubvaultsView) + ~1090+ ViV loader suite (373+ base + ~400 from LLM/voice/releases/send-browse-split sessions 08/02–08/03 + ~150 from vision/sync-safety/model-default sessions 08/04–08/07 + ~42 sg.llm hardening `test__llm_hardening.js` 08/15 + ~49 net vault read-key open/embed 08/15 + ~32 sg.llm P4 `test__llm_p4.js` 08/16 + ~9 vault settings `test__vault_settings_file_listing.js` 08/16 + 28 sgit key prefix interop `test__sgit_key_prefixes.js` 08/25; see table below) + ~78 app-shell JS + 37 embed-protocol + ~334 inbox/write-batch/owner-secrets suite + browser integration: 8 tests + 10 app-shell-nav-helpers inbox/folder-app.json tests + 19 from Phase A/B/C1 container/deploy tests (2026-08-15). Updated 2026-08-25.
 
 
 
@@ -98,6 +98,14 @@ Run with: `bash tests/unit/vault_ui/loader/run-all.sh`
 | `test__no_auto_reload.js` | 27 | Sync-safety contract: background update check must NOT auto-apply; `_checkAndAutoSync` renders banner/HUD chip rather than merging; auto-pull default OFF; auto-push unaffected; ordering asserted from source so the contract survives future refactors |
 
 | **Total ViV loader suite (08/07 state)** | **~930+** | |
+
+**sgit key prefix interop (added 2026-08-25, commit `b3a9220`):**
+
+| File | Assertions | What It Tests |
+|------|-----------|---------------|
+| `test__sgit_key_prefixes.js` | 28 | Cross-implementation guard (known-answer test against sgit-ai 0.16.0 literal output): derivation 2 KATs × 5 assertions (vault_id, read_key, write_key, ref id, index id); `stripKeyPrefix` strips all 5 current+legacy prefixes, bare key untouched, partial stem NOT stripped (7); `classifyKey` intent-by-declaration for 5 prefix types + bare key (6); format detection accepts prefixed vault/read keys, `parts.raw` is the stripped key, loader-twin ≡ `SGVaultCrypto.stripKeyPrefix` on all 7 cases (5) |
+
+| **Total ViV loader suite (08/25 state)** | **~1090+** | |
 
 **Note:** Tests T1 and T2 (null-frame `parent.document`/`localStorage` access throws) require a real browser — Phase 3 security gate tests, not runnable in Node. Phase 3 Playwright probe suite: 30 assertions, 0 failures.
 
