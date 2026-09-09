@@ -166,7 +166,7 @@ in browser (Milestone M-007).
 ### Key architectural properties
 
 - No API Gateway — Lambda URL direct HTTPS
-- Token validation: header `x-sgraph-send-access-token` or query param
+- Token validation: header **`x-sgraph-access-token`** or `?access_token=` query param — corrected 2026-09-09. The previously documented `x-sgraph-send-access-token` is **not** a valid header name: measured 401 vs 200 for the correct one against the in-memory stack (`HEADER__SGRAPH_SEND__ACCESS_TOKEN = 'x-sgraph-access-token'` in `user__config.py` — the constant NAME contains `SEND`, the header VALUE does not). Any integrator following the old line got 401s. Query-param form works but leaks the token into logs; header is the documented path.
 - Inter-Lambda: User Lambda calls Admin Lambda for token validation
 - Storage: Memory-FS (dev/test), S3 (prod) — auto-detected via `SEND__STORAGE_MODE`
 
