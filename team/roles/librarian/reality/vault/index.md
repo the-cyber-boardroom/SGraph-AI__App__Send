@@ -352,6 +352,12 @@ Round-1 and Round-2 review findings addressed after the initial surface landed:
 
 ---
 
+### Routing — the locale landing is a hash inbox (2026-09-09)
+
+| Item | Status | Evidence |
+|---|---|---|
+| **`/<locale>/#<key>` behaves exactly like `/#<key>`**: key saved to LS (verbatim — sgit prefixes are stripped later by the shells), deep-link / release pin saved, redirect to `/<locale>/app` with no hash. `/en-gb/` with **no** hash never redirects (the 353ef55 loop guard holds: the only redirect out of the landing carries no hash and lands on `/app`, which never bounces back). Root `/` unchanged (`/en-gb/app`). Applies to every generated locale (`en-us`, `pt-pt`, `pt-br`) because the decision lives in the shared module | **EXISTS** | `vault-loader-routing.js` `_consumeHashInbox` / `_appPathForLocale`; `test__routing_decisions.js` (7 landing cases); `test__routing.spec.js` Cell 4 (3 tests); `test__regression__no_locale_redirect_loop.spec.js` |
+
 ## DOES NOT EXIST (Commonly Confused)
 
 | Claimed | Reality |
