@@ -120,35 +120,77 @@ suite('VaultLoaderRouting.runRoot — hash with pipe deep-link', ({ test, before
 // ---------------------------------------------------------------------------
 // runLanding() / runVault() / runPeek() — strip hash everywhere else
 // ---------------------------------------------------------------------------
-suite('VaultLoaderRouting.runLanding — strips hash', ({ test, before, after }) => {
+// 2026-09-09: the landing is a hash inbox like root — `sgit` prints /en-gb/#<key> links.
+// It must still NEVER redirect without a hash (regression 353ef55, the / ↔ /en-gb/ loop).
+suite('VaultLoaderRouting.runLanding — hash inbox, same decision as root', ({ test, before, after }) => {
     let mock, origLocation, origHistory;
     before(() => {
+        clearVaultStorage();
         origLocation = global.location;
         origHistory  = global.history;
         mock = makeMockNav();
+        mock.location.pathname = '/en-gb/';
         installMock(mock);
     });
     after(() => restoreMock(origLocation, origHistory));
 
-    test('calls replaceState when hash is present', () => {
+    test('#token → key saved, redirect to /en-gb/app with no hash', () => {
         mock.location.hash = '#apple-river-1234';
-        mock.replaceStateCalls = [];
+        mock.location.replaced = null;
         VaultLoader.routing.runLanding();
-        assert.equal(mock.replaceStateCalls.length, 1, 'replaceState called once');
+        assert.equal(VaultLoader.storage.getCurrentKey(), 'apple-river-1234', 'key saved to LS');
+        assert.equal(mock.location.replaced, '/en-gb/app', 'redirected to the app surface');
     });
 
-    test('does NOT call replaceState when hash is absent', () => {
+    test('an sgit-prefixed read credential is saved verbatim (app-shell strips the prefix)', () => {
+        const cred = 'sgit_private_read_' + 'ab'.repeat(32) + ':dkeclt5r';
+        mock.location.hash = '#' + cred;
+        mock.location.replaced = null;
+        VaultLoader.routing.runLanding();
+        assert.equal(VaultLoader.storage.getCurrentKey(), cred, 'credential saved as-is');
+        assert.equal(mock.location.replaced, '/en-gb/app', 'redirected');
+    });
+
+    test('#token|app:path → deep link saved too', () => {
+        mock.location.hash = '#apple-river-1234|app:index.html';
+        mock.location.replaced = null;
+        VaultLoader.routing.runLanding();
+        assert.equal(mock.location.replaced, '/en-gb/app');
+        assert.equal(VaultLoader.routing.consumeDeepLink(), 'app:index.html', 'deep link saved');
+    });
+
+    test('no hash → render the landing: no redirect, no replaceState', () => {
         mock.location.hash = '';
+        mock.location.replaced = null;
         mock.replaceStateCalls = [];
         VaultLoader.routing.runLanding();
-        assert.equal(mock.replaceStateCalls.length, 0, 'replaceState not called');
+        assert.equal(mock.location.replaced, null, 'no redirect (loop guard)');
+        assert.equal(mock.replaceStateCalls.length, 0, 'nothing to strip');
     });
 
-    test('does NOT redirect (no location.replace call)', () => {
-        mock.location.hash    = '#apple-river-1234';
+    test('bare # → treated as no hash: no redirect', () => {
+        mock.location.hash = '#';
         mock.location.replaced = null;
         VaultLoader.routing.runLanding();
         assert.equal(mock.location.replaced, null, 'no redirect');
+    });
+
+    test('another locale keeps its locale: /pt-pt/#token → /pt-pt/app', () => {
+        mock.location.pathname = '/pt-pt/';
+        mock.location.hash = '#apple-river-1234';
+        mock.location.replaced = null;
+        VaultLoader.routing.runLanding();
+        assert.equal(mock.location.replaced, '/pt-pt/app');
+        mock.location.pathname = '/en-gb/';
+    });
+
+    test('root still goes to /en-gb/app (no locale segment on /)', () => {
+        mock.location.pathname = '/';
+        mock.location.hash = '#apple-river-1234';
+        mock.location.replaced = null;
+        VaultLoader.routing.runRoot();
+        assert.equal(mock.location.replaced, '/en-gb/app');
+        mock.location.pathname = '/en-gb/';
     });
 });
 

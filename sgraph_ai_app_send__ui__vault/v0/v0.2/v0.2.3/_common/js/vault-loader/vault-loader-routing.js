@@ -14,7 +14,9 @@
                                     deep-link → reads key from LS → opens vault
                                     → if app.json: run app; if no app.json: redirect
                                       to /en-gb/vault/ (deep-link kept so vault opens file)
-     /en-gb/             any hash → strip (discard) → render landing
+     /en-gb/#token       has hash → SAME as /#token (save key → /en-gb/app, no hash)
+     /<locale>/#token    has hash → save key → /<locale>/app (locale kept)
+     /en-gb/             no hash  → render landing (never redirects without a hash)
      /en-gb/vault        any hash → strip (discard) → auto-load from LS
      /en-gb/vault/peek   any hash → strip (discard) → render peek page
 
@@ -23,7 +25,12 @@
      /en-gb/vault/app#path — no longer supported; use /en-gb/app#path instead
 
    Rules:
-     1. Root (/) is the only hash inbox for vault tokens.
+     1. Root (/) and the locale landing (/<locale>/) are the hash inboxes for vault tokens.
+        The landing consumes a hash exactly like root (2026-09-09: `sgit` prints
+        `…/en-gb/#<key>` links and users paste them; stripping the key showed the home
+        page and looked like a broken key). It NEVER redirects without a hash — that is
+        what keeps the 353ef55 loop (/ → /en-gb/ → /) impossible: the only redirect out
+        of the landing carries no hash and lands on /<locale>/app, which never bounces back.
      2. Root redirect always goes to /en-gb/app with NO hash (key saved to LS).
      3. /en-gb/app hash is a file path (for App Mode), not a vault key.
         Vault key ALWAYS comes from localStorage.
@@ -87,36 +94,48 @@
         } catch (_) {}
     }
 
-    // Called from root (/) head script — the only hash inbox.
-    // Supports:
-    //   /#vault-key              → save key to LS → redirect to /en-gb/app (no hash)
-    //   /#vault-key|path         → save key + plain deep-link → redirect to /en-gb/app
-    //   /#vault-key|app:path     → save key + app: deep-link → redirect to /en-gb/app
-    // app-shell reads key from LS (hash on /en-gb/app is a file path, not a key).
-    function runRoot() {
-        if (_hasHash()) {
-            var raw    = '';
-            try { raw = decodeURIComponent(location.hash.slice(1)); } catch (_) {}
-            var pipeIdx = raw.indexOf('|');
-            var token   = (pipeIdx === -1 ? raw : raw.slice(0, pipeIdx)).toLowerCase().trim();
-            var deep    = pipeIdx === -1 ? '' : raw.slice(pipeIdx + 1).trim();
-            // Release pin: an `@name` segment anywhere after the key selects a published
-            // release (`/#key|@v1-2`, `/#key|@v1-2|app:index.html`). Extracted here so a
-            // pinned link is stable on ANY device — a pin that lived only in localStorage
-            // would die on a new laptop or cleared storage, mid-demo.
-            deep = _extractReleasePin(deep);
-            if (token) VaultLoaderStorage.setCurrentKey(token);
-            _saveDeepLink(deep);
-            // Redirect to app page with NO hash — key is now in localStorage.
-            // app-shell reads key from LS; hash on /en-gb/app is a file path, not a key.
-            location.replace('/en-gb/app');
-        } else {
-            location.replace('/en-gb/');
-        }
+    // The app surface of the locale we are on (/pt-pt/… → /pt-pt/app), else en-gb.
+    // Root (/) has no locale segment and keeps going to /en-gb/app, as before.
+    function _appPathForLocale() {
+        var m = /^\/([a-z]{2}-[a-z]{2})\//.exec(location.pathname || '');
+        return '/' + (m ? m[1] : 'en-gb') + '/app';
     }
 
-    // Called from /en-gb/ head script — strip any stray hash, render landing.
-    function runLanding() { _stripHash(); }
+    // The hash inbox, shared by root and the locale landing so both make the SAME decision:
+    //   #vault-key              → save key to LS → redirect to /<locale>/app (no hash)
+    //   #vault-key|path         → save key + plain deep-link → redirect
+    //   #vault-key|app:path     → save key + app: deep-link → redirect
+    //   #vault-key|@release     → save key + release pin → redirect
+    // app-shell reads the key from LS (a hash on /<locale>/app is a file path, not a key).
+    // Returns true when it redirected; false (and does nothing) when there is no hash.
+    function _consumeHashInbox() {
+        if (!_hasHash()) return false;
+        var raw    = '';
+        try { raw = decodeURIComponent(location.hash.slice(1)); } catch (_) {}
+        var pipeIdx = raw.indexOf('|');
+        var token   = (pipeIdx === -1 ? raw : raw.slice(0, pipeIdx)).toLowerCase().trim();
+        var deep    = pipeIdx === -1 ? '' : raw.slice(pipeIdx + 1).trim();
+        // Release pin: an `@name` segment anywhere after the key selects a published
+        // release (`/#key|@v1-2`, `/#key|@v1-2|app:index.html`). Extracted here so a
+        // pinned link is stable on ANY device — a pin that lived only in localStorage
+        // would die on a new laptop or cleared storage, mid-demo.
+        deep = _extractReleasePin(deep);
+        if (token) VaultLoaderStorage.setCurrentKey(token);
+        _saveDeepLink(deep);
+        // Redirect to the app page with NO hash — the key is now in localStorage.
+        try { location.replace(_appPathForLocale()); } catch (_) {}
+        return true;
+    }
+
+    // Called from root (/) head script.
+    function runRoot() {
+        if (!_consumeHashInbox()) location.replace('/en-gb/');
+    }
+
+    // Called from /<locale>/ head script. With a hash: the same inbox as root. Without one:
+    // render the landing — no strip needed (there is nothing to strip) and NO redirect,
+    // so /en-gb/ can never bounce (regression 353ef55).
+    function runLanding() { _consumeHashInbox(); }
 
     // Called from /en-gb/vault (and /en-gb/vault/*) head script.
     // Strips any hash — vault always reads key from localStorage.

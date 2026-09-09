@@ -17,9 +17,10 @@
     <script src="_common/js/vault-loader/vault-loader-routing.js"></script>
     <script src="_common/js/vault-loader/vault-loader.js"></script>
 
-    <!-- Routing: root is the only hash inbox; all other paths strip and discard.
-         With #token → save to LS → /en-gb/app#token (app-shell opens vault; redirects to
-         /en-gb/vault/ if no app.json found).
+    <!-- Routing: root and the locale landing (/en-gb/) are the hash inboxes; every other
+         path strips and discards.
+         With #token → save to LS → /en-gb/app (app-shell opens the vault; redirects to
+         /en-gb/vault/ if no app.json found). /en-gb/#token does the same.
          Without # → /en-gb/ (landing, user picks from list).
          Anywhere else → strip hash, render page. -->
     <script>
