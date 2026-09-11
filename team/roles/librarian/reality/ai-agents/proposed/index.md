@@ -58,6 +58,22 @@ The previous full index is preserved in git history on commit before this date.
 
 ---
 
+## New Proposals — 26 Aug to 7 Sep 2026
+
+Items added from v0.33.62–v0.33.66 briefs. All PROPOSED.
+
+| P-number | Feature | Source |
+|----------|---------|--------|
+| P-GNM-001 | **Cedar policy language for grant measurement.** Adopt Cedar for the permissions layer (default-deny; evaluation outside agent's reasoning loop; Cedar does not establish identity so it composes with the registry). What has no standard is the mandate — build the mandate document format as the novel contribution, not a new policy language. | 26 Aug v0.33.62 |
+| P-GNM-002 | **Grant-mandate pack library.** Library belongs to the registry; instance belongs to the risk product. Reality comes before the risk register. Comparison needs three terms (grant, mandate, gap). | 26 Aug v0.33.62 |
+| P-GNM-003 | **Grant-mandate public repository with probes.** Grant claims travel with the command that establishes them (public). Mandates never leave the clone (local, private). Probe = executable claim; challenge = rerun not argument. Adopt existing probe/finding vocabulary (do not mint). | 04 Sep v0.33.64 |
+| P-INS-001 | **Insurance ecosystem pack — nine-item inventory.** PKI site agent specification with acceptance test for the pack itself. Nine-item inventory with eleven questions. | 26 Aug v0.33.62 |
+| P-INS-002 | **Resource pool economics model.** Premium paid in allocation from finite pool (scarcity is the feature). Correlation is the failure mode (agent draws correlated through shared models/prompts/tooling). Experience rating must land on the team not the agent (agent is indifferent to loss). Recoverability decides insurability (reversible rate resets; committed bytes are paid by every clone). | 26 Aug v0.33.62 |
+| P-AIUC-001 | **AIUC-1 conformance layer expansion.** Layer shipped 4 Sep (in vault/website, not SGraph Send codebase). Remaining: 1,064 crosswalks with no graph to resolve into (blocked on framework publication); level five unreachable for every control (all attestations self-reported); app ships built but cannot be rebuilt from vault (reproducibility gap); recovery barriers must be marked as "our reading" (standard has no recovery class). Two-edge rule held as failing test (rule with a test vs rule in a document). | 04 Sep v0.33.64 |
+| P-CRED-001 | **Credentials and keys — four client-side patterns strategy.** Four patterns ordered by security: (1) key in page nothing bounding it — never acceptable; (2) Chrome sync treated as untrusted transport, ciphertext only, 100KB/500-item budget; (3) per-customer key with credit limit from vendor; (4) host holds key, application never sees it — this estate's current design. Origin binding is a usability control (prevents mistakes not attacks) and must be labelled as one. | 05 Sep v0.33.65 |
+
+---
+
 ## Notes
 
 **P-numbering discrepancy (P-404–P-410):** A minor discrepancy exists between the P-numbers in `risk-mandate.md` (P-408 = agentic freelancing; P-409 = personal scenario) and the June 26 master index (P-408 = personal scenario; P-410 = agentic freelancing). The descriptions are correct in both; use the description not the number when resolving ambiguity.
