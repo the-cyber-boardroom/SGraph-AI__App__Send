@@ -37,6 +37,22 @@ before P-numbering was introduced.*
 
 ---
 
+## New Proposals — 26 Aug to 7 Sep 2026
+
+Items added from v0.33.62–v0.33.66 briefs. All PROPOSED.
+
+| P-number | Feature | Source |
+|----------|---------|--------|
+| P-GAME-001 | **EXCESS game (TUI).** Never-act constraint; three opposite loss conditions; two ways to lose and they are opposite; exceeding the mandate sometimes pays. Engine rules exist as a reference prompt playable in a chat session. | 26 Aug v0.33.62 |
+| P-GAME-002 | **CAPTIVE game.** Nobody lies; pool denominated in resources; an insurer that profits too much has failed as surely as one that makes a loss. Engine rules exist as a reference prompt. | 26 Aug v0.33.62 |
+| P-GAME-003 | **Guess the Agent game.** Guessing inverts the burden; tree guesses your grant; prediction gap (what you predicted vs what was found) is the product, not the guess. | 04 Sep v0.33.64 |
+| P-GAME-004 | **Three-game arcade series (let-it-through, calibration, arcade).** Three separate games shipping together. Reach is a node not a ladder; proper scoring rule replaces correctness (rewards yes-to-everything without it); 40-item dataset travels inside the prompt; impossible bin is the largest at 16 of 40. Reference prompt exists and is self-contained. | 05 Sep v0.33.65 |
+| P-ASSESS-001 | **Assessment product — one measurement, five renderings.** OSCAL and SARIF as output schemas (adopt, do not mint third); five artefacts from one measurement (individual narrative, team summary, compliance tooling, developer tooling, import/export); every stage must produce a finished artefact; mandate authoring step has no tool and cannot have one. | 05 Sep v0.33.65 |
+| P-PROV-001 | **Providers pack.** Pack specified not written; ladder written in March; these sites are narrower than a vendor console, not better; narrowness is the whole advantage; two providers now restrict resale so a grant is a research subsidy not inventory. | 07 Sep v0.33.66 |
+| P-PLAY-001 | **Playground as explorer artefact.** A playground owes a failure ratio (record of what failed) and an exit (a way for things to leave it). Distinct from a product page. | 07 Sep v0.33.66 |
+
+---
+
 ## Full Content Reference
 
 Full content for all items: source monolith at `../v0.16.26__what-exists-today.md`

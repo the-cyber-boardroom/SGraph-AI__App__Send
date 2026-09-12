@@ -7,6 +7,20 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-09-11
+
+Processed 26 Aug to 7 Sep 2026 briefs (v0.33.62–v0.33.66): 38 briefs + 5 day indexes.
+
+Files changed:
+- `reality/index.md` — version v0.33.66 → v0.33.69; date updated; PROPOSED count ~1086+ → ~1104+; docs 980 → 1023
+- `reality/vault/proposed/index.md` — added P-VTV-001–003 (vaults-talking-to-vaults; append lane outside commit DAG; reply address in first message) and P-VID-001 (video clone template)
+- `reality/tools/proposed/index.md` — added P-GAME-001–004 (EXCESS, CAPTIVE, Guess-the-Agent, three-game arcade series); P-ASSESS-001 (assessment product OSCAL/SARIF); P-PROV-001 (providers pack); P-PLAY-001 (playground as explorer artefact)
+- `reality/ai-agents/proposed/index.md` — added P-GNM-001–003 (Cedar policy; grant-mandate pack; public repo with probes); P-INS-001–002 (insurance ecosystem pack; resource pool economics); P-AIUC-001 (AIUC-1 conformance layer expansion); P-CRED-001 (four client-side credential patterns)
+
+Session: 43 new docs catalogued | New EXISTS items: 0 | New PROPOSED items: +18 | Cumulative docs: 1023
+
+---
+
 ## 2026-09-03
 
 B-015 completed: `test__sgit_key_prefixes.js` (08/25 commit `b3a9220`) counted and added to the ViV loader suite table. 28 assertions (4 suites). Test count updated ~3100+ → ~3130+; ViV suite ~1060+ → ~1090+.
