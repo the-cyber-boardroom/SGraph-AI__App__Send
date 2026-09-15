@@ -7,6 +7,22 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-09-15
+
+Processed 3–7 September 2026 briefs (docs 981–1012, 32 new entries). No new EXISTS items — no code changes in SGraph Send app verified from these briefs. 21 new PROPOSED items added (P-CONF-001–005, P-LTO-001–002, P-OBS-001, P-REPO-001–002, P-ASMT-001–003, P-GAME-001–004, P-CRED-001–002, P-SITES-001–003, P-VTV-001–003).
+
+Files changed:
+- `reality/index.md` — Last updated → 2026-09-15; total docs 980 → 1012; PROPOSED count ~1086+ → ~1107+
+- `reality/ai-agents/proposed/index.md` — Last updated → 2026-09-15; new topic file reference added
+- `reality/ai-agents/proposed/conformance-and-games.md` — NEW FILE; 21 PROPOSED items from 03–07 Sep 2026 briefs
+- `reality/changelog.md` — this entry
+
+Session: 32 new docs catalogued | New EXISTS items: 0 | New PROPOSED items: 21 | Cumulative docs: 1012
+Master index: `team/roles/librarian/reviews/09/15/v0.33.66__master-index__briefs-03-07-sep-2026.md`
+Debrief: `team/humans/dinis_cruz/debriefs/09/15/v0.33.66__debrief__briefs-processing-03-07-sep-2026.md`
+
+---
+
 ## 2026-09-03
 
 B-015 completed: `test__sgit_key_prefixes.js` (08/25 commit `b3a9220`) counted and added to the ViV loader suite table. 28 assertions (4 suites). Test count updated ~3100+ → ~3130+; ViV suite ~1060+ → ~1090+.

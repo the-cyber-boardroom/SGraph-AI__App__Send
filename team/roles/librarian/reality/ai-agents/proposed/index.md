@@ -1,6 +1,6 @@
 # AI Agents — Proposed Items Index
 
-**Domain:** ai-agents/proposed/ | **Last updated:** 2026-08-22 | **Maintained by:** Librarian (daily run)
+**Domain:** ai-agents/proposed/ | **Last updated:** 2026-09-15 | **Maintained by:** Librarian (daily run)
 
 All items are PROPOSED. None have been code-verified. Do not describe any of these as existing features.
 
@@ -18,6 +18,7 @@ The previous full index is preserved in git history on commit before this date.
 | [`workflows.md`](workflows.md) | Scheduled and autonomous tasks, accountant demo, archiver-cataloguer pattern, agentic incident-response service | P-147–P-152; P-238–P-247 |
 | [`skills-economy.md`](skills-economy.md) | Partner integrations (Netlify, Daytona, Convex, Pi, HeyGen), skills creator economy, ownership+maintenance model, skills deepened (06/04), NHI 2.0 agent-identity cross-domain items | P-288–P-305; P-317–P-321; P-325, P-328, P-332 |
 | [`risk-mandate.md`](risk-mandate.md) | Agent blast-radius service, assessment template, WhatsApp case study, Odysseus evidence vault, formal Agent Mandate ontology, authorization ontology + delegation, how-not-why scope + mandate architecture, Wardley map series, risk acceptance service MVP, multi-stakeholder workflow, personal scenario, Calendly review, risk register architecture, digital twins, semantic graph engine, 2FA MVP, AWS risk engine (Python + browser + ontology), evidence economy (news vaults, force of proof, packs-as-service), experience loop, AOMM, regulation graph, three-predicate model, MVP field demo, agentic incident taxonomy | P-353–P-357; P-376–P-379; P-387–P-430; P-AOMM-001–P-AOMM-007; P-REG-001–P-REG-012; P-PRED-001–P-PRED-005; P-DEMO-001–P-DEMO-007; P-INC-001–P-INC-002 |
+| [`conformance-and-games.md`](conformance-and-games.md) | AIUC-1 conformance layer, licence-to-operate vault app, self-report calibration, grant/mandate public repository, assessment product, game series (calibration/prediction-gap/arcade), credentials site, new game-primitive and playground sites, vault observability and logging | P-CONF-001–005; P-LTO-001–002; P-OBS-001; P-REPO-001–002; P-ASMT-001–003; P-GAME-001–004; P-CRED-001–002; P-SITES-001–003; P-VTV-001–003 |
 
 ---
 
@@ -55,6 +56,15 @@ The previous full index is preserved in git history on commit before this date.
 | P-DEMO-001–P-DEMO-007 (MVP field demo: scenario library, vault-as-static-site, cost meter, persona-flick, takeaway, Black Hat demo, Wardley maps) | `risk-mandate.md` |
 | P-INC-001–P-INC-002 (Agentic incident taxonomy: five populations, living register) | `risk-mandate.md` |
 | P-MEB-001 (Mandate execution broker: agent never holds credential, signed receipt, concentration risk) | `agent-communication.md` |
+| P-CONF-001–005 (AIUC-1 conformance layer: two-edge rule, crosswalk pipeline, D003 measurement) | `conformance-and-games.md` |
+| P-LTO-001–002 (Licence-to-operate vault app: two-store split, derived licence) | `conformance-and-games.md` |
+| P-OBS-001 (Self-report calibration: two producers, gap as product) | `conformance-and-games.md` |
+| P-REPO-001–002 (Grant/mandate public repo: probes not tables; SARIF/OSCAL output) | `conformance-and-games.md` |
+| P-ASMT-001–003 (Assessment product: five artefacts, OSCAL import, mandate authoring) | `conformance-and-games.md` |
+| P-GAME-001–004 (Game series: prediction-gap, calibration, arcade — none yet playable) | `conformance-and-games.md` |
+| P-CRED-001–002 (Credentials/platforms site; Chrome sync as untrusted transport) | `conformance-and-games.md` |
+| P-SITES-001–003 (Game primitives site, providers pack, playground) | `conformance-and-games.md` |
+| P-VTV-001–003 (Vault observability events, LETS finality pipeline, reply address in first message) | `conformance-and-games.md` |
 
 ---
 
