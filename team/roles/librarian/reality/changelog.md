@@ -9,17 +9,31 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ## 2026-09-15
 
-Processed 3–7 September 2026 briefs (docs 981–1012, 32 new entries). No new EXISTS items — no code changes in SGraph Send app verified from these briefs. 21 new PROPOSED items added (P-CONF-001–005, P-LTO-001–002, P-OBS-001, P-REPO-001–002, P-ASMT-001–003, P-GAME-001–004, P-CRED-001–002, P-SITES-001–003, P-VTV-001–003).
+Verification run: confirmed 09/11 processing was complete. No new docs beyond 1,023. Added supplementary deliverables: alternative topic file `reality/ai-agents/proposed/conformance-and-games.md` (21 items, cross-referencing P-CONF–P-VTV series from 09/11), plus architect review, dev review, and master index for the 03–07 Sep period. Resolved merge conflict with 09/11 run (doc counts reconciled: remote 1,023 is authoritative).
 
 Files changed:
-- `reality/index.md` — Last updated → 2026-09-15; total docs 980 → 1012; PROPOSED count ~1086+ → ~1107+
-- `reality/ai-agents/proposed/index.md` — Last updated → 2026-09-15; new topic file reference added
-- `reality/ai-agents/proposed/conformance-and-games.md` — NEW FILE; 21 PROPOSED items from 03–07 Sep 2026 briefs
+- `reality/index.md` — Last updated → 2026-09-15; remote v0.33.69 accepted as base; 09/15 annotation added
+- `reality/ai-agents/proposed/index.md` — conformance-and-games.md topic file reference added
+- `reality/ai-agents/proposed/conformance-and-games.md` — NEW FILE; 21 PROPOSED items cross-referenced from 03–07 Sep 2026 briefs
 - `reality/changelog.md` — this entry
 
-Session: 32 new docs catalogued | New EXISTS items: 0 | New PROPOSED items: 21 | Cumulative docs: 1012
+Session: 0 new docs | New EXISTS items: 0 | New PROPOSED items: 21 (alternative grouping file; items already in domain files from 09/11) | Cumulative docs: 1,023
 Master index: `team/roles/librarian/reviews/09/15/v0.33.66__master-index__briefs-03-07-sep-2026.md`
 Debrief: `team/humans/dinis_cruz/debriefs/09/15/v0.33.66__debrief__briefs-processing-03-07-sep-2026.md`
+
+---
+
+## 2026-09-11
+
+Processed 26 Aug to 7 Sep 2026 briefs (v0.33.62–v0.33.66): 38 briefs + 5 day indexes.
+
+Files changed:
+- `reality/index.md` — version v0.33.66 → v0.33.69; date updated; PROPOSED count ~1086+ → ~1104+; docs 980 → 1023
+- `reality/vault/proposed/index.md` — added P-VTV-001–003 (vaults-talking-to-vaults; append lane outside commit DAG; reply address in first message) and P-VID-001 (video clone template)
+- `reality/tools/proposed/index.md` — added P-GAME-001–004 (EXCESS, CAPTIVE, Guess-the-Agent, three-game arcade series); P-ASSESS-001 (assessment product OSCAL/SARIF); P-PROV-001 (providers pack); P-PLAY-001 (playground as explorer artefact)
+- `reality/ai-agents/proposed/index.md` — added P-GNM-001–003 (Cedar policy; grant-mandate pack; public repo with probes); P-INS-001–002 (insurance ecosystem pack; resource pool economics); P-AIUC-001 (AIUC-1 conformance layer expansion); P-CRED-001 (four client-side credential patterns)
+
+Session: 43 new docs catalogued | New EXISTS items: 0 | New PROPOSED items: +18 | Cumulative docs: 1023
 
 ---
 
