@@ -31,7 +31,7 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 
 ---
 
-## Quick Stats (as of 2026-09-08)
+## Quick Stats (as of 2026-09-16)
 
 | Metric | Count |
 |--------|-------|
@@ -44,8 +44,8 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | Browser UIs | **7** (share v0.4, open v0.4, admin, workspace, vault browser, vault app /en-gb/app; user v0.3.x legacy) |
 | Active tools (tools.sgraph.ai) | 4 |
 | sgit CLI commands | 20+ |
-| Open PROPOSED items (across all domains) | ~1086+ (+13 net-new from 09/01 session: P-REG-001–005, P-CON-001–003, P-EXP-001–002, P-SITE-001–002; +6 from 08/25: P-NHI-001–006; +16 from 08/23: P-ENR-001–009, P-BRK-001–007; previously ~1051+; 09/04 and 09/08 runs: no new items — 20 Aug briefs fully catalogued 09/01) |
-| Total documents catalogued | 980 (+17 from 20 Aug v0.33.61; +1 day index; processed 08/26–08/27 and 09/01; prev: 962; 09/08 run: confirmed, no new docs; fresh architect + dev reviews produced in 09/08)
+| Open PROPOSED items (across all domains) | ~1114+ (+28 net-new from 09/16 run: P-CEDAR-001, P-GMI-001–003, P-GAME-EXCESS, P-GAME-CAPTIVE, P-LOV-001–002, P-STATUS-001, P-PASSIVE-002, P-CONF-LAYER, P-D003, P-CHAT-EXPORT, P-REPO-PROBES, P-ASSESS-SITE, P-ASSESS-PROD, P-CRED-SITE, P-CHROME-CIPH, P-GAME-REACH, P-GAME-CALIB, P-GAME-ARCADE, P-GAME-PRIMS, P-PROV-PACK, P-PLAYGROUND, P-VTV-LANES, P-VTV-LOG, P-VTV-REPLY, P-VIDEO-CLONE; previously ~1086+) |
+| Total documents catalogued | **1,023** (+43 from 26 Aug–7 Sep 2026: docs 981–1023; processed 09/16; prev: 980)
 | **Key decision** | **Risk Mandate.ai** adopted as product name (resolves OQ-company-name-1, 2026-06-25) |
 | **Key decision** | **Grounded alarm** adopted as the Risk Mandate communication strategy term (replaces FUD framing, 2026-07-05) |
 | **Key decision** | **Grant ≠ Mandate** (corrected 2026-08-20, doc 963 v0.33.61) — grant is the union of capabilities conferred at assignment; mandate is what the party is authorised and expected to do; excess authority = grant minus mandate = unaccepted blast radius; allow-list mandates are the only measurable form; the July "to grant is to mandate" identification was correct as an accounting identity (a party carries its grant's exposure) but wrong as an object collapse; the two are separate objects |
@@ -102,6 +102,22 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | **Key decision** | **Consumer register: refund is pretext, record is asset** — a subscription transparency register asks whether companies hold usage records (not how much was used); "does not hold usage data" is a valid, non-penalised response; publish the record of what was asked and answered, never a characterisation; subscription = discount for committing to regular use, not rent on something you have the right to ignore (consumer transparency register, 2026-08-20) |
 | **Key decision** | **High threat without efficacy produces denial** — a personal high-threat page must include efficacy statements or the reader produces defensive denial rather than action; a general low-threat page withholds remedies to create appetite; the two editorial rules are not alignable (user assessment brief, 2026-08-20) |
 | **Key decision** | **Levels and variants are orthogonal** — depth of detail (level) and rendering/wording (variant) must vary independently; conflating them makes an experiment undiagnosable (persona generator brief, 2026-08-20) |
+| **Key decision** | **Adopt Cedar for grant expression** — Cedar (open policy language) covers principal, action, resource, context with default-deny; evaluation outside agent's reasoning loop; Cedar's own docs say it does not establish identity — composes with registry, does not compete; grant is measured rather than authored (26-Aug-2026 dev-brief) |
+| **Key decision** | **Premium paid in allocation from a finite pool** — unit of payment is allocation not money; scarcity is the feature; correlation breaks pooling (agent draws share models/prompts/tooling); experience rating on the team (agent indifferent to loss); recoverability decides insurability (2026-08-26) |
+| **Key decision** | **Licence derived, never stored** — vault holds terms, browser holds run; three inputs computed on every render; most important word on screen is in no file; scope before amount: action outside mandate refused on capability, meter never read (2026-09-03) |
+| **Key decision** | **Two-store split validated as design pattern** — vault=terms, browser=run; the split absorbed three later requirements without a line changing; portability is transcription not mount (session can fetch, published page cannot) (2026-09-03) |
+| **Key decision** | **Self-report cannot be a meter** — build two producers of one object; gap per model is the product; applies to status block, transcription disagreement, and conformance evidence (2026-09-03) |
+| **Key decision** | **Levels beat altitudes** — level-one audience has a different problem, not a shallower version of the same one; each level's solution creates the next level's question; concepts introduced in order of attrition (2026-09-03) |
+| **Key decision** | **Rule with a test is a rule; rule in a document is a preference** — AIUC-1 two-edge rule held by a build test that fails if a layer edge reaches a source observation; unevidenced is the default state (2026-09-04) |
+| **Key decision** | **Grant is per tool, not per session** — session grant = union of tool grants × intersection of host grants; conformance claim about a session is unanswerable; two of five conformance requirements are harness properties (2026-09-04) |
+| **Key decision** | **Probes not rows** — unit of contribution to public grant/mandate repo is a probe; a challenge is a rerun not an argument; adopt probe and finding vocabulary from existing open project (2026-09-04) |
+| **Key decision** | **Adopt OSCAL + SARIF** — emit both existing interchange standards rather than minting a third; mandate authoring step has no tool and cannot have one (2026-09-05) |
+| **Key decision** | **Reach is a mesh node** — reading a file system is six different exposures wearing one verb; every answer is already a prediction; rewarding correct answers rewards yes-to-everything; proper scoring rule required; level = moves from capability to consequence (2026-09-05) |
+| **Key decision** | **Append lane sits outside commit DAG** — flat put costs O(1); committed write rewrites folder tree + all ancestors (≈1000× on 1,000-entry folder); all high-frequency vault events must use append lane (2026-09-07) |
+| **Key decision** | **Reply address inside first message** — no directory needed; broadcast is private option (unicast reveals identity); path with one writer and defined readers is an interface (2026-09-07) |
+| **Key decision** | **Playground owes failure ratio and exit** — explorer artefact not product; a playground without a record of what failed is not a playground (2026-09-07) |
+| **Key decision** | **Read documentation for the product, not the vendor** — provider credential rules differ by product; a credential mechanism stated for one endpoint may not hold for another; 5 Sep claim corrected by page fetch on 7 Sep (2026-09-07) |
+| **⚠️ Live defect** | **Mount write defect** — a write inside a linked mount lands silently in the parent vault if a real folder shadows the mount path; no test covers it; must be fixed before any linked-mount feature ships (found 2026-09-07) |
 
 ---
 
