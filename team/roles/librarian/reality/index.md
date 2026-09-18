@@ -1,6 +1,6 @@
 # Reality — Master Index
 
-**Version:** v0.33.66 | **Last updated:** 2026-09-08 | **Maintained by:** Librarian (daily run)
+**Version:** v0.33.69 | **Last updated:** 2026-09-18 | **Maintained by:** Librarian (daily run)
 **Structure:** Domain tree — each domain has its own directory with `index.md` and `proposed/`
 
 This file is the entry point. Read it to find the right domain, then go to that domain's
@@ -44,8 +44,8 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | Browser UIs | **7** (share v0.4, open v0.4, admin, workspace, vault browser, vault app /en-gb/app; user v0.3.x legacy) |
 | Active tools (tools.sgraph.ai) | 4 |
 | sgit CLI commands | 20+ |
-| Open PROPOSED items (across all domains) | ~1086+ (+13 net-new from 09/01 session: P-REG-001–005, P-CON-001–003, P-EXP-001–002, P-SITE-001–002; +6 from 08/25: P-NHI-001–006; +16 from 08/23: P-ENR-001–009, P-BRK-001–007; previously ~1051+; 09/04 and 09/08 runs: no new items — 20 Aug briefs fully catalogued 09/01) |
-| Total documents catalogued | 980 (+17 from 20 Aug v0.33.61; +1 day index; processed 08/26–08/27 and 09/01; prev: 962; 09/08 run: confirmed, no new docs; fresh architect + dev reviews produced in 09/08)
+| Open PROPOSED items (across all domains) | ~1116+ (+30 net-new from 09/18 session: P-CEDAR-001, P-GMPK-001, P-INS-001–004, P-PRIM-001, P-GAME-EXC-001, P-GAME-CAP-001, P-LTV-001–002, P-OBS-STATUS-001, P-CONF-001–003, P-REPO-001, P-ASSESS-001–002, P-GAME-GUESS-001, P-GAME-REACH-001, P-GAME-CAL-001, P-GAME-ARC-001, P-CRED-001, P-VTV-001, P-LOG-001, P-RETURN-001, P-GAME-PRIM-001, P-PROVIDER-001, P-PLAYGROUND-001, P-VIDEO-001; prev: ~1086+) |
+| Total documents catalogued | 1023 (+43 from 26 Aug–07 Sep: 5 day indexes + 38 briefs/refs across 5 days; prev: 980; 09/18 run closes backlog since 09/08)
 | **Key decision** | **Risk Mandate.ai** adopted as product name (resolves OQ-company-name-1, 2026-06-25) |
 | **Key decision** | **Grounded alarm** adopted as the Risk Mandate communication strategy term (replaces FUD framing, 2026-07-05) |
 | **Key decision** | **Grant ≠ Mandate** (corrected 2026-08-20, doc 963 v0.33.61) — grant is the union of capabilities conferred at assignment; mandate is what the party is authorised and expected to do; excess authority = grant minus mandate = unaccepted blast radius; allow-list mandates are the only measurable form; the July "to grant is to mandate" identification was correct as an accounting identity (a party carries its grant's exposure) but wrong as an object collapse; the two are separate objects |
@@ -102,6 +102,23 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | **Key decision** | **Consumer register: refund is pretext, record is asset** — a subscription transparency register asks whether companies hold usage records (not how much was used); "does not hold usage data" is a valid, non-penalised response; publish the record of what was asked and answered, never a characterisation; subscription = discount for committing to regular use, not rent on something you have the right to ignore (consumer transparency register, 2026-08-20) |
 | **Key decision** | **High threat without efficacy produces denial** — a personal high-threat page must include efficacy statements or the reader produces defensive denial rather than action; a general low-threat page withholds remedies to create appetite; the two editorial rules are not alignable (user assessment brief, 2026-08-20) |
 | **Key decision** | **Levels and variants are orthogonal** — depth of detail (level) and rendering/wording (variant) must vary independently; conflating them makes an experiment undiagnosable (persona generator brief, 2026-08-20) |
+| **Key decision** | **Adopt Cedar policy language** — composable with identity registry; Cedar covers permissions, the registry covers identity; Cedar does not establish identity (its own documentation states this); the mandate has no standard; Cedar covers the permissions file (grant/mandate brief, 2026-08-26) |
+| **Key decision** | **Grant is discovered, not authored** — a hand-authored grant records a belief; a measured one records the environment; the branch constraint that lives in prose beside three enforced hook constraints is the worked instance (grant/mandate brief, 2026-08-26) |
+| **Key decision** | **Premium = allocation from finite pool** — scarcity is the feature; a budget nobody can exhaust produces no decisions; correlation breaks agent pooling (shared models/prompts/tooling/dependencies); experience rating must land on the team, not the agent (insurance brief, 2026-08-26) |
+| **Key decision** | **Licence is derived, never stored** — three inputs (mandate in force, policy covering it, zone not outside) computed on every render; the most important word on screen is in no file; three withdrawal modes (amount, scope, lapse) must look different (licence-to-operate vault, 2026-09-03) |
+| **Key decision** | **Scope before amount** — an action inside the grant and outside the mandate is refused on its capability with the meter never read; unauthorised action becomes visible without being counted (licence-to-operate vault, 2026-09-03) |
+| **Key decision** | **Levels beat altitudes** — an audience at level one has a different problem, not a shallower version of the same one; each level's solution creates the next level's question; concepts are introduced in order of attrition, not logic (positioning brief, 2026-09-03) |
+| **Key decision** | **Two-edge rule is a test, not a preference** — the AIUC-1 conformance layer holds the two-edge rule by a failing build test; a rule in a document is a preference; a rule with a test is a rule (conformance layer, 2026-09-04) |
+| **Key decision** | **Unevidenced is the default conformance state** — the first honest output of any conformance layer is a map of what nobody has looked at; inability to observe belongs on the assertion as a field with a reason, not as a fourth vocabulary state (conformance layer, 2026-09-04) |
+| **Key decision** | **Grant is per tool, not per session** — a conformance claim about a session is unanswerable; agent conformance requires a party outside the agent for two of five requirements (conformance measurement, 2026-09-04) |
+| **Key decision** | **Adopt probe and finding vocabulary** — the vocabulary proposed for the public repository already exists in a widely-adopted project with definitions close enough to adopt; the same project replaced a score with structured findings for precisely the reason this corpus objected to collapsed maturity levels (research brief, 2026-09-04) |
+| **Key decision** | **Five renderings of one measurement** — adopt OSCAL and SARIF as interchange standards rather than minting a third schema; five renderings of one measurement rather than five measurements; import matters as much as export (assessment product, 2026-09-05) |
+| **Key decision** | **Proper scoring rule for games** — rewarding correct answers rewards answering yes to everything (real grants are wider than expected); fix the incentive, not the content; name every lazy strategy and show it losing with numbers (game series, 2026-09-05) |
+| **Key decision** | **Chrome sync = untrusted transport** — ciphertext only; 100KB budget; origin binding downgraded to usability control (prevents mistakes, not attacks); an extension enforcing a rule about itself fails the enforcer test (credentials brief, 2026-09-05) |
+| **Key decision** | **Append lane outside commit DAG** — single fact the logging architecture turns on; a committed write rewrites its folder's tree and every ancestor; history walks truncate silently (logging architecture, 2026-09-07) |
+| **Key decision** | **Reply address inside first message** — no directory needed; broadcast is the private option because addressing somebody means learning who they are; a path with one writer and defined readers is an interface (return path, 2026-09-07) |
+| **Key decision** | **Sites narrower than vendor console, not better** — narrowness is the whole advantage; a limit the app author chooses is not a limit; built-in limits bound accidents, provisioned keys bound loss (sites brief, 2026-09-07) |
+| **Key decision** | **Read documentation for the product, not the vendor** — 5 Sep brief quoted agent product's signed-URL rule on a speech page; speech endpoint does not accept signed URLs; the 4 Sep lesson (clone the thing) in a new form (correction, 2026-09-07) |
 
 ---
 
