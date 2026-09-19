@@ -70,7 +70,7 @@ no longer maintained. Use `sgit-ai` for all new work.
 | `sgit upload <file>` (file transfer, not vault) | PROPOSED — not in sgit |
 | `sgit download <transfer-id>` | PROPOSED — not in sgit |
 | `sgit secrets store/get/list/delete` (OS keychain) | PROPOSED — not in sgit |
-| Merge and conflict resolution | PROPOSED — architecture simulated, no code |
+| Merge and conflict resolution | **EXISTS in the CLI** (three-way per file, `.conflict` files — per sgit.ai `docs/two-branch-model.md`; not re-verified here) and **in the browser** (`SGVault.merge()`, vault reality). Structured merge drivers: PROPOSED |
 | Nested vaults (vault-inside-vault) | PROPOSED |
 | `sg-send-cli` (old package) | Deprecated — use `sgit-ai` |
 

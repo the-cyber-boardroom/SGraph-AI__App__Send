@@ -365,7 +365,7 @@ Round-1 and Round-2 review findings addressed after the initial surface landed:
 | `structure_key` used for encryption | PROPOSED — derived but never used currently |
 | `GET /api/vault/bundle/{vault_id}` (single-call clone) | PROPOSED |
 | MCP transport backend for sgit | PROPOSED |
-| Merge and conflict resolution | PROPOSED — architecture simulated, no code |
+| Merge and conflict resolution in the browser | **EXISTS** — `SGVault.merge()` is a three-way file-level merge (fast-forward when cleanly behind; conflicts saved as `_conflict` copies; `merge(their, {publish:false})` for CAS callers), `sg-vault--sync.js:163`. Structured (JSON-aware) merge drivers do NOT exist |
 | Nested vaults (vault-inside-vault) | PROPOSED |
 | SQLite as local vault storage backend | PROPOSED — future optimisation |
 

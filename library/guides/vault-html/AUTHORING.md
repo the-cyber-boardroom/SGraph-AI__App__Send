@@ -125,7 +125,7 @@ Every vault HTML file gets a `<script>` injected into its `<head>` that exposes:
 ```js
 window.sg = {
     vfs: {
-        write   : (path, content)        => Promise<{path, size}>,   // string | Uint8Array | ArrayBuffer
+        write   : (path, content)        => Promise<{path, size, commit_id, published}>,   // string | Uint8Array | ArrayBuffer — receipt: see "Writing through a declared mount"
         read    : (path)                  => Promise<ArrayBuffer>,    // raw bytes; no read-size cap
         readText: (path)                  => Promise<string>,
         list    : (prefix)                => Promise<[{path,name,size,type}]>,
@@ -185,9 +185,9 @@ window.sg = {
     // AND a user-consent overlay on first call per (vault, appId, verb). Reads use the
     // standard vfs.* namespace; these are for non-read changes. Throws on read-only views.
     fs: {
-        move  : (from, to) => Promise<{ok: true, from, to}>,
-        delete: (path)     => Promise<{ok: true, path}>,
-        mkdir : (path)     => Promise<{ok: true, path}>,
+        move  : (from, to) => Promise<{moved: true, to?, commit_id?, published?}>,     // receipt fields on mounted paths
+        delete: (path)     => Promise<{deleted: true}>,                               // across a mount: EUNDERPRIVILEGED
+        mkdir : (path)     => Promise<{created: true, commit_id?, published?}>,
     },
     // Vault lifecycle — create / unlink / delete sub-vaults, and ViV mount/unmount for
     // cross-vault reads/writes through this kernel. Each verb is independently grantable
@@ -204,7 +204,7 @@ window.sg = {
         delete  : (ref)          => Promise<{ok: true}>,
         mount   : ({prefix, ref, label}) => Promise<{mountId}>,
         unmount : (mountId)      => Promise<{ok: true}>,
-        mounts  : ()             => Promise<[{mountId, prefix, label, ref}]>,
+        mounts  : ()             => Promise<[{prefix, access, declared, state, at}]>,   // projection; state is as of the last behind-check
         notify  : (mountId, name, payload) => Promise<{mountId, checked}>,  // run a DECLARED mount's lane check now (needs vault.notify)
         // Open ANOTHER vault inside an iframe in YOUR app. See "Embedding another vault".
         embed   : (mountEl, key, opts?) => Promise<{vaultName, fileCount, hasApp, iframe}>,
