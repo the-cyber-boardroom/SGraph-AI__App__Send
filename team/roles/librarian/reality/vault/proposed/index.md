@@ -26,6 +26,19 @@
 
 ---
 
+## New Proposals — 26 Aug to 7 Sep 2026
+
+Items added from v0.33.62–v0.33.66 briefs. All PROPOSED.
+
+| P-number | Feature | Source |
+|----------|---------|--------|
+| P-VTV-001 | **Vaults talking to vaults — two-lane convergence.** Two linked-vault lanes share no code; one already writes; work is path convergence not new machinery. | 07 Sep v0.33.66 |
+| P-VTV-002 | **Append lane outside commit DAG — performance.** Flat put vs tree rewrite (thousandfold); performance harness ships unused; publish three curves before high-frequency writes are built on commit lane. | 07 Sep v0.33.66 |
+| P-VTV-003 | **Reply address in first message — no directory.** Sender carries its own reply address sealed inside the first message; no directory service needed; broadcast is private option. Requires client sealing layer (P-ENR-002 family) to be enforced. | 07 Sep v0.33.66 |
+| P-VID-001 | **Video production clone template — UX fix.** Four of five mechanisms exist; clone cannot be started from inside the template (button is in wrong place in flow). A UX change, not new infrastructure. | 07 Sep v0.33.66 |
+
+---
+
 ## P-Number Lookup
 
 | P-number(s) | Topic file |
