@@ -1,6 +1,6 @@
 # Reality — Master Index
 
-**Version:** v0.33.66 | **Last updated:** 2026-09-08 | **Maintained by:** Librarian (daily run)
+**Version:** v0.33.69 | **Last updated:** 2026-09-20 | **Maintained by:** Librarian (daily run)
 **Structure:** Domain tree — each domain has its own directory with `index.md` and `proposed/`
 
 This file is the entry point. Read it to find the right domain, then go to that domain's
@@ -31,7 +31,7 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 
 ---
 
-## Quick Stats (as of 2026-09-08)
+## Quick Stats (as of 2026-09-20)
 
 | Metric | Count |
 |--------|-------|
@@ -44,8 +44,8 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | Browser UIs | **7** (share v0.4, open v0.4, admin, workspace, vault browser, vault app /en-gb/app; user v0.3.x legacy) |
 | Active tools (tools.sgraph.ai) | 4 |
 | sgit CLI commands | 20+ |
-| Open PROPOSED items (across all domains) | ~1086+ (+13 net-new from 09/01 session: P-REG-001–005, P-CON-001–003, P-EXP-001–002, P-SITE-001–002; +6 from 08/25: P-NHI-001–006; +16 from 08/23: P-ENR-001–009, P-BRK-001–007; previously ~1051+; 09/04 and 09/08 runs: no new items — 20 Aug briefs fully catalogued 09/01) |
-| Total documents catalogued | 980 (+17 from 20 Aug v0.33.61; +1 day index; processed 08/26–08/27 and 09/01; prev: 962; 09/08 run: confirmed, no new docs; fresh architect + dev reviews produced in 09/08)
+| Open PROPOSED items (across all domains) | ~1106+ (+20 net-new from 09/20 session: P-CED-001, P-INS-001, P-PKI-001, P-PLT-001, P-EXC-001, P-CAP-001, P-SBL-001, P-PSM-001, P-APR-001, P-GMS-001, P-GGA-001, P-PRM-001, P-PRV-001, P-LTO-001, P-VTV-001, P-ALA-001, P-RPL-001, P-VID-001, P-PLG-001, P-CSY-001; prev: ~1086+) |
+| Total documents catalogued | 1022 (+42 from 26 Aug v0.33.62 + 3/4/5/7 Sep 2026; processed 09/20; prev: 980)
 | **Key decision** | **Risk Mandate.ai** adopted as product name (resolves OQ-company-name-1, 2026-06-25) |
 | **Key decision** | **Grounded alarm** adopted as the Risk Mandate communication strategy term (replaces FUD framing, 2026-07-05) |
 | **Key decision** | **Grant ≠ Mandate** (corrected 2026-08-20, doc 963 v0.33.61) — grant is the union of capabilities conferred at assignment; mandate is what the party is authorised and expected to do; excess authority = grant minus mandate = unaccepted blast radius; allow-list mandates are the only measurable form; the July "to grant is to mandate" identification was correct as an accounting identity (a party carries its grant's exposure) but wrong as an object collapse; the two are separate objects |
@@ -102,6 +102,24 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | **Key decision** | **Consumer register: refund is pretext, record is asset** — a subscription transparency register asks whether companies hold usage records (not how much was used); "does not hold usage data" is a valid, non-penalised response; publish the record of what was asked and answered, never a characterisation; subscription = discount for committing to regular use, not rent on something you have the right to ignore (consumer transparency register, 2026-08-20) |
 | **Key decision** | **High threat without efficacy produces denial** — a personal high-threat page must include efficacy statements or the reader produces defensive denial rather than action; a general low-threat page withholds remedies to create appetite; the two editorial rules are not alignable (user assessment brief, 2026-08-20) |
 | **Key decision** | **Levels and variants are orthogonal** — depth of detail (level) and rendering/wording (variant) must vary independently; conflating them makes an experiment undiagnosable (persona generator brief, 2026-08-20) |
+| **Key decision** | **Grant is discovered, not written** — a hand-authored grant records a belief; a measured grant records the environment; generate by measurement, do not author by hand (grant/mandate pack brief, 2026-08-26) |
+| **Key decision** | **Adopt Cedar for policy expression** — Cedar expresses principal/action/resource/context with default-deny, evaluation outside the agent's loop, and explicitly does not establish identity; composes with sgit registry rather than competing; library to registry, instance to risk product (Cedar policy brief, 2026-08-26) |
+| **Key decision** | **Correlation breaks insurance pooling** — agent draws are correlated through shared models, prompts, tooling, and upstream dependencies; a pool sized for independence empties on one afternoon; recoverability decides insurability (insurance economics brief, 2026-08-26) |
+| **Key decision** | **Licence is derived, never stored** — three inputs (mandate in force, policy covering it, zone not outside), computed on every render; the most important word on screen is in no file; scope check before amount check (LTO vault brief, 2026-09-03) |
+| **Key decision** | **Session can fetch; published page cannot** — the fragment key is never sent to a server; portability is transcription, not mount (vault portability brief, 2026-09-03) |
+| **Key decision** | **Self-report cannot be a meter** — a self-report of this session's consumption was measured at ~4× low, consistently in one direction; build two independent producers of one object; the gap per model is the finding; baseline is the harness's to supply (status-block brief, 2026-09-03) |
+| **Key decision** | **Levels beat altitudes** — an audience on level one has a different problem, not a shallower version; each level's solution creates the next level's question; concepts are introduced in order of attrition (positioning correction brief, 2026-09-03) |
+| **Key decision** | **A rule with a test is a rule; a rule in a document is a preference** — the two-edge rule in AIUC-1 is enforced by a build test, not editorial guidance; unevidenced is a state and the default (conformance layer brief, 2026-09-04) |
+| **Key decision** | **Grant is per tool, not per session** — a conformance claim about a session is unanswerable rather than imprecise; agent conformance requires a party outside the agent (conformance measurement brief, 2026-09-04) |
+| **Key decision** | **Probe is the unit of contribution** — a challenge is a rerun, not an argument; grants are public and mandates never leave the clone; adopt existing probe/finding vocabulary rather than minting it (repository design brief, 2026-09-04) |
+| **Key decision** | **Where a credential lives and what bounds it** — the only axis separating four client-side patterns; a store the vendor steers secrets away from becomes usable by carrying ciphertext only (credentials platform brief, 2026-09-05) |
+| **Key decision** | **Five renderings of one measurement** (not five measurements) — OSCAL and SARIF already exist as standards for the two ends; emit both rather than mint a third; mandate authoring step is a human act no tool can replace (assessment product brief, 2026-09-05) |
+| **Key decision** | **Proper scoring rule fixes the incentive, not the content** — level = number of moves from capability to consequence; asking "can it?" beside "should it?" produces believed grant and intended mandate in one motion (calibration game brief, 2026-09-05) |
+| **Key decision** | **Append lane sits outside the commit DAG** — a record written to the append lane costs one flat put; the same record committed rewrites its folder's tree and every ancestor (~1000× difference at 1000 entries); log entries belong in the append lane (append-lane architecture brief, 2026-09-07) |
+| **Key decision** | **Reply address belongs inside the first message** — no directory needed or should exist; broadcast is the private option because addressing reveals identity; a path with one writer and defined readers is an interface (return-path brief, 2026-09-07) |
+| **Key decision** | **A playground owes a failure ratio and an exit** — Explorer artefacts must record what failed and provide a way for things to leave the playground; narrowness over a vendor console is the advantage (playground brief, 2026-09-07) |
+| **Key decision** | **Searching before writing is the highest-value habit** — sixteen instances of already-specified work found in a single day (26 Aug–7 Sep running count); each instance found only by searching the corpus before writing (method finding, 2026-09-07) |
+| **Key decision** | **Read the documentation for the product, not the vendor** — credential rules differ between products from the same vendor; a brief citing agent rules on a speech endpoint was wrong; this is the 4 September lesson in a new form (correction, 2026-09-07) |
 
 ---
 
