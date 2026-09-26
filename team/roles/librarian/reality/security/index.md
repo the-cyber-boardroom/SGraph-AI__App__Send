@@ -119,6 +119,19 @@ Measurements should be repeated after CDN migration.
 
 ## Known Violations (Flagged for Remediation)
 
+### Vault `file_id` not validated before storage path (2026-09-26, flagged by Dev review v0.33.66)
+
+`Routes__Vault__Pointer` accepts `file_id` as a raw `str` and passes it verbatim into the storage
+path (`Service__Vault__Pointer.write/read/delete/batch`); only `vault_id` is validated
+(`VAULT_ID_PATTERN`). **Impact is backend-scoped:** on S3 and Memory (production `send.sgraph.ai`)
+a `../` is a literal key segment — no traversal — but on the **Disk backend** (container / EC2
+targets) a crafted `file_id` resolves outside the vault directory. Write is gated by the vault
+write key; read/list are unauthenticated. The append service already validates its path
+components strictly (`Safe_Str__Vault__Append_Token/File_Id`) — the pointer path is inconsistent
+with that shipped pattern. **Fix proposed:** validate/normalise `file_id` at the route boundary
+(reject `..`, leading `/`, NUL) and add the traversal negative tests the append suite already
+has. See `team/roles/dev/reviews/09/26/v0.33.66__code-review__sg-api-quality-performance-security.md` (S1).
+
 ### Google Fonts (External Dependency) — PARTIALLY FIXED
 
 **sgraph_ai__website: FIXED.** All Google Fonts references removed; fonts vendored locally.
