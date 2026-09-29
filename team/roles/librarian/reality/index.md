@@ -1,6 +1,6 @@
 # Reality — Master Index
 
-**Version:** v0.33.66 | **Last updated:** 2026-09-08 | **Maintained by:** Librarian (daily run)
+**Version:** v0.33.69 | **Last updated:** 2026-09-29 | **Maintained by:** Librarian (daily run)
 **Structure:** Domain tree — each domain has its own directory with `index.md` and `proposed/`
 
 This file is the entry point. Read it to find the right domain, then go to that domain's
@@ -31,7 +31,7 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 
 ---
 
-## Quick Stats (as of 2026-09-08)
+## Quick Stats (as of 2026-09-29)
 
 | Metric | Count |
 |--------|-------|
@@ -44,8 +44,8 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | Browser UIs | **7** (share v0.4, open v0.4, admin, workspace, vault browser, vault app /en-gb/app; user v0.3.x legacy) |
 | Active tools (tools.sgraph.ai) | 4 |
 | sgit CLI commands | 20+ |
-| Open PROPOSED items (across all domains) | ~1086+ (+13 net-new from 09/01 session: P-REG-001–005, P-CON-001–003, P-EXP-001–002, P-SITE-001–002; +6 from 08/25: P-NHI-001–006; +16 from 08/23: P-ENR-001–009, P-BRK-001–007; previously ~1051+; 09/04 and 09/08 runs: no new items — 20 Aug briefs fully catalogued 09/01) |
-| Total documents catalogued | 980 (+17 from 20 Aug v0.33.61; +1 day index; processed 08/26–08/27 and 09/01; prev: 962; 09/08 run: confirmed, no new docs; fresh architect + dev reviews produced in 09/08)
+| Open PROPOSED items (across all domains) | ~1106+ (+~20 net-new from 09/29 session: P-SEP-001–020 across licence-to-operate, conformance, game series, assessment product, credentials platform, vault-to-vault, providers pack; prev: ~1086+) |
+| Total documents catalogued | **1012** (+32 from Sep 3–7: 28 briefs + 4 day indexes; prev: 980; processed 09/29)
 | **Key decision** | **Risk Mandate.ai** adopted as product name (resolves OQ-company-name-1, 2026-06-25) |
 | **Key decision** | **Grounded alarm** adopted as the Risk Mandate communication strategy term (replaces FUD framing, 2026-07-05) |
 | **Key decision** | **Grant ≠ Mandate** (corrected 2026-08-20, doc 963 v0.33.61) — grant is the union of capabilities conferred at assignment; mandate is what the party is authorised and expected to do; excess authority = grant minus mandate = unaccepted blast radius; allow-list mandates are the only measurable form; the July "to grant is to mandate" identification was correct as an accounting identity (a party carries its grant's exposure) but wrong as an object collapse; the two are separate objects |
@@ -102,6 +102,21 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | **Key decision** | **Consumer register: refund is pretext, record is asset** — a subscription transparency register asks whether companies hold usage records (not how much was used); "does not hold usage data" is a valid, non-penalised response; publish the record of what was asked and answered, never a characterisation; subscription = discount for committing to regular use, not rent on something you have the right to ignore (consumer transparency register, 2026-08-20) |
 | **Key decision** | **High threat without efficacy produces denial** — a personal high-threat page must include efficacy statements or the reader produces defensive denial rather than action; a general low-threat page withholds remedies to create appetite; the two editorial rules are not alignable (user assessment brief, 2026-08-20) |
 | **Key decision** | **Levels and variants are orthogonal** — depth of detail (level) and rendering/wording (variant) must vary independently; conflating them makes an experiment undiagnosable (persona generator brief, 2026-08-20) |
+| **Key decision** | **Licence is derived not stored** — three inputs computed on every render: mandate in force, policy covering it and paid, zone not outside; scope check before amount check so an action outside the mandate is refused on capability without reading the meter (licence-to-operate vault, 2026-09-03) |
+| **Key decision** | **Self-report cannot be a meter** — measured against transcript, the self-report was low by ~4× on tokens in one direction consistently; two producers of one object with the gap between them as the product; derivation produces a curve, not a policy (observation brief, 2026-09-03) |
+| **Key decision** | **Levels and altitudes are orthogonal** — levels describe the audience's problem depth; altitudes describe a document's depth; keeping both requires saying which every time; retire one frame (positioning brief, 2026-09-03) |
+| **Key decision** | **A rule with a test is a rule; a rule in a document is a preference** — the two-edge conformance rule holds because a build fails if a layer edge reaches a source observation (AIUC-1 conformance layer, 2026-09-04) |
+| **Key decision** | **Unevidenced is the default, not an exceptional state** — the first honest output of a conformance layer is a map of what nobody has looked at (AIUC-1 conformance layer, 2026-09-04) |
+| **Key decision** | **Grant is per tool, not per session** — a conformance claim about a session is unanswerable rather than imprecise; all conformance displays must use per-tool granularity (AIUC-1 conformance layer, 2026-09-04) |
+| **Key decision** | **Probe/finding vocabulary adopted, not minted** — an existing widely-adopted standard already has definitions close enough; anchoring to published vocabulary rather than inventing it applies again (grant/mandate repo brief, 2026-09-04) |
+| **Key decision** | **Reach is a node in a mesh, not a rung on a ladder** — reading a file system is six different exposures wearing one verb; a level is the number of moves from a capability to a consequence (game series, 2026-09-05) |
+| **Key decision** | **Dataset travels inside the prompt** — a model comparison then measures the game, not who invented better examples; the arcade game prompt carries 40 items (game series, 2026-09-05) |
+| **Key decision** | **Adopt OSCAL and SARIF as interchange schemas** — one internal shape emits both rather than minting a third; the assessment product schema chain this estate built by hand matches the OSCAL/SARIF layer structure (assessment product, 2026-09-05) |
+| **Key decision** | **Chrome sync is an untrusted transport** — 100 KB budget across 500 items; carries ciphertext only; same posture as this estate's own server; origin binding is a usability control, not a security one (credentials platform, 2026-09-05) |
+| **Key decision** | **Append lane sits outside the commit DAG** — a committed write rewrites the folder's tree and all ancestors (~1000× cost on a 1000-entry folder); a flat put is the cost of one append; this fact is the entire logging architecture (vaults-talking-to-vaults, 2026-09-07) |
+| **Key decision** | **Reply address travels inside the first sealed message** — no directory needed; broadcast is the private option because addressing somebody means learning who they are (vaults-talking-to-vaults, 2026-09-07) |
+| **Key decision** | **A grant is a research subsidy not inventory** — two providers now restrict resale; a limit the app author chooses is not a limit (providers pack, 2026-09-07) |
+| **Key decision** | **Searching before writing is now the highest-value habit in the method** — 8 prior-art instances found in one day on 2026-09-07, taking the running total from 8 to 16 (09/07 day index) |
 
 ---
 

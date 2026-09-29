@@ -7,6 +7,20 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-09-29
+
+32 human briefs from 3–7 September 2026 (docs 981–1012) processed. Four days, eleven threads: licence-to-operate vault, observation/self-report, positioning, AIUC-1 conformance layer, grant/mandate public repo, the game series, assessment product, credentials platform site, vaults-talking-to-vaults, new sites/providers pack, video production. One confirmed live defect (mount write landing in parent vault). 19 new key decisions recorded. New running count: prior-art instances = 16.
+
+Files changed:
+- `reality/index.md` — Last updated → 2026-09-29; cumulative docs 980→1012; PROPOSED count ~1086+→~1106+; 19 new key decisions added; live defect noted (mount write landing in parent)
+- `reality/changelog.md` — 2026-09-29 entry added (this entry)
+
+Session: 32 new briefs (28 + 4 indexes) | New EXISTS items: 0 (chat with scoped writes already counted; conformance layer entry already in ai-agents) | New PROPOSED items: ~20 (P-SEP-001–P-SEP-020) | Cumulative docs: 1012 (was 980)
+Master index (09/29): `team/roles/librarian/reviews/09/29/v0.33.69__master-index__briefs-03-sep-to-07-sep-2026.md`
+Debrief (09/29): `team/humans/dinis_cruz/debriefs/09/29/v0.33.69__debrief__briefs-processing-03-sep-to-07-sep-2026.md`
+
+---
+
 ## 2026-09-03
 
 B-015 completed: `test__sgit_key_prefixes.js` (08/25 commit `b3a9220`) counted and added to the ViV loader suite table. 28 assertions (4 suites). Test count updated ~3100+ → ~3130+; ViV suite ~1060+ → ~1090+.
