@@ -1,6 +1,6 @@
 # Reality — Master Index
 
-**Version:** v0.33.66 | **Last updated:** 2026-09-08 | **Maintained by:** Librarian (daily run)
+**Version:** v0.33.69 | **Last updated:** 2026-09-30 | **Maintained by:** Librarian (daily run)
 **Structure:** Domain tree — each domain has its own directory with `index.md` and `proposed/`
 
 This file is the entry point. Read it to find the right domain, then go to that domain's
@@ -31,7 +31,7 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 
 ---
 
-## Quick Stats (as of 2026-09-08)
+## Quick Stats (as of 2026-09-30)
 
 | Metric | Count |
 |--------|-------|
@@ -44,8 +44,8 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | Browser UIs | **7** (share v0.4, open v0.4, admin, workspace, vault browser, vault app /en-gb/app; user v0.3.x legacy) |
 | Active tools (tools.sgraph.ai) | 4 |
 | sgit CLI commands | 20+ |
-| Open PROPOSED items (across all domains) | ~1086+ (+13 net-new from 09/01 session: P-REG-001–005, P-CON-001–003, P-EXP-001–002, P-SITE-001–002; +6 from 08/25: P-NHI-001–006; +16 from 08/23: P-ENR-001–009, P-BRK-001–007; previously ~1051+; 09/04 and 09/08 runs: no new items — 20 Aug briefs fully catalogued 09/01) |
-| Total documents catalogued | 980 (+17 from 20 Aug v0.33.61; +1 day index; processed 08/26–08/27 and 09/01; prev: 962; 09/08 run: confirmed, no new docs; fresh architect + dev reviews produced in 09/08)
+| Open PROPOSED items (across all domains) | ~1093+ (+7 net-new from 09/30 session: P-INS-001–002, P-GAME-001–003, P-ASSESS-001, P-APPEND-001; previously ~1086+) |
+| Total documents catalogued | 1023 (+38 from 26 Aug – 07 Sep 2026: 4 day indexes + 34 briefs; prev: 980; processed 09/30)
 | **Key decision** | **Risk Mandate.ai** adopted as product name (resolves OQ-company-name-1, 2026-06-25) |
 | **Key decision** | **Grounded alarm** adopted as the Risk Mandate communication strategy term (replaces FUD framing, 2026-07-05) |
 | **Key decision** | **Grant ≠ Mandate** (corrected 2026-08-20, doc 963 v0.33.61) — grant is the union of capabilities conferred at assignment; mandate is what the party is authorised and expected to do; excess authority = grant minus mandate = unaccepted blast radius; allow-list mandates are the only measurable form; the July "to grant is to mandate" identification was correct as an accounting identity (a party carries its grant's exposure) but wrong as an object collapse; the two are separate objects |
@@ -102,6 +102,21 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | **Key decision** | **Consumer register: refund is pretext, record is asset** — a subscription transparency register asks whether companies hold usage records (not how much was used); "does not hold usage data" is a valid, non-penalised response; publish the record of what was asked and answered, never a characterisation; subscription = discount for committing to regular use, not rent on something you have the right to ignore (consumer transparency register, 2026-08-20) |
 | **Key decision** | **High threat without efficacy produces denial** — a personal high-threat page must include efficacy statements or the reader produces defensive denial rather than action; a general low-threat page withholds remedies to create appetite; the two editorial rules are not alignable (user assessment brief, 2026-08-20) |
 | **Key decision** | **Levels and variants are orthogonal** — depth of detail (level) and rendering/wording (variant) must vary independently; conflating them makes an experiment undiagnosable (persona generator brief, 2026-08-20) |
+| **Key decision** | **Cedar as policy language** — Cedar covers principal, action, resource, context with default-deny and evaluation outside the agent's reasoning loop; Cedar's own documentation states it does not establish identity, composing with the registry rather than competing with it; what has no standard is the mandate, not the permissions file; the build narrows from a stack to one document (grant/mandate vocabulary, 2026-08-26) |
+| **Key decision** | **A grant is discovered, not authored** — a hand-authored grant records a belief; a measured grant records the environment; a policy may only be written in units the system already meters (grant/mandate vocabulary, 2026-08-26) |
+| **Key decision** | **Premium is paid in allocation from a finite pool** — scarcity is the feature; a budget nobody can exhaust produces no decisions; correlation is the failure mode (agent draws are correlated through shared models, prompts, tooling and dependencies); experience rating lands on the team, not the agent (insurance economics, 2026-08-26) |
+| **Key decision** | **Recoverability decides insurability** — a reversible rate resets; bytes committed into history are paid by every clone forever; a hard cap on an irreversible stock is a boundary, not the top of a buffer (insurance economics, 2026-08-26) |
+| **Key decision** | **A licence is derived, never stored** — three inputs (mandate in force, policy covering it with premium paid, zone not outside); the most important word on the screen is in no file; scope before amount: an action outside the mandate is refused on its capability with the meter never read (licence-to-operate vault, 2026-09-03) |
+| **Key decision** | **A self-report cannot be a meter** — measured at 4× below actual on tokens, consistently in one direction; two producers of one object with the gap between them as the product; the baseline is the harness's to supply (observation architecture, 2026-09-03) |
+| **Key decision** | **Levels beat altitudes** — an audience on level one has a different problem, not a shallower version of the same one; each level's solution creates the next level's question; the sequence is a narrative, not a menu; concepts are introduced in order of attrition (positioning, 2026-09-03) |
+| **Key decision** | **A page is not a vault** — a conformance claim written against a vault's published page rather than its cloned contents will miss changes; clone the thing; check its version log, not its landing page (method finding, 2026-09-04) |
+| **Key decision** | **A rule held by a test is a rule; a rule in a document is a preference** — the two-edge rule in the AIUC-1 conformance layer fails a build if a layer edge reaches a source observation; this is the model for all architectural constraints (conformance layer, 2026-09-04) |
+| **Key decision** | **Unevidenced is the default state** — not a failure state; the first honest output of any conformance layer is a map of what nobody has looked at; a fourth state for "cannot observe from inside" belongs on the assertion as a field with a reason, not in the vocabulary (conformance layer, 2026-09-04) |
+| **Key decision** | **OSCAL + SARIF as interchange schemas** — do not mint a third schema; OSCAL for the compliance/policy layer, SARIF for findings; SARIF replaced a collapsed maturity score with structured findings for the same reason this corpus objected to it, arrived at independently (assessment product, 2026-09-05) |
+| **Key decision** | **Probe and finding rather than minted vocabulary** — SARIF vocabulary adopted; a probe is a rerun rather than an argument; adopt published vocabulary rather than creating synonyms (public repository, 2026-09-04) |
+| **Key decision** | **Append lane sits outside the commit DAG** — decides the logging architecture; a flat put costs one operation; the same record committed rewrites its folder's tree and every ancestor (~1,000× at scale); a write key on the append lane grants write and nothing else (vault architecture, 2026-09-07) |
+| **Key decision** | **Reply address travels inside the first message** — no directory needed; broadcast is the private option, not the weak one; addressing somebody means learning who they are; a path with one writer and defined readers is an interface (vault-to-vault communication, 2026-09-07) |
+| **Key decision** | **Searching before writing is the highest-value habit** — sixteen prior-art instances found in this corpus; eight appeared in a single day (07 Sep); the count rose from 8 to 16 in one session; every instance was found by searching before writing, never by reviewing after (method, 2026-09-07) |
 
 ---
 
