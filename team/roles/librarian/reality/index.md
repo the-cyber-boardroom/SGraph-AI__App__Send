@@ -1,6 +1,6 @@
 # Reality — Master Index
 
-**Version:** v0.33.66 | **Last updated:** 2026-09-08 | **Maintained by:** Librarian (daily run)
+**Version:** v0.33.69 | **Last updated:** 2026-10-04 | **Maintained by:** Librarian (daily run)
 **Structure:** Domain tree — each domain has its own directory with `index.md` and `proposed/`
 
 This file is the entry point. Read it to find the right domain, then go to that domain's
@@ -44,8 +44,8 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | Browser UIs | **7** (share v0.4, open v0.4, admin, workspace, vault browser, vault app /en-gb/app; user v0.3.x legacy) |
 | Active tools (tools.sgraph.ai) | 4 |
 | sgit CLI commands | 20+ |
-| Open PROPOSED items (across all domains) | ~1086+ (+13 net-new from 09/01 session: P-REG-001–005, P-CON-001–003, P-EXP-001–002, P-SITE-001–002; +6 from 08/25: P-NHI-001–006; +16 from 08/23: P-ENR-001–009, P-BRK-001–007; previously ~1051+; 09/04 and 09/08 runs: no new items — 20 Aug briefs fully catalogued 09/01) |
-| Total documents catalogued | 980 (+17 from 20 Aug v0.33.61; +1 day index; processed 08/26–08/27 and 09/01; prev: 962; 09/08 run: confirmed, no new docs; fresh architect + dev reviews produced in 09/08)
+| Open PROPOSED items (across all domains) | ~1093+ (+7 net-new from 10/04 session: AIUC-1 Conformance Layer, Licence-to-Operate Vault type, Game Series × 3, Public Grant/Mandate Repository, Providers Pack, Video Production vault clone; prev ~1086+) |
+| Total documents catalogued | 1,008 (+28 from 3–7 Sep 2026; prev: 980; processed 10/04)
 | **Key decision** | **Risk Mandate.ai** adopted as product name (resolves OQ-company-name-1, 2026-06-25) |
 | **Key decision** | **Grounded alarm** adopted as the Risk Mandate communication strategy term (replaces FUD framing, 2026-07-05) |
 | **Key decision** | **Grant ≠ Mandate** (corrected 2026-08-20, doc 963 v0.33.61) — grant is the union of capabilities conferred at assignment; mandate is what the party is authorised and expected to do; excess authority = grant minus mandate = unaccepted blast radius; allow-list mandates are the only measurable form; the July "to grant is to mandate" identification was correct as an accounting identity (a party carries its grant's exposure) but wrong as an object collapse; the two are separate objects |
@@ -102,6 +102,23 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | **Key decision** | **Consumer register: refund is pretext, record is asset** — a subscription transparency register asks whether companies hold usage records (not how much was used); "does not hold usage data" is a valid, non-penalised response; publish the record of what was asked and answered, never a characterisation; subscription = discount for committing to regular use, not rent on something you have the right to ignore (consumer transparency register, 2026-08-20) |
 | **Key decision** | **High threat without efficacy produces denial** — a personal high-threat page must include efficacy statements or the reader produces defensive denial rather than action; a general low-threat page withholds remedies to create appetite; the two editorial rules are not alignable (user assessment brief, 2026-08-20) |
 | **Key decision** | **Levels and variants are orthogonal** — depth of detail (level) and rendering/wording (variant) must vary independently; conflating them makes an experiment undiagnosable (persona generator brief, 2026-08-20) |
+| **Key decision** | **Scope check before amount check** — an action inside the grant but outside the mandate is refused on its capability; the meter is never read; this prevents a category of authorised-misuse that capability grants cannot close (licence-to-operate vault, 2026-09-03) |
+| **Key decision** | **Licence is derived, never stored** — three inputs (mandate in force + policy covering it with premium paid + zone inside); the most important word on screen is in no file; three withdrawal modes (amount, scope, lapse) must look different on screen (licence-to-operate vault, 2026-09-03) |
+| **Key decision** | **Levels beat altitudes** — an audience on level one has a different problem, not a shallower version of the same one; each level's solution creates the next level's question; concepts are introduced in order of attrition (positioning, 2026-09-03) |
+| **Key decision** | **A self-report cannot be a meter** — build two producers of one object and sell the gap between them; measured: self-reported token consumption was ~4× lower than actual, consistently in one direction (observation/status-block, 2026-09-03) |
+| **Key decision** | **Unevidenced is a state and the default** — the first honest output of any conformance layer is a map of what nobody has looked at; inability to observe from inside belongs on the assertion with a reason, not in the vocabulary of states (AIUC-1 conformance, 2026-09-04) |
+| **Key decision** | **A rule with a test is a rule; a rule in a document is a preference** — the two-edge rule fails a build if a layer edge reaches a source observation (AIUC-1 conformance, 2026-09-04) |
+| **Key decision** | **Grant is per tool, not per session** — a conformance claim about a session is unanswerable rather than imprecise; agent conformance requires a party outside the agent (AIUC-1 conformance, 2026-09-04) |
+| **Key decision** | **Probe rather than row is the unit of contribution** — a challenge is a rerun, not an argument; grants are public; mandates never leave the clone (public repository design, 2026-09-04) |
+| **Key decision** | **A surprise is an action outside the grant** — this makes an assessment falsifiable; the game's metric is a prediction gap rather than the guess (The Game, 2026-09-04) |
+| **Key decision** | **Reach is a node in a mesh, not a rung on a ladder** — reading a filesystem is six different exposures wearing one verb; a level is the number of moves from a capability to a consequence, derivable from the mesh rather than authored by taste (game series, 2026-09-05) |
+| **Key decision** | **Rewarding correct answers rewards answering yes to everything** — real grants are consistently wider than people expect; a proper scoring rule fixes the incentive without fixing the content; the question set also had to change (game scoring, 2026-09-05) |
+| **Key decision** | **One measurement, five renderings** — five audiences want five renderings of one measurement, not five separate measurements which would disagree; adopt OSCAL and SARIF rather than mint a third interchange schema (assessment product, 2026-09-05) |
+| **Key decision** | **Treat Chrome sync as untrusted transport** — the vendor's documentation steers secrets away from it; 100 KB budget across 500 items; carry ciphertext only; origin binding downgraded to usability control by the enforcer test (credentials, 2026-09-05) |
+| **Key decision** | **Append lane sits outside the commit DAG** — a committed write rewrites its folder's tree and every ancestor (~1,000× cost on a folder of 1,000 entries); logging architecture follows from this fact with no further choices; history walks truncate silently rather than reporting a limit (vault comms, 2026-09-07) |
+| **Key decision** | **Reply address travels inside the first message** — the sender carries its own reply address; no directory needed; broadcast is the private option because addressing somebody requires learning who they are (vault comms, 2026-09-07) |
+| **Key decision** | **Searching before writing is the highest-value method habit** — sixteen instances of prior art found in this corpus across Sep 3–7 alone; eight in a single day (7 Sep); every one of today's memos found prior art when searched (2026-09-07) |
+| **Key decision** | **A playground owes a failure record and an exit** — a playground is an Explorer artefact; it must record what failed and provide a way for things to leave it (playground design, 2026-09-07) |
 
 ---
 
