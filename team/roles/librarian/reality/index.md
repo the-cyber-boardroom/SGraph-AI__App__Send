@@ -1,6 +1,6 @@
 # Reality — Master Index
 
-**Version:** v0.33.69 | **Last updated:** 2026-10-05 | **Maintained by:** Librarian (daily run)
+**Version:** v0.33.69 | **Last updated:** 2026-10-06 | **Maintained by:** Librarian (daily run)
 **Structure:** Domain tree — each domain has its own directory with `index.md` and `proposed/`
 
 This file is the entry point. Read it to find the right domain, then go to that domain's
@@ -31,7 +31,7 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 
 ---
 
-## Quick Stats (as of 2026-10-05)
+## Quick Stats (as of 2026-10-06)
 
 | Metric | Count |
 |--------|-------|
@@ -44,8 +44,8 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | Browser UIs | **7** (share v0.4, open v0.4, admin, workspace, vault browser, vault app /en-gb/app; user v0.3.x legacy) |
 | Active tools (tools.sgraph.ai) | 4 |
 | sgit CLI commands | 20+ |
-| Open PROPOSED items (across all domains) | ~1116+ (+30 from 09/09–09/23 runs; +22 catalogued 09/26; confirmed 09/30 and 10/02 and 10/04; +23 net-new from 10/05 session: P-CEP-001, P-INS-001/002, P-HTTP-001, P-GAME-001–004, P-VLT-LTO-001, P-OBS-001/002, P-CNF-001–003, P-CRED-001/002, P-ASS-001, P-SITES-001/002, P-VVT-001/002, P-PROV-001, P-VIDEO-001; prev: ~1086+ from 09/08) |
-| Total documents catalogued | **1,024** (+44 from 26 Aug–7 Sep 2026; docs 981–1024; processed 09/09–09/26 and fresh review 10/05; prev: 980)
+| Open PROPOSED items (across all domains) | ~1116+ (+30 from 09/09–09/23 runs; +22 catalogued 09/26; confirmed 09/30 and 10/02 and 10/04; +23 net-new from 10/05 session: P-CEP-001, P-INS-001/002, P-HTTP-001, P-GAME-001–004, P-VLT-LTO-001, P-OBS-001/002, P-CNF-001–003, P-CRED-001/002, P-ASS-001, P-SITES-001/002, P-VVT-001/002, P-PROV-001, P-VIDEO-001; prev: ~1086+ from 09/08; 10/06 run produced fresh role reviews for same batch) |
+| Total documents catalogued | **1,024** (+44 from 26 Aug–7 Sep 2026; docs 981–1024; processed 09/09–09/26 and fresh review 10/05; 10/06 run confirmed same batch with fresh architect + dev reviews)
 | **Key decision** | **Risk Mandate.ai** adopted as product name (resolves OQ-company-name-1, 2026-06-25) |
 | **Key decision** | **Grounded alarm** adopted as the Risk Mandate communication strategy term (replaces FUD framing, 2026-07-05) |
 | **Key decision** | **Grant ≠ Mandate** (corrected 2026-08-20, doc 963 v0.33.61) — grant is the union of capabilities conferred at assignment; mandate is what the party is authorised and expected to do; excess authority = grant minus mandate = unaccepted blast radius; allow-list mandates are the only measurable form; the July "to grant is to mandate" identification was correct as an accounting identity (a party carries its grant's exposure) but wrong as an object collapse; the two are separate objects |
