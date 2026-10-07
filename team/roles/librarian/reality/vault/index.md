@@ -1,6 +1,6 @@
 # vault — Reality Index
 
-**Domain:** `vault/` | **Last updated:** 2026-09-07 | **Maintained by:** Librarian (daily run)
+**Domain:** `vault/` | **Last updated:** 2026-10-07 | **Maintained by:** Librarian (daily run)
 
 The vault/SGit cryptographic storage system. This domain covers the encryption layer, the
 object storage model, the browser JS client, PKI, and the sgit CLI as it relates to vault
@@ -161,7 +161,7 @@ Closes two `sgit`-CLI-team briefs about web↔CLI two-ref-model interop.
 
 | Fix | Status | Evidence |
 |-----|--------|---------|
-| Web vaults now write a single-branch index (`branch_index_v1`) at `bare/indexes/<idx-pid-muw-*>` on **create** and every **push** → `sgit clone <web-vault>` no longer errors "No branch index found" | **EXISTS** | `SGVaultRefManager.writeBranchIndex` (9 tests); called in `SGVault.create` + `push()` |
+| Web vaults now write a single-branch index (`branch_index_v1`) at `bare/indexes/<idx-pid-muw-*>` on **create** and every **push** → `sgit clone <web-vault>` no longer errors "No branch index found" | **EXISTS** | `SGVaultRefManager.writeBranchIndex` (9 tests); called in `SGVault.create` + `push()`. **Note (2026-10-07):** the write *replaces* the index (one entry), dropping CLI clone-branch entries — see "CLI history-integrity interop" below |
 | `SGVault.open` reconcile-on-open: when the clone ref is **cleanly behind** the named ref (strict ancestor), load the **named** head, not the stale clone — fixes the "open prefers clone, silently shadows CLI pushes" bug | **EXISTS** | `sg-vault.js` open (`_isAncestor` clean-behind check); diverged/ahead clones keep their head (no data loss) |
 | Branch-index path already aligned (`bare/indexes/`, not the CLI brief's feared `bare/idx/`) | **EXISTS** | `sg-vault-ref-manager.js` |
 
@@ -357,6 +357,28 @@ Round-1 and Round-2 review findings addressed after the initial surface landed:
 | Item | Status | Evidence |
 |---|---|---|
 | **`/<locale>/#<key>` behaves exactly like `/#<key>`**: key saved to LS (verbatim — sgit prefixes are stripped later by the shells), deep-link / release pin saved, redirect to `/<locale>/app` with no hash. `/en-gb/` with **no** hash never redirects (the 353ef55 loop guard holds: the only redirect out of the landing carries no hash and lands on `/app`, which never bounces back). Root `/` unchanged (`/en-gb/app`). Applies to every generated locale (`en-us`, `pt-pt`, `pt-br`) because the decision lives in the shared module | **EXISTS** | `vault-loader-routing.js` `_consumeHashInbox` / `_appPathForLocale`; `test__routing_decisions.js` (7 landing cases); `test__routing.spec.js` Cell 4 (3 tests); `test__regression__no_locale_redirect_loop.spec.js` |
+
+### CLI history-integrity interop — code-verified state (2026-10-07)
+
+Checked against the sgit-ai CLI team's 7 Oct history-integrity brief (signature verification,
+ref monotonicity, 128-bit object ids as "format 2", a format gate in the branch index). Full
+analysis: `team/roles/dev/reviews/10/07/v0.33.66__research__cli-history-integrity-side-effects-on-api-and-vault-web.md`;
+reply: `team/comms/briefs/10/07/v0.33.66__reply-to-cli-team__history-integrity-q1-q2-q3.md`.
+
+| Item | Status | Evidence |
+|---|---|---|
+| Server vault routes accept 44-char object names (`obj-cas-imm-` + 32 hex) on write/read/read-base64/list/batch (all 4 ops)/delete/presigned schemas; no id parsing beyond the `-imm-` cache-header check | **EXISTS** (by construction) | in-memory run of the real routes, 7 Oct |
+| `GET /api/vault/list` is **unpaginated** — one JSON body; Lambda 6 MB cap ≈ 165k objects (12-hex ids) / ≈ 108k (32-hex) | **EXISTS** (limit) | `Routes__Vault__Pointer` list; continuation token **PROPOSED** |
+| Both clients default to `https://dev.send.sgraph.ai/api/vault/*`; `vault.sgraph.ai` / `dev.vault.sgraph.ai` serve the UI only; no per-environment endpoint injected at deploy | **EXISTS** | `vault-entry.js` `_getSGSend`, `app-shell.js` `_sendEndpoint`; CLI `Vault__API.DEFAULT_BASE_URL`; `deploy-ui-vault.yml` |
+| `writeBranchIndex` **replaces** the branch index with one named entry on create, every `push()`/`pushIfMatch()`, and in child kernels — no read/merge, no compare-and-swap; drops CLI clone-branch entries and their `public_key_id` | **EXISTS** (latent defect) | `sg-vault-ref-manager.js` `writeBranchIndex`; callers `sg-vault.js`, `sg-vault--sync.js` |
+| Web object ids are 12 hex only (`computeObjectId` → `hex.slice(0, 12)`); reproduces the CLI's format-1 test vector | **EXISTS** | `sg-vault-object-store.js` `computeObjectId` |
+| Web read path treats ids as opaque strings (already accepts 32-hex) | **EXISTS** | `load` / `batchLoad` / tree walks |
+| Web trees encrypted with a **random** IV (CLI uses `HMAC-SHA256(read_key, plaintext)[:12]`) | **EXISTS** (divergence) | `sg-vault-commit.js` → `SGSendCrypto.encrypt` |
+| Web shells push with unconditional `push()`; only child kernels use `pushIfMatch()` | **EXISTS** | `sg-vault--sync.js`; `kernel-app-handlers.js` |
+| Web commits: `schema:'commit_v2'`, `branch_id: null`, `signature: null`, no `author_key_id`; one shared clone branch per vault (`web-ui`) | **EXISTS** | `sg-vault-commit.js` `createCommit` |
+| Web commit signing; web per-device signing keys | **DOES NOT EXIST** | — |
+| Web awareness of the format gate (`format` / `min_client` / `features`) | **DOES NOT EXIST** | `sg-vault.js` open reads only the named ref from the index |
+| Format-aware `computeObjectId`; branch-index read-modify-write with `write-if-match`; shells on `pushIfMatch()`; deterministic tree IV | **PROPOSED** | research §3, sequenced before CLI 0.19 / 0.20 / format 2 |
 
 ## DOES NOT EXIST (Commonly Confused)
 

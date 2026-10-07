@@ -7,6 +7,19 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-10-07
+
+CLI team history-integrity brief (signatures, ref monotonicity, 128-bit ids / format gate) checked against both codebases. New code-verified section in `vault/index.md`: server accepts 44-char object ids on every surface; `list` unpaginated (6 MB ≈ 165k / 108k objects); web `writeBranchIndex` replaces the index (latent defect); web ids 12-hex only; random-IV web trees; web commit signing and gate awareness DOES NOT EXIST; four web fixes PROPOSED.
+
+Files changed:
+- `reality/vault/index.md` — new section "CLI history-integrity interop — code-verified state (2026-10-07)"; note on the 06/08 branch-index row; last-updated → 2026-10-07
+- `reality/changelog.md` — this entry
+
+Research: `team/roles/dev/reviews/10/07/v0.33.66__research__cli-history-integrity-side-effects-on-api-and-vault-web.md`
+Reply: `team/comms/briefs/10/07/v0.33.66__reply-to-cli-team__history-integrity-q1-q2-q3.md`
+
+---
+
 ## 2026-09-03
 
 B-015 completed: `test__sgit_key_prefixes.js` (08/25 commit `b3a9220`) counted and added to the ViV loader suite table. 28 assertions (4 suites). Test count updated ~3100+ → ~3130+; ViV suite ~1060+ → ~1090+.
