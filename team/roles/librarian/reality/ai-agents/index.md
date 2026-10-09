@@ -179,6 +179,80 @@ issuance, mandate objects, and execution broker are all PROPOSED.
 | P-AGT-005 | **Broker credential concentration mitigation** — execution broker holds all credentials for all tenants; total broker compromise = all credentials usable immediately; self-hosting must be a first-class deployment option (not an enterprise upsell); agent must be able to verify broker identity and refuse unrecognised brokers; credential storage is the product's most critical engineering | PROPOSED |
 | P-AGT-006 | **Mandate receipts as evidence chain** — every broker operation produces a signed receipt: agent identity, mandate reference, action performed, timestamp; creates an evidence chain not reliant on mutable platform audit logs; receipts can feed downstream workflow stages directly | PROPOSED |
 
+### Grant/Mandate Ecosystem (26 Aug – 7 Sep 2026 — docs 982–986, 1004–1006)
+
+**PROPOSED — does not exist yet.** Full specification complete; vocabulary settled (Aug 26). Adoption decision: Cedar as the policy language.
+
+| # | Item | Status |
+|---|------|--------|
+| P-GRANT-001 | **Public grant/mandate repository** — unit of contribution is a probe (command + claimed grant); a challenge is a rerun not an argument; grants are public and measured; mandates never leave the clone (privacy + adoption in one sentence); probe/finding vocabulary adopted from existing open-source project rather than minted | PROPOSED |
+| P-GRANT-002 | **Cedar policy language adoption** — Cedar (Amazon, Apache 2.0) adopted for expressing grant policies; principal, action, resource, context; default-deny; evaluation outside the agent's reasoning loop; Cedar does not establish identity and composes with the registry | PROPOSED |
+| P-GRANT-003 | **Grant/mandate pack** — library belongs to the registry; instance belongs to the risk product; nine-item inventory for the insurance ecosystem; mandate must carry: subject, issuer, service, capability, resource, constraints, validity window, usage limit, signature | PROPOSED |
+| P-INS-001 | **Insurance ecosystem pack** — nine-item specification; premium paid in resource allocation from a finite pool; correlation (not individual variance) breaks pooling; experience rating on the team, not the agent; recoverability decides insurability; agent pool sizing assumes correlated draws (shared models, prompts, tooling) | PROPOSED |
+
+### AIUC-1 Conformance Layer (4 Sep 2026 — docs 1000–1003)
+
+**PROPOSED in this codebase.** Shipped in the RiskMandate vault product; needs porting decision.
+
+| # | Item | Status |
+|---|------|--------|
+| P-CONF-001 | **AIUC-1 Conformance Layer** — two-edge rule enforced by a failing test; unevidenced is the default; 1,126 crosswalks (EU AI Act); standard has no recovery class (recovery barriers are the project's reading); evidence mode decides the insurance instrument; agent conformance requires a party outside the agent (two of five requirements are harness properties) | PROPOSED (in this codebase) |
+
+### Agent Calibration Games Series (26 Aug – 5 Sep 2026 — docs 987–990, 1007, 1012–1015)
+
+**PROPOSED — none coded yet.** Three engine scripts are playable now. Nine game designs in the corpus total; one built.
+
+| # | Item | Status |
+|---|------|--------|
+| P-GAME-001 | **EXCESS game** — TUI; player never acts, only decides what may happen; three opposite lose conditions; exceeding the mandate sometimes pays; engine rules in reference doc, playable in a model session now | PROPOSED — engine playable |
+| P-GAME-002 | **CAPTIVE game** — TUI; player is insurer of a captive resource pool; nobody lies; losses are weather; profit-too-much is also a loss; engine rules in reference doc, playable now | PROPOSED — engine playable |
+| P-GAME-003 | **Guess the Agent game** — tree guesses the player's grant; prediction gap (not the guess) is the product; inverts the burden of proof | PROPOSED — specification only |
+| P-GAME-004 | **Reach calibration game** — reach = mesh node (not ladder rung); questions either identify or measure; reliability per answer; proper scoring rule | PROPOSED — specification only |
+| P-GAME-005 | **What Can It Do** — score calibration not knowledge; ask "can it" beside "should it"; level = distance from consequence; elicits the mandate nobody has written | PROPOSED — specification only |
+| P-GAME-006 | **Arcade game** — classification task; 40-item dataset travels inside the prompt; three inputs = three bins; proper scoring rule confirmed; three lazy strategies all lose (let all through: −350, flag all: −250, shoot all: −200, perfect: +400) | PROPOSED — prompt reference playable |
+
+### Vault-to-Vault Communication Protocol (7 Sep 2026 — docs 1017–1019)
+
+**PROPOSED — append lane transport EXISTS; protocol extensions do not.**
+
+| # | Item | Status |
+|---|------|--------|
+| P-VTV-001 | **Reply-address protocol** — sender carries reply address inside first sealed message; no directory service required; broadcast is the private option (addressing reveals identity) | PROPOSED |
+| P-VTV-002 | **Append-lane logging architecture** — append lane sits outside the commit DAG; one flat PUT vs. rewriting every ancestor folder entry (~1,000× at scale on a 1,000-object folder); all high-frequency writes must use append lane, not commit history | PROPOSED — design constraint catalogued |
+| P-VTV-003 | **Path convergence for linked-vault two-lane write** — the write already ships on a different path; work is convergence, not new machinery | PROPOSED |
+
+### Licence-to-Operate Vault Component (3 Sep 2026 — docs 993–994)
+
+**PROPOSED as a component in this codebase.** Published as a RiskMandate vault artefact.
+
+| # | Item | Status |
+|---|------|--------|
+| P-LIC-001 | **Licence-to-operate vault** — vault holds terms, browser holds run; licence derived from three inputs (mandate in force, policy covering it with paid premium, zone not outside); two host adapters; scope check before amount check; three ways licence is withdrawn (scope, amount, lapse) must look different on screen | PROPOSED |
+
+### Observation / Calibration Instrument (3 Sep 2026 — docs 995–996)
+
+**PROPOSED — passive mode architecture specified May 2026; sensor-inside design is new.**
+
+| # | Item | Status |
+|---|------|--------|
+| P-OBS-001 | **Status block as calibration instrument** — session self-report is wrong by ~4× consistently; build two producers of one measurement; sell the gap between them; derivation produces a curve of bands against draw rates, not a policy; three platform artefacts that corrupt a naive derivation: clipped meter, granularity set by recording format, bimodal meter measuring two activities | PROPOSED |
+
+### Assessment Product (5 Sep 2026 — doc 1011)
+
+**PROPOSED — research complete; schema work not started.**
+
+| # | Item | Status |
+|---|------|--------|
+| P-ASSESS-001 | **Assessment product — five renderings of one measurement** — OSCAL and SARIF as output standards (emit both rather than mint a third); individual-to-corporate axis orthogonal to simple-to-complex; every stage must produce a finished artefact; mandate authoring step has no tool and cannot have one — this is the place most people stop | PROPOSED |
+
+### Credentials and Keys Site (5 Sep 2026 — docs 1009–1010)
+
+**PROPOSED — specification complete.**
+
+| # | Item | Status |
+|---|------|--------|
+| P-CRED-001 | **Credentials-and-keys site** — spine is four client-side patterns by where the key lives and what bounds it; Chrome sync = untrusted transport, ciphertext only, 100KB budget; origin binding downgraded to usability control (fails the enforcer test); host holds the key, application never sees it, is the pattern this estate already ships | PROPOSED |
+
 *Full proposed items: [proposed/index.md](proposed/index.md)*
 
 ---
