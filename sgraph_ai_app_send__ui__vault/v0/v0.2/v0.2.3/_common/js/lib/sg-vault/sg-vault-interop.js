@@ -274,8 +274,12 @@
         // The device's signer for a vault, created on first use; null where no durable key
         // store exists (null-origin iframe, private mode with storage disabled, Node).
         static async forVault(vaultId) {
-            if (typeof indexedDB === 'undefined' || !vaultId) return null;
+            if (!vaultId) return null;
             try {
+                // Inside the try on purpose: in a sandboxed (null-origin) iframe `indexedDB` is a
+                // defined accessor that THROWS a SecurityError on read, and `typeof` does not
+                // swallow that (the same trap the object store documents for `caches`).
+                if (typeof indexedDB === 'undefined' || !indexedDB) return null;
                 const db = await idbOpen();
                 try {
                     let rec = await idbGet(db, vaultId);

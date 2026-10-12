@@ -138,9 +138,11 @@ class SGVaultCommit {
         }
 
         if (entry.blob_id) {
-            // undefined → guess as the CLI does (mimetypes.guess_type or application/octet-stream);
-            // an explicit null is kept null (older entries; the CLI's own vector uses it).
-            const contentType = entry.content_type === null ? null
+            // Missing or null → guess as the CLI does (`entry.get('content_type') or
+            // mimetypes.guess_type(...) or application/octet-stream`), so an entry carried forward
+            // from a pre-2026-10 tree (no content_type_enc) gets the same bytes the CLI would write.
+            // `omit_content_type` keeps it null (only the CLI's synthetic test vector needs that).
+            const contentType = entry.omit_content_type ? null
                               : (entry.content_type || SGVaultPyMimetypes.contentTypeFor(entry.name))
             return {
                 blob_id:          entry.blob_id,

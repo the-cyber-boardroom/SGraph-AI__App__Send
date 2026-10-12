@@ -75,9 +75,22 @@ const hex  = (u8) => Array.from(new Uint8Array(u8)).map(b => b.toString(16).padS
         const ve      = JSON.parse(V.tree_deterministic.plaintext_utf8).entries[0];
         const dec     = async (b64) => new TextDecoder().decode(await SGSendCrypto.decrypt(SGVaultCommit._base64ToArrayBuffer(b64), aesKey));
         const id = await cm.createTree([{ name: V.tree_deterministic.name_plain, size: Number(await dec(ve.size_enc)), content_hash: await dec(ve.content_hash_enc),
-                                           content_type: null, large: false, blob_id: ve.blob_id, tree_id: null }]);
+                                           omit_content_type: true, large: false, blob_id: ve.blob_id, tree_id: null }]);
         ok('createTree reproduces the CLI tree vector id', id === V.tree_deterministic.object_id, id);
         ok('…and its ciphertext byte for byte', hex(stored[id]) === V.tree_deterministic.ciphertext_hex);
+    }
+
+    {   // an entry decrypted from an OLD tree (no content_type_enc) re-encrypts with the guessed type, as the CLI would
+        const rk      = Uint8Array.from(V.tree_deterministic.read_key_hex.match(/../g).map(x => parseInt(x, 16)));
+        const aesKey  = await crypto.subtle.importKey('raw', rk, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+        const hmacKey = await crypto.subtle.importKey('raw', rk, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+        const stored  = {};
+        const store   = { store: async (ct) => { const id = await new SGVaultObjectStore({}, 'v', null).computeObjectId(ct); stored[id] = ct; return id; }, load: async (id) => stored[id] };
+        const cm      = new SGVaultCommit(store, aesKey, hmacKey);
+        const idA = await cm.createTree([{ name: 'x.json', size: 2, content_hash: 'abcdefabcdef', content_type: null, blob_id: 'obj-cas-imm-1abfd21f1430', tree_id: null }]);
+        const idB = await cm.createTree([{ name: 'x.json', size: 2, content_hash: 'abcdefabcdef', content_type: 'application/json', blob_id: 'obj-cas-imm-1abfd21f1430', tree_id: null }]);
+        ok('a null content_type is guessed, not written as null (same id as the explicit type)', idA === idB);
+        ok('…and decrypts to the guessed type', (await cm.loadTree(idA)).entries[0].content_type === 'application/json');
     }
 
     // ---------------------------------------------------------------- 2+3. second device
