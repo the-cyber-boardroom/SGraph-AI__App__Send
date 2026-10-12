@@ -1,6 +1,6 @@
 # AI Agents — Proposed Items Index
 
-**Domain:** ai-agents/proposed/ | **Last updated:** 2026-08-22 | **Maintained by:** Librarian (daily run)
+**Domain:** ai-agents/proposed/ | **Last updated:** 2026-09-15 | **Maintained by:** Librarian (daily run)
 
 All items are PROPOSED. None have been code-verified. Do not describe any of these as existing features.
 
@@ -18,6 +18,7 @@ The previous full index is preserved in git history on commit before this date.
 | [`workflows.md`](workflows.md) | Scheduled and autonomous tasks, accountant demo, archiver-cataloguer pattern, agentic incident-response service | P-147–P-152; P-238–P-247 |
 | [`skills-economy.md`](skills-economy.md) | Partner integrations (Netlify, Daytona, Convex, Pi, HeyGen), skills creator economy, ownership+maintenance model, skills deepened (06/04), NHI 2.0 agent-identity cross-domain items | P-288–P-305; P-317–P-321; P-325, P-328, P-332 |
 | [`risk-mandate.md`](risk-mandate.md) | Agent blast-radius service, assessment template, WhatsApp case study, Odysseus evidence vault, formal Agent Mandate ontology, authorization ontology + delegation, how-not-why scope + mandate architecture, Wardley map series, risk acceptance service MVP, multi-stakeholder workflow, personal scenario, Calendly review, risk register architecture, digital twins, semantic graph engine, 2FA MVP, AWS risk engine (Python + browser + ontology), evidence economy (news vaults, force of proof, packs-as-service), experience loop, AOMM, regulation graph, three-predicate model, MVP field demo, agentic incident taxonomy | P-353–P-357; P-376–P-379; P-387–P-430; P-AOMM-001–P-AOMM-007; P-REG-001–P-REG-012; P-PRED-001–P-PRED-005; P-DEMO-001–P-DEMO-007; P-INC-001–P-INC-002 |
+| [`conformance-and-games.md`](conformance-and-games.md) | AIUC-1 conformance layer, licence-to-operate vault app, self-report calibration, grant/mandate public repository, assessment product, game series (calibration/prediction-gap/arcade), credentials site, new game-primitive and playground sites, vault observability and logging | P-CONF-001–005; P-LTO-001–002; P-OBS-001; P-REPO-001–002; P-ASMT-001–003; P-GAME-001–004; P-CRED-001–002; P-SITES-001–003; P-VTV-001–003 |
 
 ---
 
@@ -55,6 +56,31 @@ The previous full index is preserved in git history on commit before this date.
 | P-DEMO-001–P-DEMO-007 (MVP field demo: scenario library, vault-as-static-site, cost meter, persona-flick, takeaway, Black Hat demo, Wardley maps) | `risk-mandate.md` |
 | P-INC-001–P-INC-002 (Agentic incident taxonomy: five populations, living register) | `risk-mandate.md` |
 | P-MEB-001 (Mandate execution broker: agent never holds credential, signed receipt, concentration risk) | `agent-communication.md` |
+| P-CONF-001–005 (AIUC-1 conformance layer: two-edge rule, crosswalk pipeline, D003 measurement) | `conformance-and-games.md` |
+| P-LTO-001–002 (Licence-to-operate vault app: two-store split, derived licence) | `conformance-and-games.md` |
+| P-OBS-001 (Self-report calibration: two producers, gap as product) | `conformance-and-games.md` |
+| P-REPO-001–002 (Grant/mandate public repo: probes not tables; SARIF/OSCAL output) | `conformance-and-games.md` |
+| P-ASMT-001–003 (Assessment product: five artefacts, OSCAL import, mandate authoring) | `conformance-and-games.md` |
+| P-GAME-001–004 (Game series: prediction-gap, calibration, arcade — none yet playable) | `conformance-and-games.md` |
+| P-CRED-001–002 (Credentials/platforms site; Chrome sync as untrusted transport) | `conformance-and-games.md` |
+| P-SITES-001–003 (Game primitives site, providers pack, playground) | `conformance-and-games.md` |
+| P-VTV-001–003 (Vault observability events, LETS finality pipeline, reply address in first message) | `conformance-and-games.md` |
+
+---
+
+## New Proposals — 26 Aug to 7 Sep 2026
+
+Items added from v0.33.62–v0.33.66 briefs. All PROPOSED.
+
+| P-number | Feature | Source |
+|----------|---------|--------|
+| P-GNM-001 | **Cedar policy language for grant measurement.** Adopt Cedar for the permissions layer (default-deny; evaluation outside agent's reasoning loop; Cedar does not establish identity so it composes with the registry). What has no standard is the mandate — build the mandate document format as the novel contribution, not a new policy language. | 26 Aug v0.33.62 |
+| P-GNM-002 | **Grant-mandate pack library.** Library belongs to the registry; instance belongs to the risk product. Reality comes before the risk register. Comparison needs three terms (grant, mandate, gap). | 26 Aug v0.33.62 |
+| P-GNM-003 | **Grant-mandate public repository with probes.** Grant claims travel with the command that establishes them (public). Mandates never leave the clone (local, private). Probe = executable claim; challenge = rerun not argument. Adopt existing probe/finding vocabulary (do not mint). | 04 Sep v0.33.64 |
+| P-INS-001 | **Insurance ecosystem pack — nine-item inventory.** PKI site agent specification with acceptance test for the pack itself. Nine-item inventory with eleven questions. | 26 Aug v0.33.62 |
+| P-INS-002 | **Resource pool economics model.** Premium paid in allocation from finite pool (scarcity is the feature). Correlation is the failure mode (agent draws correlated through shared models/prompts/tooling). Experience rating must land on the team not the agent (agent is indifferent to loss). Recoverability decides insurability (reversible rate resets; committed bytes are paid by every clone). | 26 Aug v0.33.62 |
+| P-AIUC-001 | **AIUC-1 conformance layer expansion.** Layer shipped 4 Sep (in vault/website, not SGraph Send codebase). Remaining: 1,064 crosswalks with no graph to resolve into (blocked on framework publication); level five unreachable for every control (all attestations self-reported); app ships built but cannot be rebuilt from vault (reproducibility gap); recovery barriers must be marked as "our reading" (standard has no recovery class). Two-edge rule held as failing test (rule with a test vs rule in a document). | 04 Sep v0.33.64 |
+| P-CRED-001 | **Credentials and keys — four client-side patterns strategy.** Four patterns ordered by security: (1) key in page nothing bounding it — never acceptable; (2) Chrome sync treated as untrusted transport, ciphertext only, 100KB/500-item budget; (3) per-customer key with credit limit from vendor; (4) host holds key, application never sees it — this estate's current design. Origin binding is a usability control (prevents mistakes not attacks) and must be labelled as one. | 05 Sep v0.33.65 |
 
 ---
 
