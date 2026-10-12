@@ -56,6 +56,7 @@
                 }
 
                 this._renderObject(container);
+                this._decorateSignatures(container);      // fills the signature chip (commits only)
             } catch (err) {
                 container.innerHTML = `<div class="sgit-error">Failed to load object: ${this._esc(err.message)}</div>`;
             }
@@ -124,7 +125,11 @@
                             <div class="sgit-schema-label">PARENTS (${(data.parents || []).length})</div>
                             <div class="sgit-schema-value">${(data.parents || []).map(p => `<a class="sgit-obj-link" href="#" data-id="${this._esc(p)}">${this._esc(p)}</a>`).join('<br>') || 'none'}</div>
                         </div>
-                        ${data.signature ? `<div class="sgit-schema-field"><div class="sgit-schema-label">SIGNATURE</div><div class="sgit-schema-value sgit-mono" style="word-break:break-all;">${this._esc(data.signature)}</div></div>` : ''}
+                        <div class="sgit-schema-field">
+                            <div class="sgit-schema-label">SIGNATURE</div>
+                            <div class="sgit-schema-value">${this._sigChip(obj.id)}${data.author_key_id ? ` <span class="sgit-mono">key ${this._esc(data.author_key_id)}</span>` : ''}</div>
+                        </div>
+                        ${data.signature ? `<div class="sgit-schema-field"><div class="sgit-schema-label">SIGNATURE BYTES</div><div class="sgit-schema-value sgit-mono" style="word-break:break-all;">${this._esc(data.signature)}</div></div>` : ''}
                     </div>
                 `;
             }

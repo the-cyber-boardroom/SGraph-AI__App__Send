@@ -319,6 +319,7 @@
             this.addEventListener('click', (e) => {
                 if (e.target.closest('.vs-sync-merge-btn')) this._onAutoMerge();
                 if (e.target.closest('.vs-sync-pull-btn')) this._onPull();
+                if (e.target.closest('.vs-sync-accept-rewind-btn')) this._onAcceptRewind();
                 if (e.target.closest('.vs-sync-notice-close')) {
                     const n = this.querySelector('.vs-sync-notice');
                     if (n) n.style.display = 'none';
@@ -716,7 +717,10 @@
                     }
                 }
 
-                this._syncState   = { ahead, behind, diverged };
+                // sgit-ai 0.21 parity: the named branch only moves forward. getBehindCount()
+                // classified the live head against the last head this device accepted.
+                const rewound = this._vault.remoteHeadStatus === 'rewound';
+                this._syncState   = { ahead, behind, diverged, rewound };
                 this._lastSyncedAt = Date.now();
                 const header = this.querySelector('vault-header');
                 header?.setAheadCount(ahead);
@@ -749,15 +753,20 @@
         async _onPush() {
             if (!this._vault || !this._accessKey) return;
 
-            // Guard: diverged vault — pushing silently discards published-only commits
-            const { diverged, behind } = this._syncState || {};
+            // push() is compare-and-swap (sgit-ai 0.21 parity): on a diverged vault it merges the
+            // published commits into the working branch, then publishes the merge — nothing on the
+            // published branch is ever overwritten. A rewound branch is refused unless accepted.
+            const { diverged, behind, rewound } = this._syncState || {};
+            if (rewound) {
+                window.sgraphVault.messages.warn('The published branch was rewound \u2014 accept the rewind in the banner before pushing');
+                return;
+            }
             if (diverged) {
                 const ok = confirm(
-                    '\u26a0  Diverged vault\n\n' +
-                    `Pushing will overwrite the published branch and permanently discard ` +
-                    `${behind} published commit(s) not in your working branch.\n\n` +
-                    'To safely merge, use SGit \u2192 Repair tab to reconcile changes first.\n\n' +
-                    'Force-push anyway?'
+                    '\u2195  Diverged vault\n\n' +
+                    `The published branch has ${behind} commit(s) not in your working branch. ` +
+                    'Pushing will merge them into your branch first (conflicts are saved as _conflict copies), then publish.\n\n' +
+                    'Merge and push?'
                 );
                 if (!ok) return;
             }
@@ -768,6 +777,10 @@
                 await this._vault.push();
                 await this._refreshSyncState();
                 window.sgraphVault.messages.success('Pushed \u2014 named branch updated');
+                if (this._vault._lastRegisterError) {
+                    window.sgraphVault.messages.warn('Pushed, but this device could not be registered in the branch index: ' + this._vault._lastRegisterError.message);
+                    this._vault._lastRegisterError = null;
+                }
                 if (this._activeView === 'sgit') {
                     const sgit = this.querySelector('vault-sgit-view');
                     if (sgit) { sgit.vault = this._vault; sgit.refresh(); }
@@ -841,6 +854,34 @@
             }
 
             return { from: prevHead, to: newHead, changed: !!changed };
+        }
+
+        // The user's deliberate `sgit pull --accept-rewind`: the rewound head becomes this
+        // device's baseline and is merged like any other published head.
+        async _onAcceptRewind() {
+            if (!this._vault || !this._accessKey) return;
+            const ok = confirm(
+                '\u26a0  Accept a rewound published branch?\n\n' +
+                'Only do this if the vault owner force-pushed on purpose. Commits that were removed from the ' +
+                'published branch stay in your working branch until you merge or discard them.\n\nAccept?'
+            );
+            if (!ok) return;
+            let namedHead;
+            try { namedHead = await this._vault._refManager.readRef(this._vault._refFileId); } catch (err) {
+                window.sgraphVault.messages.error(`Sync failed: ${err.message}`); return;
+            }
+            if (!namedHead) return;
+            try {
+                const prev   = this._vault._headCommitId;
+                const result = await this._vault.merge(namedHead, { acceptRewind: true });
+                await this._mountBrowse();
+                await this._refreshSyncState();
+                window.dispatchEvent(new CustomEvent('sg-vault-synced', { detail: { prevHead: prev, newHead: this._vault._headCommitId } }));
+                window.sgraphVault.messages.success(result?.merged ? 'Rewind accepted \u2014 synced with the published branch' : 'Rewind accepted');
+                if (this._activeView === 'sgit') { const sgit = this.querySelector('vault-sgit-view'); if (sgit) { sgit.vault = this._vault; sgit.refresh(); } }
+            } catch (err) {
+                window.sgraphVault.messages.error(`Accept rewind failed: ${err.message}`);
+            }
         }
 
         async _onAutoMerge() {
@@ -1395,9 +1436,22 @@
         _updateSyncNotice() {
             const notice = this.querySelector('.vs-sync-notice');
             if (!notice) return;
-            const { ahead, behind, diverged } = this._syncState || {};
+            const { ahead, behind, diverged, rewound } = this._syncState || {};
 
-            if (diverged) {
+            if (rewound) {
+                // Same rule and wording as `sgit status` / `sgit pull`: report, never apply.
+                notice.style.display = '';
+                notice.className = 'vs-sync-notice vs-sync-notice--rewound';
+                notice.innerHTML = `
+                    <span class="vs-sync-notice-icon">⚠</span>
+                    <span class="vs-sync-notice-text">
+                        The published branch was <strong>rewound or rewritten</strong>: it no longer descends from what this device last accepted.
+                        If the owner force-pushed on purpose, accept it; otherwise treat it as tampering and check with the vault owner. Nothing was changed.
+                    </span>
+                    <button class="vs-sync-notice-btn vs-sync-accept-rewind-btn">Accept rewind →</button>
+                    <button class="vs-sync-notice-close" title="Dismiss">✕</button>
+                `;
+            } else if (diverged) {
                 notice.style.display = '';
                 notice.className = 'vs-sync-notice vs-sync-notice--diverged';
                 notice.innerHTML = `
@@ -1515,6 +1569,7 @@
             background: rgba(180,150,80,0.1); color: #b8a060;
             border-bottom-color: rgba(180,150,80,0.2);
         }
+        .vs-sync-notice--rewound { background: rgba(233, 69, 96, 0.12); border-color: rgba(233, 69, 96, 0.5); }
         .vs-sync-notice--behind {
             background: rgba(78,205,196,0.08); color: var(--color-text-secondary);
             border-bottom-color: rgba(78,205,196,0.15);

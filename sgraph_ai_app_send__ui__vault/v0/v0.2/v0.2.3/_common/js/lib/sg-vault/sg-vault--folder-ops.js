@@ -32,7 +32,10 @@
                 name,
                 type:         entry.type,
                 size:         entry.size || 0,
-                content_hash: entry.content_hash || null
+                content_hash: entry.content_hash || null,
+                content_type: entry.content_type || null,
+                large:        !!entry.large,
+                blob_id:      entry.blob_id || null
             }))
         },
 
@@ -104,7 +107,8 @@
                 } else {
                     node.children[entry.name] = {
                         type: 'file', blob_id: entry.blob_id,
-                        size: entry.size || 0, content_hash: entry.content_hash || null
+                        size: entry.size || 0, content_hash: entry.content_hash || null,
+                        content_type: entry.content_type || null, large: !!entry.large
                     }
                 }
             }

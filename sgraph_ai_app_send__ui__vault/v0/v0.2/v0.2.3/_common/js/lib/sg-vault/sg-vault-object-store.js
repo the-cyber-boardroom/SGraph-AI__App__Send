@@ -3,7 +3,8 @@
    v0.3.0 — Encrypted blob storage with self-describing content-addressed IDs
 
    Objects are stored as encrypted ciphertext. The object ID follows the
-   four-segment format: "obj-cas-imm-" + hex(SHA256(ciphertext))[:12].
+   four-segment format: "obj-cas-imm-" + hex(SHA256(ciphertext))[:12] on a format-1 vault
+   and [:32] on a format-2 vault (sgit-ai 0.19 gate; see setFormat).
      - obj: data object (blob, tree, or commit)
      - cas: content-addressed (SHA256 of ciphertext)
      - imm: immutable (written once, never changes)
@@ -64,6 +65,20 @@ class SGVaultObjectStore {
         this._vaultId = vaultId
         this._writeKey = writeKey
         this._batch   = null                                                     // write-buffer (array) when a batch scope is open
+        this._idHexLen = 12                                                      // vault format 1; setFormat(2) → 32 (sgit-ai 0.19+)
+    }
+
+    // --- Vault format (sgit-ai 0.19 format gate) -----------------------------------
+    // Format 1: 'obj-cas-imm-' + sha256[:12] (48-bit ids). Format 2: sha256[:32] (128-bit) for
+    // every NEW object; existing objects keep their ids, so a raised vault mixes both widths
+    // and every reader takes ids as opaque. The format is read from the branch index by
+    // SGVault.open() and re-applied whenever the index is refreshed.
+    get idHexLen() { return this._idHexLen }
+    setFormat(format) {
+        const f = Number(format) || 1
+        this._idHexLen = (typeof SGVaultBranchIndex !== 'undefined')
+            ? SGVaultBranchIndex.idHexLen({ format: f })
+            : (f >= 2 ? 32 : 12)
     }
 
     // --- Write-batch scope (collapse a commit's PUTs into one POST /batch) --------
@@ -220,7 +235,7 @@ class SGVaultObjectStore {
         const hex   = Array.from(new Uint8Array(hash))
             .map(b => b.toString(16).padStart(2, '0'))
             .join('')
-        return 'obj-cas-imm-' + hex.slice(0, 12)
+        return 'obj-cas-imm-' + hex.slice(0, this._idHexLen)
     }
 
     // --- Batch-load multiple objects by ID ---------------------------------------

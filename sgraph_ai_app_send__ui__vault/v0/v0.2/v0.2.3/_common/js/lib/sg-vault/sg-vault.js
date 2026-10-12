@@ -12,13 +12,16 @@
    Vault key format: {passphrase}:{vault_id}
    Key derivation: SGVaultCrypto.deriveKeys() → readKey, writeKey, refFileId, branchIndexFileId
 
-   Compatible with sg-send-cli v0.5.x (same tree format, same crypto, same API).
+   Compatible with sgit-ai 0.21.0: format gate, shared branch index, signed commit_v1,
+   deterministic trees, rewind detection (see sg-vault-interop.js for the byte contract).
 
    Depends on: SGSend, SGSendCrypto, SGVaultCrypto, SGVaultObjectStore,
                SGVaultRefManager, SGVaultCommit
    ================================================================================= */
 
 class SGVault {
+
+    static LARGE_BLOB_THRESHOLD = 4 * 1024 * 1024        // sgit-ai Vault__Sub_Tree.LARGE_BLOB_THRESHOLD (encrypted bytes)
 
     constructor(sgSend) {
         this._sgSend            = sgSend
@@ -38,6 +41,13 @@ class SGVault {
         this._objectStore       = null                                         // SGVaultObjectStore
         this._refManager        = null                                         // SGVaultRefManager
         this._commitManager     = null                                         // SGVaultCommit
+        this._signer            = null                                         // SGVaultSigner (per-device key) — null = unsigned commits
+        this._format            = 1                                            // sgit-ai format gate (1: 12-hex ids, 2: 32-hex ids)
+        this._features          = []                                           // gate features, e.g. 'signatures-required'
+        this._minClient         = ''                                           // gate min_client (a sgit-ai version; informational here)
+        this._lastAcceptedHead  = null                                         // the named head this device last accepted (rewind detection)
+        this._remoteHeadStatus  = 'forward'                                    // 'forward' | 'rewound' | 'unknown' after the last named-ref read
+        this._publicKeyCache    = new Map()                                    // key id → CryptoKey | null
     }
 
     // --- Vault Lifecycle --------------------------------------------------------
@@ -58,7 +68,9 @@ class SGVault {
         vault._hmacKey           = keys.hmacKey
         vault._refFileId         = keys.refFileId
         vault._branchIndexFileId = keys.branchIndexFileId
-        vault._cloneRefFileId    = await SGVaultCrypto.deriveBranchRefFileId(keys.hmacKey, vault._vaultId, 'web-ui')
+        vault._signer            = await SGVault._signerFor(vault._vaultId, options)
+        vault._cloneBranch       = SGVault._cloneBranchName(options, vault._signer)
+        vault._cloneRefFileId    = await SGVaultCrypto.deriveBranchRefFileId(keys.hmacKey, vault._vaultId, vault._cloneBranch)
 
         // 3. Initialize component managers
         vault._initManagers()
@@ -83,11 +95,37 @@ class SGVault {
             await vault._commit('Initial vault creation')                         // tree + commit + clone-ref (staged)
             await vault._refManager.writeRef(vault._refFileId, vault._headCommitId)   // named ref → ahead count starts at 0
             vault._namedHeadId = vault._headCommitId
-            // Single-branch index so the vault is immediately clonable by the sgit CLI.
-            try { await vault._refManager.writeBranchIndex(vault._branchIndexFileId, vault._refFileId) } catch (_) {}
         })
+        vault._recordAcceptedHead(vault._headCommitId)
+        // Branch index (named entry + this device's clone entry + its public key) so the vault is
+        // immediately clonable by the sgit CLI and its signatures verifiable. Its own request:
+        // the index is a shared document written with compare-and-swap, never staged blind.
+        try { await vault._registerClone() } catch (err) { vault._lastRegisterError = err }
 
         return vault
+    }
+
+    // --- Clone branch per device -------------------------------------------------------
+    // The CLI gives every clone its own branch and ref. Web sessions used to share ONE clone
+    // ref ('web-ui') across every browser, so one device's unpushed commit became every
+    // device's working head. With a per-device signer the clone ref is per device too
+    // ('web-ui:<branch id>'); sessions without a signer keep the shared legacy name, and a
+    // caller-supplied name (child kernels: 'viv:<parent>') always wins.
+    static _cloneBranchName(options, signer) {
+        if (options && options.cloneBranch) return String(options.cloneBranch)
+        return signer ? 'web-ui:' + signer.branchId : 'web-ui'
+    }
+
+    // --- Per-device signer -------------------------------------------------------------
+    // Shells and the /app page get a durable key (IndexedDB). A child kernel (cloneBranch
+    // 'viv:…', null-origin sandbox) has no key store: it may be handed a signer by its parent
+    // via options.signer; otherwise its commits stay unsigned, as before. options.signer === null
+    // explicitly disables signing (tests, read-only surfaces).
+    static async _signerFor(vaultId, options) {
+        if (options && 'signer' in options) return options.signer || null
+        if (options && options.cloneBranch && String(options.cloneBranch).startsWith('viv:')) return null
+        if (typeof SGVaultSigner === 'undefined') return null
+        try { return await SGVaultSigner.forVault(vaultId) } catch (_) { return null }
     }
 
     // --- Read-Only Vault Open (Phase 2) -----------------------------------------
@@ -111,6 +149,16 @@ class SGVault {
         )
         vault._refFileId = refFileId
         vault._initManagers()
+
+        // The format gate lives in the branch index, whose id is HMAC(read_key, …): derivable
+        // here, so a read-only open of a raised (format-2) vault knows the id width too.
+        try {
+            const raw = Uint8Array.from(atob(readKeyBase64), c => c.charCodeAt(0))
+            const hmacKey = await crypto.subtle.importKey('raw', raw, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
+            const hex = await SGVaultCrypto._deriveFileId(hmacKey, `sg-vault-v1:file-id:branch-index:${vaultId}`)
+            vault._branchIndexFileId = 'idx-pid-muw-' + hex
+            await vault._refreshBranchIndex()
+        } catch (err) { if (err && err.code === 'EFORMAT') throw err }
 
         const namedCommitId = await vault._refManager.readRef(vault._refFileId)
         if (!namedCommitId) throw new Error('Vault not found: HEAD ref missing')
@@ -155,30 +203,43 @@ class SGVault {
         vault._hmacKey           = keys.hmacKey
         vault._refFileId         = keys.refFileId
         vault._branchIndexFileId = keys.branchIndexFileId
-        vault._cloneBranch       = (options && options.cloneBranch) || 'web-ui'
+        vault._signer            = await SGVault._signerFor(vaultId, options)
+        vault._cloneBranch       = SGVault._cloneBranchName(options, vault._signer)
         vault._cloneRefFileId    = await SGVaultCrypto.deriveBranchRefFileId(keys.hmacKey, vaultId, vault._cloneBranch)
 
         vault._initManagers()
 
-        // Step 1: Read branch index — store it for branch operations, use it to find named ref
+        // Step 1: Read branch index — the format gate, the branches, the tags; use it to find
+        // the named ref. A format this version does not know refuses the open (EFORMAT).
         try {
-            const idx = await vault._refManager.readBranchIndex(vault._branchIndexFileId)
-            if (idx?.branches) {
-                vault._branchIndex = idx
-                const named = idx.branches.find(b => b.branch_type === 'named')
-                if (named?.head_ref_id) {
-                    vault._refFileId = named.head_ref_id
-                }
-            }
-        } catch (_) { /* branch index unavailable — use derived refFileId */ }
+            await vault._refreshBranchIndex()
+        } catch (err) { if (err && err.code === 'EFORMAT') throw err /* else: index unavailable — derived refFileId */ }
 
         // Step 2: Read named HEAD ref LIVE (never use a cached commit ID)
         const namedCommitId = await vault._refManager.readRef(vault._refFileId)
         if (!namedCommitId) throw new Error('Vault not found: HEAD ref missing')
         vault._namedHeadId = namedCommitId
+        vault._loadAcceptedHead()
+        if (!vault._lastAcceptedHead) vault._recordAcceptedHead(namedCommitId)        // a fresh clone: nothing to compare with
+        else await vault._classifyRemoteHead(namedCommitId)                           // a rewind is reported, never auto-applied
 
         // Clone ref created lazily on first commit; 404 is expected on read-only open
-        const cloneCommitId = await vault._refManager.readRef(vault._cloneRefFileId)
+        let cloneCommitId = await vault._refManager.readRef(vault._cloneRefFileId)
+
+        // Migration from the shared legacy clone ref: a device opening with its own (new) clone
+        // ref for the first time adopts unpublished work left on the old shared 'web-ui' ref, so
+        // nothing a user typed before this version is lost. View only; the next commit lands on
+        // this device's ref. Skipped when the legacy head is already published.
+        if (!cloneCommitId && vault._signer && !(options && options.cloneBranch) && !(options && options.adoptLegacyClone === false)) {
+            try {
+                const legacyRef  = await SGVaultCrypto.deriveBranchRefFileId(keys.hmacKey, vaultId, 'web-ui')
+                const legacyHead = await vault._refManager.readRef(legacyRef)
+                if (legacyHead && legacyHead !== namedCommitId && !(await vault._isAncestor(legacyHead, namedCommitId))) {
+                    cloneCommitId = legacyHead
+                    vault._adoptedLegacyClone = legacyRef
+                }
+            } catch (_) {}
+        }
 
         // Reconcile-on-open (CLI interop): the named ref is canonical. If the clone branch is
         // CLEANLY BEHIND the named head (clone is a strict ancestor of named — e.g. the CLI or
@@ -233,6 +294,16 @@ class SGVault {
         } catch (_) { return null }
     }
     get created()   { return this._settings?.created    }
+    get format()    { return this._format               }   // sgit-ai format gate: 1 or 2
+    get features()  { return this._features.slice()     }   // gate features ('signatures-required', 'ids-128', 'signed-since-…')
+    get minClient() { return this._minClient            }   // gate min_client (a sgit-ai version; the web does not compare it)
+    get signer()    { return this._signer               }   // this device's SGVaultSigner, or null (unsigned commits)
+    get remoteHeadStatus() { return this._remoteHeadStatus }   // 'forward' | 'rewound' | 'unknown' (see _classifyRemoteHead)
+    get lastAcceptedHead() { return this._lastAcceptedHead }
+    hasFeature(name) { return this._features.includes(name) }
+    get requiresSignatures() { return this.hasFeature(SGVaultBranchIndex.FEATURE_SIG_REQUIRED) }
+    // Live tags from the branch index: { name: tag_id } (0.21 signed tags; tombstones excluded)
+    getTags() { return SGVaultBranchIndex.liveTags(this._branchIndex) }
     get writable()  { return !!this._writeKey           }
     get writeKeyHex() { return this._writeKey || null   }   // hex string (owner-secret store input); null in RO sessions
     get aheadOf()   { return this._namedHeadId          }
@@ -306,7 +377,209 @@ class SGVault {
     _initManagers() {
         this._objectStore   = new SGVaultObjectStore(this._sgSend, this._vaultId, this._writeKey)
         this._refManager    = new SGVaultRefManager(this._sgSend, this._vaultId, this._writeKey, this._readKey, this._objectStore)
-        this._commitManager = new SGVaultCommit(this._objectStore, this._readKey)
+        this._commitManager = new SGVaultCommit(this._objectStore, this._readKey, this._hmacKey)
+        this._objectStore.setFormat(this._format)
+    }
+
+    // --- Branch index / format gate ----------------------------------------------------
+    // Re-read the server's copy (one small read), apply the gate (id width, features) and keep
+    // the parsed index for branches / tags. Called on open and before every sync, as the CLI's
+    // pull and status do, so a vault raised while a tab is open is honoured on the next sync.
+    async _refreshBranchIndex() {
+        if (!this._branchIndexFileId) return null
+        const { raw, index } = await this._refManager.readBranchIndexRaw(this._branchIndexFileId)
+        if (raw && !index) return null                           // present but unreadable: keep what we had
+        this._applyBranchIndex(index)
+        return index
+    }
+
+    _applyBranchIndex(idx) {
+        if (!idx || typeof idx !== 'object') return
+        SGVaultBranchIndex.checkFormat(idx)                      // throws EFORMAT on a format this version cannot read
+        this._branchIndex = idx
+        this._format      = SGVaultBranchIndex.formatOf(idx)
+        this._features    = SGVaultBranchIndex.features(idx)
+        this._minClient   = SGVaultBranchIndex.minClient(idx)
+        if (this._objectStore) this._objectStore.setFormat(this._format)
+        if (Array.isArray(idx.branches)) {
+            const named = idx.branches.find(b => b.branch_type === 'named' && b.name === 'current')
+                       || idx.branches.find(b => b.branch_type === 'named')
+            if (named?.head_ref_id && !this._refPinned) this._refFileId = named.head_ref_id
+        }
+    }
+
+    // --- Rewind detection (sgit-ai Vault__Ref_Guard) ---------------------------------
+    // Each device records the last named head it ACCEPTED (open, pull, merge, push). A remote
+    // head that does not descend from it is a rewind: a rollback, a rewritten history, or a
+    // host replaying an old ref. Reported as remoteHeadStatus; pull/merge refuse it unless
+    // { acceptRewind: true }; nothing is ever applied silently.
+    _acceptedHeadKey() { return `sg-vault-remote-head:${this._vaultId}:${this._refFileId}` }
+    _loadAcceptedHead() {
+        try { this._lastAcceptedHead = localStorage.getItem(this._acceptedHeadKey()) || null } catch (_) { this._lastAcceptedHead = this._lastAcceptedHead || null }
+    }
+    _recordAcceptedHead(commitId) {
+        if (!commitId) return
+        this._lastAcceptedHead = commitId
+        this._remoteHeadStatus = 'forward'
+        try { localStorage.setItem(this._acceptedHeadKey(), commitId) } catch (_) {}
+    }
+    // 'forward' when remoteHead equals or descends from the last accepted head (or none is
+    // recorded); 'rewound' when it is an ancestor of it, or a complete unrelated lineage;
+    // 'unknown' when the walk hit its limit before deciding.
+    async _classifyRemoteHead(remoteHead) {
+        const known = this._lastAcceptedHead
+        let status = 'forward'
+        if (known && remoteHead && remoteHead !== known) {
+            const fwd = await this._walkReaches(remoteHead, known, 2000)
+            if (fwd.reached) status = 'forward'
+            else {
+                const back = await this._walkReaches(known, remoteHead, 2000)
+                status = back.reached ? 'rewound' : (fwd.complete ? 'rewound' : 'unknown')
+            }
+        }
+        this._remoteHeadStatus = status
+        return status
+    }
+    // BFS over all parents from `from`: { reached: target met, complete: walk exhausted under max }
+    async _walkReaches(from, target, max) {
+        if (!from || !target) return { reached: false, complete: true }
+        if (from === target) return { reached: true, complete: true }
+        const seen = new Set([from]); let wave = [from]
+        while (wave.length) {
+            if (seen.size > max) return { reached: false, complete: false }
+            const commits = await this._batchLoadCommits(wave)
+            const next = []
+            for (const id of wave) {
+                const c = commits.get(id)
+                if (!c) return { reached: false, complete: false }          // missing object: cannot decide
+                for (const p of (c.parents || [])) {
+                    if (p === target) return { reached: true, complete: true }
+                    if (!seen.has(p)) { seen.add(p); next.push(p) }
+                }
+            }
+            wave = next
+        }
+        return { reached: false, complete: true }
+    }
+    rewindMessage(remoteHead) {
+        return `the published branch was rewound or rewritten: it pointed at ${this._lastAcceptedHead} the last time this device saw it and now points at ${remoteHead}, which does not descend from it. If the owner force-pushed on purpose, accept the rewind; otherwise treat it as tampering and check with the vault owner. Nothing was changed.`
+    }
+
+    // --- Signature verification (sgit-ai Vault__Signatures) ---------------------------
+    // Status per commit: 'verified' | 'bad' | 'unsigned' | 'no-key' | 'missing'. The key comes
+    // from the commit's own author_key_id, else from the index's branch → public_key_id mapping;
+    // key files are fetched from bare/keys/ (read_key-encrypted, so the host cannot substitute).
+    async _publicKeyFor(commit) {
+        let kid = commit.author_key_id ? String(commit.author_key_id) : ''
+        if (!kid && commit.branch_id && this._branchIndex?.branches) {
+            const meta = this._branchIndex.branches.find(b => String(b.branch_id) === String(commit.branch_id))
+            if (meta?.public_key_id) kid = String(meta.public_key_id)
+        }
+        if (!kid) return null
+        if (this._publicKeyCache.has(kid)) return this._publicKeyCache.get(kid)
+        let key = null
+        if (this._signer && kid === this._signer.keyId) {                 // our own key: no network needed
+            try { key = await SGVaultSigning.importPublicKeyPem(this._signer.publicPem) } catch (_) { key = null }
+            this._publicKeyCache.set(kid, key)
+            return key
+        }
+        try {
+            const pem = await this._refManager.readPublicKeyPem(kid)
+            if (pem) key = await SGVaultSigning.importPublicKeyPem(pem)
+        } catch (_) { key = null }
+        this._publicKeyCache.set(kid, key)
+        return key
+    }
+    async verifyCommit(commitId, commit = null) {
+        if (!commit) {
+            try { commit = await this._commitManager.loadCommit(commitId) } catch (_) { return 'missing' }
+        }
+        if (!commit.signature) return 'unsigned'
+        const key = await this._publicKeyFor(commit)
+        if (!key) return 'no-key'
+        return (await SGVaultSigning.verifyCommit(commit, key)) ? 'verified' : 'bad'
+    }
+    // Walk from head (all parents), classify every commit reached. stopAt: ids not classified
+    // nor expanded (what we already hold / the policy start). limit 0 = all.
+    // Returns { total, counts, byStatus, firstFailure: [id, status] | null }
+    async verifyChain(head, opts = {}) {
+        const stop = new Set(opts.stopAt || []), limit = opts.limit || 0, anchor = opts.anchorPrefix || ''
+        const seen = new Set(); const queue = head ? [head] : []
+        const by = { verified: [], bad: [], unsigned: [], 'no-key': [], missing: [] }
+        let firstFailure = null
+        while (queue.length) {
+            const cid = queue.shift()
+            if (!cid || seen.has(cid) || stop.has(cid)) continue
+            if (anchor && cid.startsWith('obj-cas-imm-' + anchor)) continue     // the policy's start and its history: not held against anyone
+            seen.add(cid)
+            if (limit && seen.size > limit) break
+            let commit = null
+            try { commit = await this._commitManager.loadCommit(cid) } catch (_) {}
+            const status = commit ? await this.verifyCommit(cid, commit) : 'missing'
+            by[status].push(cid)
+            if (status !== 'verified' && !firstFailure) firstFailure = [cid, status]
+            if (commit) for (const p of (commit.parents || [])) if (p && !seen.has(p)) queue.push(p)
+        }
+        const counts = {}; for (const k of Object.keys(by)) counts[k] = by[k].length
+        return { total: seen.size, counts, byStatus: by, firstFailure }
+    }
+    // Under 'signatures-required': every commit from incomingHead down to what this device
+    // already holds (everything reachable from heldHead) must verify (Vault__Incoming_Check).
+    async _requireSignatures(incomingHead, heldHead) {
+        if (!this.requiresSignatures || !incomingHead || incomingHead === heldHead) return
+        const held = await this._localHistory(heldHead)
+        if (held.has(incomingHead)) return
+        const report = await this.verifyChain(incomingHead, { stopAt: held, anchorPrefix: SGVaultBranchIndex.sigAnchor(this._branchIndex) })
+        if (report.firstFailure) {
+            const [cid, status] = report.firstFailure
+            const e = new Error(`this vault requires signed commits and commit ${cid} is ${status}; it was refused before anything was changed. Ask the vault owner; if the owner relaxes the policy (sgit vault format --remove-feature signatures-required), try again.`)
+            e.code = 'ESIGNATURE'; e.commitId = cid; e.status = status; throw e
+        }
+    }
+    async _localHistory(head) {
+        const seen = new Set(); let wave = head ? [head] : []
+        while (wave.length && seen.size < 5000) {
+            const commits = await this._batchLoadCommits(wave); const next = []
+            for (const id of wave) {
+                if (seen.has(id)) continue
+                seen.add(id)
+                for (const p of (commits.get(id)?.parents || [])) if (p && !seen.has(p)) next.push(p)
+            }
+            wave = next
+        }
+        return seen
+    }
+
+    // --- Clone registration (sgit-ai _register_pending_branch / _ensure_public_key) -----
+    // Publish this device's public key at bare/keys/<id> (once) and upsert our clone entry +
+    // the named entry into the shared index. Called after every successful push and on create.
+    // Publish this device's public key file once (bare/keys/<id>); before the first push so
+    // every verifier, including this one's pre-push policy check, can find it.
+    async _ensurePublicKey() {
+        if (!this.writable || !this._signer || this._publicKeyRegistered) return
+        const s = this._signer
+        if (!(await this._refManager.publicKeyExists(s.keyId))) await this._refManager.writePublicKey(s.keyId, s.publicKeyFilePlain())
+        this._publicKeyRegistered = true
+    }
+
+    async _registerClone() {
+        if (!this.writable || !this._branchIndexFileId) return
+        const entries = []
+        if (this._signer) {
+            const s = this._signer
+            await this._ensurePublicKey()
+            const named = this._branchIndex?.branches?.find(b => b.branch_type === 'named')
+            // `name` must satisfy the CLI's Safe_Str__Branch_Name (^[a-zA-Z0-9_-]{1,64}$): one bad
+            // entry makes the CLI's parse of the WHOLE index fail, and its next push then
+            // overwrites the index from its single-branch fallback (verified against 0.21.0).
+            // The ref-derivation name ('web-ui:<branch id>') is internal and never written here.
+            entries.push({ branch_id: s.branchId, name: 'web-ui', branch_type: 'clone',
+                           head_ref_id: this._cloneRefFileId, public_key_id: s.keyId, private_key_id: null,
+                           created_at: Number(s.createdAt) || Date.now(), creator_branch: named ? named.branch_id : null,
+                           display_name: 'web-ui' })
+        }
+        const { index } = await this._refManager.upsertBranchIndex(this._branchIndexFileId, entries, { namedRefId: this._refFileId })
+        if (index) this._applyBranchIndex(index)
     }
 
     // Run `fn` with the object-store write-batch open, flushing all staged writes (objects +
@@ -334,9 +607,11 @@ class SGVault {
         try {
             const result = await fn()
             await this._objectStore.flushBatch()
+            if (this._refManager) this._refManager.commitPendingRaw()
             return result
         } catch (err) {
             this._objectStore.discardBatch()
+            if (this._refManager) this._refManager.discardPendingRaw()
             this._headCommitId         = snap.head
             this._namedHeadId          = snap.namedHead
             this._settingsDirty        = snap.settingsDirty
@@ -377,6 +652,8 @@ class SGVault {
                 name:         '.vault-settings.json',
                 size:         settingsPlain.byteLength,
                 content_hash: settingsHash,
+                content_type: 'application/json',
+                large:        false,
                 blob_id:      settingsBlobId,
                 tree_id:      null
             }
@@ -387,7 +664,7 @@ class SGVault {
         const treeId    = await this._commitManager.createTree(entries)
         const parentIds = this._headCommitId ? [this._headCommitId] : []
         const commitId  = await this._commitManager.createCommit({
-            parentIds, treeId, message, branchId: null
+            parentIds, treeId, message, branchId: null, signer: this._signer
         })
 
         const targetRef = this._cloneRefFileId || this._refFileId
@@ -426,6 +703,8 @@ class SGVault {
                     name,
                     size:         entry.size || 0,
                     content_hash: entry.content_hash || null,
+                    content_type: entry.content_type || undefined,     // undefined → createTree guesses as the CLI does
+                    large:        !!entry.large,
                     blob_id:      entry.blob_id || null,
                     tree_id:      null
                 })
@@ -533,7 +812,8 @@ class SGVault {
         }
         node.children[fileName] = {
             type: 'file', blob_id: entry.blob_id,
-            size: entry.size | 0, content_hash: entry.content_hash || null
+            size: entry.size | 0, content_hash: entry.content_hash || null,
+            content_type: entry.content_type || null, large: !!entry.large
         }
     }
 

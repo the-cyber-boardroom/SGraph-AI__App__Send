@@ -10,7 +10,10 @@
 
    Wire format: AES-256-GCM encrypted JSON: { "commit_id": "obj-cas-imm-..." }
 
-   Depends on: SGSend, SGSendCrypto, Web Crypto API
+   Also owns the branch index (shared with the sgit CLI — see upsertBranchIndex) and the
+   public signing keys at bare/keys/.
+
+   Depends on: SGSend, SGSendCrypto, SGVaultBranchIndex, SGVaultSigning, Web Crypto API
    ================================================================================= */
 
 class SGVaultRefManager {
@@ -37,9 +40,24 @@ class SGVaultRefManager {
     async writeRef(refFileId, commitId) {
         const filePath  = `bare/refs/${refFileId}`
         const payload   = new TextEncoder().encode(JSON.stringify({ commit_id: commitId }))
-        const encrypted = await SGSendCrypto.encrypt(payload, this._readKey)
-        await this._putOrStage(filePath, new Uint8Array(encrypted))
+        const encrypted = new Uint8Array(await SGSendCrypto.encrypt(payload, this._readKey))
+        await this._putOrStage(filePath, encrypted)
+        if (!(this._objectStore && this._objectStore.batching)) this._rememberRaw(refFileId, encrypted)   // a flushed write is what the server holds
+        else this._pendingRaw(refFileId, encrypted)
     }
+
+    // A staged ref write lands at flushBatch(); until then the server still holds the old bytes.
+    // SGVault._withBatch calls commitPendingRaw() after a successful flush.
+    _pendingRaw(refFileId, bytes) {
+        if (!this._rawPending) this._rawPending = Object.create(null)
+        this._rawPending[refFileId] = bytes
+    }
+    commitPendingRaw() {
+        if (!this._rawPending) return
+        for (const [id, bytes] of Object.entries(this._rawPending)) this._rememberRaw(id, bytes)
+        this._rawPending = null
+    }
+    discardPendingRaw() { this._rawPending = null }
 
     // --- Read ref: decrypt and return commit_id ----------------------------------
 
@@ -100,59 +118,140 @@ class SGVaultRefManager {
         const e = new Error('writeRefIfMatch: unexpected batch result ' + JSON.stringify(r || null)); e.code = 'EUNREACH'; throw e
     }
 
-    // --- Read branch index: decrypt and return parsed index ----------------------
+    // --- Branch index: a SHARED document (sgit-ai 0.19+ contract) ------------------
     //
-    // Branch index format (decrypted JSON):
-    //   { "schema": "branch_index_v1", "branches": [
-    //     { "branch_id": "branch-named-...", "branch_type": "named",
-    //       "head_ref_id": "ref-pid-muw-...", "name": "...", "created_at": ... }
-    //   ]}
+    // Decrypted JSON (Schema__Branch_Index):
+    //   { "schema": "branch_index_v1",
+    //     "branches": [ { branch_id, name, branch_type: "named"|"clone", head_ref_id,
+    //                     public_key_id, private_key_id, created_at, creator_branch, display_name } ],
+    //     "format": 1|2, "min_client": "X.Y.Z", "features": [...],     ← the gate (absent = format 1)
+    //     "tags": [ { name, tag_id, timestamp_ms, deleted } ] }         ← 0.21 signed tags (+ tombstones)
     //
-    // branch_type values: "named" | "clone"
-    // head_ref_id format: ref-pid-(muw|snw)-[0-9a-f]{12}
+    // Two clients write it. The rule both now follow: read the server copy, MERGE (branches by
+    // id, the gate as the server has it, tags per name, unknown members kept), write with
+    // compare-and-swap against the exact bytes read, re-read and re-merge on conflict. The old
+    // single-entry overwrite erased every CLI clone branch, its keys, the tags and the gate on
+    // every web push (the CLI repaired it on its next pull — sgit.ai history-integrity §6).
 
     async readBranchIndex(branchIndexFileId) {
-        const filePath  = `bare/indexes/${branchIndexFileId}`
-        const encrypted = await this._sgSend.vaultRead(this._vaultId, filePath)
-        if (!encrypted) return null
-        const decrypted = await SGSendCrypto.decrypt(encrypted, this._readKey)
-        return JSON.parse(new TextDecoder().decode(decrypted))
+        const { index } = await this.readBranchIndexRaw(branchIndexFileId)
+        return index
     }
 
-    // --- Write a single-branch index (interop with the sgit CLI) -----------------
-    //
-    // Web-created vaults historically never wrote a CLI-format branch index, so
-    // `sgit clone <web-vault>` hard-errored with "No branch index found" (the CLI now
-    // has a fallback, but writing the index makes web vaults clonable by ANY CLI
-    // version and discoverable by agents). Written on create() and on every push()
-    // so the index always points at the current named ref. Stored at the same path
-    // the CLI reads (`bare/indexes/`), encrypted under read_key like every ref.
-    //
-    // Stable plaintext per refFileId (no timestamp); the encrypted blob still carries a
-    // fresh AES-GCM IV per write, so the index is small and cheap to re-write each push.
-    // head_ref_id points at the NAMED ref (ref-pid-muw-*) — never the clone ref — so the
-    // CLI keeps cloning the canonical published branch (see the CLI interop briefs).
-    //
-    // CLI wire contract — pinned to the sgit CLI's Schema__Branch_Index (round 2 review):
-    //   - `branch_id`  MUST match  ^branch-(named|clone)-[0-9a-f]{8,64}$  (opaque hex; NOT a label).
-    //     We derive it from `branchIndexFileId`'s hex suffix (`idx-pid-muw-{12 hex}` → 12 hex chars),
-    //     so it's deterministic per vault, opaque, and well inside the regex bounds.
-    //   - `name`       MUST be  "current"  (hardcoded in 10+ CLI workflow steps; changing the CLI
-    //     would break every CLI-created vault in the wild). Human-readable display labels belong
-    //     in a separate field (see the in-flight architect interop contract).
-    // Earlier wire ("branch-named-main" / "main") was strictly worse than no index: it tripped
-    // the CLI's `Safe_Str__Branch_Id` parse → crash, bypassing their absent-index fallback.
+    // { raw: Uint8Array|null (exact server bytes, the CAS match), index: object|null }
+    async readBranchIndexRaw(branchIndexFileId) {
+        const filePath  = `bare/indexes/${branchIndexFileId}`
+        const encrypted = await this._sgSend.vaultRead(this._vaultId, filePath)
+        if (!encrypted) return { raw: null, index: null }
+        const raw = new Uint8Array(encrypted)
+        let index = null
+        try {
+            const decrypted = await SGSendCrypto.decrypt(raw, this._readKey)
+            index = JSON.parse(new TextDecoder().decode(decrypted))
+        } catch (_) { index = null }                                 // present but unreadable: caller decides
+        return { raw, index }
+    }
+
+    // Write the whole index with compare-and-swap. `raw` null = the server has none (plain write).
+    // Returns true on success; on a CAS miss throws 'ECAS' with e.current = the server's bytes now.
+    async writeBranchIndexIfMatch(branchIndexFileId, index, raw) {
+        const filePath  = `bare/indexes/${branchIndexFileId}`
+        const payload   = new TextEncoder().encode(JSON.stringify(index))
+        const encrypted = new Uint8Array(await SGSendCrypto.encrypt(payload, this._readKey))
+        const results   = await this._sgSend.vaultBatch(this._vaultId, this._writeKey, [{
+            op      : raw ? 'write-if-match' : 'write',
+            file_id : filePath,
+            data    : SGSend._abToB64(encrypted),
+            match   : raw ? SGSend._abToB64(raw) : null
+        }])
+        const r = results && results[0]
+        if (r && r.status === 'ok') return true
+        if (r && r.status === 'conflict') {
+            const e = new Error('branch index moved on server: ' + branchIndexFileId); e.code = 'ECAS'
+            e.current = r.current ? SGSend._b64ToBytes(r.current) : null; throw e
+        }
+        const e = new Error('branch index write: unexpected batch result ' + JSON.stringify(r || null)); e.code = 'EUNREACH'; throw e
+    }
+
+    // Merge our entries into the server's copy and write it back (CAS, up to 3 rounds).
+    //   entries  : [branch meta objects] — upserted by branch_id (ours win per field over a
+    //              same-id entry; every other entry, the gate, tags and unknown members are kept)
+    //   opts.namedRefId : ensure a named entry 'current' exists pointing at this ref (never
+    //              replaces an existing named entry)
+    // Returns { index, written } — the merged index as the server now holds it.
+    async upsertBranchIndex(branchIndexFileId, entries, opts) {
+        if (!branchIndexFileId) return { index: null, written: false }
+        opts = opts || {}
+        const BI = SGVaultBranchIndex
+        const ours = { schema: 'branch_index_v1', branches: [] }
+        for (const e of entries || []) if (e && e.branch_id) ours.branches.push(Object.assign({}, e))
+
+        let { raw, index: remote } = await this.readBranchIndexRaw(branchIndexFileId)
+        for (let attempt = 0; attempt < 3; attempt++) {
+            if (raw && !remote) {                                      // present but undecryptable: never overwrite
+                const e = new Error('branch index on the server does not decrypt; nothing was written'); e.code = 'EINDEX'; throw e
+            }
+            let merged = remote ? BI.merge(ours, remote) : BI.merge(ours, null)
+            // our entries win per field (the CLI's merge lets the remote win; this is OUR registration)
+            for (const mine of ours.branches) {
+                const cur = merged.branches.find(b => String(b.branch_id) === String(mine.branch_id))
+                if (cur) Object.assign(cur, mine)
+            }
+            if (opts.namedRefId && !merged.branches.some(b => b.branch_type === 'named')) {
+                const hex = (branchIndexFileId.match(/[0-9a-f]+$/) || ['00000000'])[0]
+                merged.branches.push({ branch_id: 'branch-named-' + hex, branch_type: 'named', head_ref_id: opts.namedRefId, name: 'current' })
+            }
+            if (remote && BI.same(merged, remote)) {
+                return { index: merged, written: false }               // nothing to add: no write
+            }
+            try {
+                await this.writeBranchIndexIfMatch(branchIndexFileId, merged, raw)
+                this._lastIndex = merged
+                return { index: merged, written: true }
+            } catch (err) {
+                if (!err || err.code !== 'ECAS') throw err
+                if (err.current) {                                     // the conflict reply carries the current bytes
+                    raw = err.current
+                    try { remote = JSON.parse(new TextDecoder().decode(await SGSendCrypto.decrypt(raw, this._readKey))) } catch (_) { remote = null }
+                } else {
+                    ({ raw, index: remote } = await this.readBranchIndexRaw(branchIndexFileId))
+                }
+            }
+        }
+        const e = new Error('the branch index changed on the server 3 times while this write was retried; nothing was written. Try again.')
+        e.code = 'ECAS'; throw e
+    }
+
+    // Kept for callers that only know the named ref: upserts the named entry (interop with the
+    // sgit CLI: `branch_id` MUST match ^branch-(named|clone)-[0-9a-f]{8,64}$ and `name` MUST be
+    // "current" — hardcoded in the CLI's workflow steps).
     async writeBranchIndex(branchIndexFileId, refFileId) {
         if (!branchIndexFileId || !refFileId) return
-        const filePath = `bare/indexes/${branchIndexFileId}`
-        // Derive the opaque hex id from the index file id's hex tail.
-        const hex      = (branchIndexFileId.match(/[0-9a-f]+$/) || ['00000000'])[0]
-        const branchId = 'branch-named-' + hex
-        const index    = { schema: 'branch_index_v1', branches: [
-            { branch_id: branchId, branch_type: 'named', head_ref_id: refFileId, name: 'current' }
-        ]}
-        const payload   = new TextEncoder().encode(JSON.stringify(index))
-        const encrypted = await SGSendCrypto.encrypt(payload, this._readKey)
-        await this._putOrStage(filePath, new Uint8Array(encrypted))
+        return this.upsertBranchIndex(branchIndexFileId, [], { namedRefId: refFileId })
+    }
+
+    // --- Signing keys: bare/keys/<key-rnd-imm-…> --------------------------------------
+    // {"type":"public","pem":"-----BEGIN PUBLIC KEY-----…"} encrypted under the read key, exactly
+    // what Vault__Key_Manager.store_public_key writes and Vault__Key_Fetch accepts.
+
+    async readPublicKeyPem(keyId) {
+        if (!keyId || !SGVaultSigning.KEY_ID_RE.test(String(keyId))) return null
+        const encrypted = await this._sgSend.vaultRead(this._vaultId, `bare/keys/${keyId}`)
+        if (!encrypted) return null
+        try {
+            const data = JSON.parse(new TextDecoder().decode(await SGSendCrypto.decrypt(encrypted, this._readKey)))
+            if (data && data.type === 'public' && typeof data.pem === 'string' && data.pem.includes('PUBLIC KEY')) return data.pem
+        } catch (_) {}
+        return null
+    }
+
+    async publicKeyExists(keyId) {
+        const encrypted = await this._sgSend.vaultRead(this._vaultId, `bare/keys/${keyId}`)
+        return !!encrypted
+    }
+
+    async writePublicKey(keyId, plainBytes) {
+        const encrypted = new Uint8Array(await SGSendCrypto.encrypt(plainBytes, this._readKey))
+        await this._sgSend.vaultWrite(this._vaultId, `bare/keys/${keyId}`, this._writeKey, encrypted)
     }
 }

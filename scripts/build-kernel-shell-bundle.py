@@ -30,6 +30,7 @@ SCRIPTS = [
     'js/components/app-shell/secure-channel-envelope.js',
     'js/components/app-shell/secure-channel.js',
     'js/lib/sg-vault/sg-vault-crypto.js',
+    'js/lib/sg-vault/sg-vault-interop.js',
     'js/lib/sg-vault/sg-vault-object-store.js',
     'js/lib/sg-vault/sg-vault-ref-manager.js',
     'js/lib/sg-vault/sg-vault-commit.js',

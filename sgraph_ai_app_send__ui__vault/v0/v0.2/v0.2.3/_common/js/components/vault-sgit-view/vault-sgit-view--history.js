@@ -25,6 +25,11 @@
         // --- Entry point ---------------------------------------------------------
 
         async _renderHistory(container) {
+            await this._renderHistoryGraph(container);
+            this._decorateSignatures(container);          // async; fills the signature chips in place
+        },
+
+        async _renderHistoryGraph(container) {
             container.innerHTML = '<div class="sgit-loading">Loading commit history...</div>';
 
             const vault     = this._vault;
@@ -243,6 +248,7 @@
                 isHead      ? '<span class="sgit-badge sgit-badge--head">Working HEAD</span>'         : '',
                 isNamedHere ? '<span class="sgit-badge sgit-badge--named-head">Published HEAD</span>' : '',
                 branch      ? `<span class="sgit-badge sgit-badge--branch">${this._esc(this._shortBranch(branch))}</span>` : '',
+                this._sigChip(row.id),
             ].join('');
             const treeLink = row.tree_id
                 ? `<a class="sgit-obj-link sgit-commit-tree-link" href="#" data-id="${this._esc(row.tree_id)}" title="View tree">tree</a>`
@@ -405,6 +411,7 @@
                 s.isCloneHead ? '<span class="sgit-badge sgit-badge--head">Working HEAD</span>'          : '',
                 s.isNamedHead ? '<span class="sgit-badge sgit-badge--named-head">Published HEAD</span>'  : '',
                 s.isFork      ? '<span class="sgit-badge sgit-badge--fork">fork</span>'                  : '',
+                this._sigChip(row.id),
             ].join('');
 
             return `<div class="sgit-commit-row sgit-commit-row--two${s.isHead ? ' sgit-commit-row--head' : ''}${s.isFork ? ' sgit-commit-row--fork' : ''}">
@@ -506,6 +513,7 @@
                     ${isHead      ? '<span class="sgit-badge sgit-badge--head">Working HEAD</span>'         : ''}
                     ${isNamedHere ? '<span class="sgit-badge sgit-badge--named-head">Published HEAD</span>' : ''}
                     ${branch      ? `<span class="sgit-badge sgit-badge--branch">${this._esc(this._shortBranch(branch))}</span>` : ''}
+                    ${this._sigChip(commit.id)}
                     <span class="sgit-commit-msg">${this._esc(msg)}</span>
                     <a class="sgit-obj-link sgit-commit-tree-link" href="#" data-id="${this._esc(commit.tree_id)}" title="View tree">tree</a>
                     ${this._diffLink(commit.id)}

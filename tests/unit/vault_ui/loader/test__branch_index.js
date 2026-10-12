@@ -13,20 +13,38 @@ function load(rel) {
     runInThisContext(readFileSync(p, 'utf8'), { filename: rel, displayErrors: true });
 }
 load('lib/sg-send/sg-send-crypto.js');
+load('lib/sg-send/sg-send.js');
+load('lib/sg-vault/sg-vault-interop.js');
 load('lib/sg-vault/sg-vault-ref-manager.js');
-runInThisContext('globalThis.SGVaultRefManager = SGVaultRefManager; globalThis.SGSendCrypto = SGSendCrypto;');
+runInThisContext('globalThis.SGVaultRefManager = SGVaultRefManager; globalThis.SGSendCrypto = SGSendCrypto; globalThis.SGSend = SGSend;');
 const { SGVaultRefManager } = globalThis;
 
 let pass = 0, fail = 0;
 function ok(name, cond) { if (cond) { pass++; console.log('  ✓ ' + name); } else { fail++; console.log('  ✗ ' + name); } }
 
 // Fake SGSend: an in-memory bare/ store. writeBranchIndex calls vaultWrite; readBranchIndex calls vaultRead.
+// The index is now written through the batch endpoint (write / write-if-match, sgit-ai 0.19+
+// shared-document contract), so the fake serves that too.
 function fakeSgSend() {
     const store = {};
+    const b64  = (u8) => btoa(String.fromCharCode(...new Uint8Array(u8)));
+    const un64 = (s)  => Uint8Array.from(atob(s), c => c.charCodeAt(0));
     return {
         _store: store,
         async vaultWrite(vaultId, filePath, writeKey, data) { store[filePath] = data; return { ok: true }; },
-        async vaultRead(vaultId, filePath) { return store[filePath] ? store[filePath] : null; }
+        async vaultRead(vaultId, filePath) { return store[filePath] ? store[filePath] : null; },
+        async vaultBatch(vaultId, writeKey, ops) {
+            return ops.map(o => {
+                if (o.op === 'write') { store[o.file_id] = un64(o.data); return { op: 'write', file_id: o.file_id, status: 'ok' }; }
+                if (o.op === 'write-if-match') {
+                    const cur = store[o.file_id] || null, exp = o.match ? un64(o.match) : null;
+                    const same = (cur === null && exp === null) || (cur && exp && cur.length === exp.length && cur.every((x, i) => x === exp[i]));
+                    if (same) { store[o.file_id] = un64(o.data); return { op: 'write-if-match', file_id: o.file_id, status: 'ok' }; }
+                    return { op: 'write-if-match', file_id: o.file_id, status: 'conflict', current: cur ? b64(cur) : null };
+                }
+                return { op: o.op, file_id: o.file_id, status: 'ok' };
+            });
+        }
     };
 }
 

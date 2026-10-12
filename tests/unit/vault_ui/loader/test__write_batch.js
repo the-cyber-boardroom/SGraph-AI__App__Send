@@ -11,6 +11,8 @@ import { runInThisContext } from 'node:vm';
 const VAULT = '../../../../sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.3/_common/js/';
 const load = (rel) => runInThisContext(readFileSync(fileURLToPath(new URL(VAULT + rel, import.meta.url)), 'utf8'), { filename: rel, displayErrors: true });
 load('lib/sg-send/sg-send-crypto.js');
+load('lib/sg-send/sg-send.js');
+load('lib/sg-vault/sg-vault-interop.js');
 load('lib/sg-vault/sg-vault-object-store.js');
 load('lib/sg-vault/sg-vault-ref-manager.js');
 load('lib/sg-vault/sg-vault-commit.js');
@@ -25,7 +27,8 @@ function fakeSgSend() {
     return {
         puts: 0, batches: 0, lastBatchOps: null,
         async vaultWrite(vaultId, filePath, wk, bytes) { this.puts++; return { ok: true }; },
-        async vaultBatch(vaultId, wk, ops) { this.batches++; this.lastBatchOps = ops; return ops.map(o => ({ op: 'write', file_id: o.file_id, status: 'ok' })); }
+        async vaultRead(vaultId, filePath) { return null; },     // the index upsert reads the server copy first (absent here)
+        async vaultBatch(vaultId, wk, ops) { this.batches++; this.lastBatchOps = ops; return ops.map(o => ({ op: o.op, file_id: o.file_id, status: 'ok' })); }
     };
 }
 const buf = (s) => new TextEncoder().encode(s).buffer;
@@ -52,21 +55,31 @@ const buf = (s) => new TextEncoder().encode(s).buffer;
     const id3 = await osB.store(buf('the commit'));
     await rmB.writeRef('ref-pid-snw-clone0000', id3);
     await rmB.writeRef('ref-pid-muw-named00000', id3);
-    await rmB.writeBranchIndex('idx-pid-muw-index0000', 'ref-pid-muw-named00000');
     ok('no PUTs while staging',          sgB.puts === 0);
     ok('no POST until flush',            sgB.batches === 0);
     ok('store() returns content id',     id1.startsWith('obj-cas-imm-'));
     await osB.flushBatch();
     ok('exactly ONE POST /batch on flush', sgB.batches === 1 && sgB.puts === 0);
-    ok('all 6 writes in the one batch',  sgB.lastBatchOps.length === 6);
+    ok('all 5 writes in the one batch',  sgB.lastBatchOps.length === 5);
     ok('not batching after flush',       osB.batching === false);
 
-    console.log('\n[suite] ordering — objects before indexes before refs');
-    const ranks = sgB.lastBatchOps.map(o =>
-        o.file_id.startsWith('bare/data/') ? 0 : (o.file_id.startsWith('bare/indexes/') ? 1 : 2));
-    ok('ops sorted data → indexes → refs', ranks.every((r, i) => i === 0 || ranks[i - 1] <= r));
-    ok('3 data ops first',  ranks.slice(0, 3).every(r => r === 0));
-    ok('refs are last',     ranks[ranks.length - 1] === 2);
+    // The branch index is a SHARED document (sgit-ai 0.19+): it is never staged into the commit
+    // batch. It is read, merged and written with compare-and-swap as its own request, after the
+    // objects and refs have landed — a CAS conflict inside the commit batch would abort the ref
+    // writes that follow it (the server stops a batch at the first conflict).
+    osB.beginBatch();
+    await rmB.writeBranchIndex('idx-pid-muw-index0000', 'ref-pid-muw-named00000');
+    ok('index upsert is its own POST, not staged', sgB.batches === 2 && sgB.lastBatchOps.length === 1 && sgB.lastBatchOps[0].file_id === 'bare/indexes/idx-pid-muw-index0000');
+    ok('absent on the server → plain write op',   sgB.lastBatchOps[0].op === 'write');
+    osB.discardBatch();
+
+    console.log('\n[suite] ordering — objects before refs (indexes never in the batch)');
+    const first = await (async () => { const sg = fakeSgSend(); const os = new SGVaultObjectStore(sg, 'v', 'wk'); const rm = new SGVaultRefManager(sg, 'v', 'wk', readKey, os);
+        os.beginBatch(); await rm.writeRef('ref-pid-muw-named00000', 'obj-cas-imm-aaaaaaaaaaaa'); await os.store(buf('x')); await os.store(buf('y')); await os.flushBatch(); return sg.lastBatchOps; })();
+    const ranks = first.map(o => o.file_id.startsWith('bare/data/') ? 0 : (o.file_id.startsWith('bare/indexes/') ? 1 : 2));
+    ok('ops sorted data → refs',   ranks.every((r, i) => i === 0 || ranks[i - 1] <= r));
+    ok('2 data ops first',         ranks.slice(0, 2).every(r => r === 0));
+    ok('refs are last',            ranks[ranks.length - 1] === 2);
 
     console.log('\n[suite] batch ops carry base64 data + write op');
     ok('every op is a write with base64 data', sgB.lastBatchOps.every(o => o.op === 'write' && typeof o.data === 'string' && o.data.length > 0));

@@ -181,6 +181,11 @@
         .sgit-badge { font-size: 0.625rem; padding: 0.0625rem 0.375rem; border-radius: 3px; font-weight: 600; font-family: var(--font-mono); white-space: nowrap; flex-shrink: 0; }
         .sgit-badge--head { background: var(--color-primary); color: var(--bg-primary); }
         .sgit-badge--branch { background: rgba(78, 205, 196, 0.15); color: var(--color-primary); }
+        .sgit-badge--sig { background: rgba(255,255,255,0.06); color: var(--color-text-secondary); }
+        .sgit-badge--verified { background: rgba(78, 205, 196, 0.18); color: #4ECDC4; }
+        .sgit-badge--unsigned { background: rgba(233, 196, 69, 0.15); color: #E9C445; }
+        .sgit-badge--no-key   { background: rgba(255,255,255,0.08); color: var(--color-text-secondary); }
+        .sgit-badge--bad      { background: rgba(233, 69, 96, 0.2); color: #E94560; }
         .sgit-badge--schema { background: rgba(78, 205, 196, 0.15); color: var(--color-primary); display: inline-block; margin-bottom: 1rem; }
         .sgit-badge--current { background: rgba(79, 143, 247, 0.15); color: var(--color-primary); }
 
@@ -378,6 +383,33 @@
         .sgit-dl--del  .sgit-dl-gutter { color: #E94560; }
         .sgit-dl--ctx  .sgit-dl-text { color: var(--color-text-secondary); }
     `;
+
+    // --- Signature status chips (sgit check verify vocabulary) --------------------------
+    // Rows render a placeholder chip; _decorateSignatures() fills them in asynchronously from
+    // SGVault.verifyCommit (verified / bad / unsigned / no-key / missing), cached per view.
+    Object.assign(VaultSgitView.prototype, {
+        _sigChip(commitId) {
+            if (!commitId) return '';
+            const cached = this._sigCache && this._sigCache.get(commitId);
+            return `<span class="sgit-badge sgit-badge--sig sgit-sig${cached ? ' sgit-badge--' + cached : ''}" data-sig-id="${this._esc(commitId)}" title="commit signature (sgit check verify)">${cached || '\u2026'}</span>`;
+        },
+        async _decorateSignatures(container) {
+            if (!this._vault || typeof this._vault.verifyCommit !== 'function' || !container) return;
+            if (!this._sigCache) this._sigCache = new Map();
+            const chips = Array.from(container.querySelectorAll('.sgit-sig[data-sig-id]'));
+            for (const chip of chips) {
+                const id = chip.getAttribute('data-sig-id');
+                let status = this._sigCache.get(id);
+                if (!status) {
+                    try { status = await this._vault.verifyCommit(id); } catch (_) { status = 'missing'; }
+                    this._sigCache.set(id, status);
+                }
+                if (!chip.isConnected) continue;
+                chip.textContent = status;
+                chip.className   = 'sgit-badge sgit-badge--sig sgit-sig sgit-badge--' + status;
+            }
+        }
+    });
 
     // Expose globally so companion modules (vault-sgit-view--*.js) can extend the prototype
     window.VaultSgitView = VaultSgitView;

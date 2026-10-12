@@ -107,6 +107,25 @@ class SGSendCrypto {
         return result.buffer
     }
 
+    // --- Deterministic encrypt (sgit-ai Vault__Crypto.encrypt_deterministic) ---------
+    // IV = HMAC-SHA256(read_key, plaintext)[:12]; same key + plaintext → same ciphertext, so
+    // an unchanged tree gives the same content address in every client (dedup across
+    // commits and across the CLI). Trees and tree-entry fields only; blobs and commits keep
+    // the random IV above. `hmacKey` is the read key imported for HMAC (SGVaultCrypto.deriveKeys
+    // returns it as `hmacKey`). Vector-pinned by test__sgit_interop_vectors.js.
+
+    static async encryptDeterministic(data, key, hmacKey) {
+        this.requireSecureContext()
+        const plain = data instanceof ArrayBuffer ? new Uint8Array(data) : data
+        const mac   = await crypto.subtle.sign('HMAC', hmacKey, plain)
+        const iv    = new Uint8Array(mac).slice(0, this.IV_LENGTH)
+        const ciphertext = await crypto.subtle.encrypt({ name: this.ALGORITHM, iv }, key, plain)
+        const result = new Uint8Array(iv.byteLength + ciphertext.byteLength)
+        result.set(iv, 0)
+        result.set(new Uint8Array(ciphertext), iv.byteLength)
+        return result.buffer
+    }
+
     static async decrypt(data, key) {
         this.requireSecureContext()
         const bytes      = new Uint8Array(data)
