@@ -1,6 +1,6 @@
 # vault — Reality Index
 
-**Domain:** `vault/` | **Last updated:** 2026-09-07 | **Maintained by:** Librarian (daily run)
+**Domain:** `vault/` | **Last updated:** 2026-10-12 | **Maintained by:** Librarian (daily run)
 
 The vault/SGit cryptographic storage system. This domain covers the encryption layer, the
 object storage model, the browser JS client, PKI, and the sgit CLI as it relates to vault
@@ -363,6 +363,13 @@ Round-1 and Round-2 review findings addressed after the initial surface landed:
 | Claimed | Reality |
 |---------|---------|
 | `structure_key` used for encryption | PROPOSED — derived but never used currently |
+| Web UI signs commits / verifies signatures | **DOES NOT EXIST** (2026-10-12 audit). Web commits are `commit_v2` with `signature: null`, no `author_key_id`; nothing in `v0.2.3` reads `bare/keys/` or verifies. sgit-ai 0.19+ classifies every web commit as `unsigned`; a vault under `signatures-required` cannot be written from the web. Plan: `team/roles/architect/reviews/10/12/v0.33.69__architect-review__sgit-0.21-vault-web-gap-analysis.md` item 3 |
+| Web UI honours the sgit format gate (`format`, `min_client`, `features` in the branch index) | **DOES NOT EXIST**. `open()` ignores the fields; `writeBranchIndex` drops them. Item 1 of the same review |
+| Web UI writes 128-bit (32-hex) object ids on a format-2 vault | **DOES NOT EXIST**. `computeObjectId` is fixed at 12 hex (`sg-vault-object-store.js:223`). Reads either width. Item 1 |
+| Web UI merges the branch index before writing | **DOES NOT EXIST**. `create()` and every `push()` write a one-entry index (`sg-vault-ref-manager.js:112-141`), erasing CLI clone branches, keys, tags and the gate; the CLI's next pull restores them. Item 2 |
+| Web UI detects a rewound named branch / shells push with compare-and-swap | **DOES NOT EXIST** for the shells (`vault-shell.js`, `app-shell.js` call blind `push()`); only child kernels use `pushIfMatch()`. No `last_remote_head` record. Item 4 |
+| Web UI deterministic tree encryption (HMAC-derived IV) | **DOES NOT EXIST**. Trees and entry fields use random IVs; tree ids never match the CLI's for identical content. Item 5 |
+| Web UI reads / creates signed tags (`tag_v1`, `tags[]` in the index) | **DOES NOT EXIST** |
 | `GET /api/vault/bundle/{vault_id}` (single-call clone) | PROPOSED |
 | MCP transport backend for sgit | PROPOSED |
 | Merge and conflict resolution | PROPOSED — architecture simulated, no code |
@@ -375,6 +382,7 @@ Round-1 and Round-2 review findings addressed after the initial surface landed:
 
 Key proposals for this domain. Full details: see sub-files in `proposed/`.
 
+- **sgit-ai 0.21.0 interop: format gate, shared branch index, signed web commits, ref monotonicity, deterministic trees** — PROPOSED (2026-10-12): five-item plan with vectors verified under Web Crypto (`tests/unit/vault_ui/loader/test__sgit_interop_vectors.js`, EXISTS) → `team/roles/architect/reviews/10/12/v0.33.69__architect-review__sgit-0.21-vault-web-gap-analysis.md`; reply to the CLI team → `team/comms/briefs/10/12/`. Further out, on the CLI side and PROPOSED there too: writer-signed refs/index (Ed25519), native PKI vault mode (`format: 3`), sealed files.
 - **Structure key encryption split** — activate `structure_key` for structural objects (four-team, 04/28 review) → `proposed/structure-key-split.md`
 - **Vault architecture overhaul** — self-describing file IDs, sub-tree model, batch read API → `proposed/vault-architecture.md`
 - **SG Vault Hub** — GitHub-equivalent for encrypted vaults, change packs, public view publishing → `proposed/vault-hub.md`

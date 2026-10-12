@@ -1,0 +1,49 @@
+{
+  "object_id": {
+    "ciphertext_ascii": "sgit test vector 0001",
+    "sha256": "1abfd21f14308c611fe591dc4d6de2859249189637fd8d682c8d1d1515ef5479",
+    "format_1": "obj-cas-imm-1abfd21f1430",
+    "format_2": "obj-cas-imm-1abfd21f14308c611fe591dc4d6de285"
+  },
+  "tree_deterministic": {
+    "read_key_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    "rule": "IV = HMAC-SHA256(read_key, plaintext)[:12]; ciphertext = IV || AES-256-GCM(read_key, IV, plaintext, no AAD) (tag appended by GCM)",
+    "metadata_rule": "tree entry fields (name_enc, size_enc, content_hash_enc) use the same deterministic IV rule over their UTF-8 plaintext, base64-encoded",
+    "name_plain": "hello.txt",
+    "name_enc": "YXrKdnw0D4s0TFAZDi9DqoveI0A+YfhuZtG6iy6lbEWHJL5I9w==",
+    "plaintext_utf8": "{\"schema\": \"tree_v1\", \"entries\": [{\"blob_id\": \"obj-cas-imm-1abfd21f1430\", \"tree_id\": null, \"name_enc\": \"YXrKdnw0D4s0TFAZDi9DqoveI0A+YfhuZtG6iy6lbEWHJL5I9w==\", \"size_enc\": \"KpYxn+DSYn3I3oXiBoREJ0G4rfanQ4f8toGhazvD\", \"content_hash_enc\": \"YRw5gq5nQY+PhTWlABZJY8Grn6GT8DVVO1WzHGeZIehXLWB0kz+frg==\", \"content_type_enc\": null, \"large\": false}]}",
+    "plaintext_sha256": "4eddacf608f72500d4e36c833917db4506fff91d3c6135aa6ab9926ef061db69",
+    "iv_hex": "6bb76ce3575c279eb21209ea",
+    "ciphertext_hex": "6bb76ce3575c279eb21209ea8d56de9b0732f0fb9fc02bb2dc9264d14e2ea0df53262ef2f4a7e1c112a51b0e40f605887665ed8348652d42a33a05e35c7c25b6d7f1dcf9147a8e6e2fd63fef51c38b0699d2906322b87744e3565597c075613205337eee98c14d37964c599a6922558ad56b30dcaee88ced7ae19e1e00fd669d0c5c70619a13bea280eb5365b46a66e4b12d40e3314c1cd715573a672748051d90ccbd78969fa4ab8e1ae088a8bf3243bb18c33f294cfcdf33ae37875ccabe1aea856986f9e4472e014765dd8bc744173613b1b7b7f67f0c3efc080b2e0cf57c9bead92bf4d9b0954a65b4f7fe9930ddcb7e3a4fb3fcd91089e9117809013dca3d34cf748bc3f61db55a5d61766ffaa223ed0c756e504322695d0d2100623041ba36885d87503d2e889c4827b7cd17f21a5e54f3a2a27ce0d83193e44b4e338b3f97a0cfb874592c0fb16f70b20f627e463b88ea1a4e2a6d059e0dcaeeb68909cc009067e489bc9c7362b4ac2013",
+    "object_id": "obj-cas-imm-1b397bef28b6"
+  },
+  "commit_signing": {
+    "rule": "signing bytes = JCS (RFC 8785) of the stored commit JSON with the \"signature\" member removed: keys sorted, no whitespace, UTF-8, non-ASCII unescaped; signature = ECDSA P-256 / SHA-256 over those bytes, raw r||s (64 bytes), base64 in \"signature\"",
+    "marker": "author_key_id non-null => canonical form; null => legacy form (json.dumps default separators, \"signature\": null present), still accepted on verify",
+    "test_private_key_pem": "-----BEGIN PRIVATE KEY-----\nMIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgraqwKZ6mtpVnItCb\n/g8zPWVvWOkQGWb/HT+6fSzCKsuhRANCAAR3xDqdR1aC68cGwcbZhRhPl4QHB5hM\n8mBPEw+BXe0HT+kiv5FZrtTSKrWeT27rBwBjj/W4FAt4Q75CGKlD1+Sx\n-----END PRIVATE KEY-----\n",
+    "test_public_key_pem": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEd8Q6nUdWguvHBsHG2YUYT5eEBweY\nTPJgTxMPgV3tB0/pIr+RWa7U0iq1nk9u6wcAY4/1uBQLeEO+QhipQ9fksQ==\n-----END PUBLIC KEY-----\n",
+    "key_fingerprint": "sha256:21011842e87718da",
+    "stored_commit_json": {
+      "schema": "commit_v1",
+      "tree_id": "obj-cas-imm-1b397bef28b6",
+      "message_enc": "XXi/cugHFTI2/X/ouElbp8nZWCrZeBuUfEui0qpidCSWuO6UDVHPWVZbz+ndp3KX",
+      "branch_id": "branch-clone-0123456789abcdef",
+      "signature": "8zY7wV+t5ri6MF5K2nwzePytKBClGRfeUdbHLbYOByB1cxPO1/n03OttSxXCPKBRTyQ7jqFhJoSbEI1Kr4lvvg==",
+      "author_key_id": "key-rnd-imm-0011223344556677",
+      "author_signature": null,
+      "parents": [
+        "obj-cas-imm-0123456789ab"
+      ],
+      "timestamp_ms": 1759795200000,
+      "attestations": []
+    },
+    "signing_bytes_utf8": "{\"attestations\":[],\"author_key_id\":\"key-rnd-imm-0011223344556677\",\"author_signature\":null,\"branch_id\":\"branch-clone-0123456789abcdef\",\"message_enc\":\"XXi/cugHFTI2/X/ouElbp8nZWCrZeBuUfEui0qpidCSWuO6UDVHPWVZbz+ndp3KX\",\"parents\":[\"obj-cas-imm-0123456789ab\"],\"schema\":\"commit_v1\",\"timestamp_ms\":1759795200000,\"tree_id\":\"obj-cas-imm-1b397bef28b6\"}",
+    "signing_bytes_sha256": "8b963a11daff2334b70fac556466773eb42aff7fea3c968d7623204655ce7d89",
+    "signature_b64": "8zY7wV+t5ri6MF5K2nwzePytKBClGRfeUdbHLbYOByB1cxPO1/n03OttSxXCPKBRTyQ7jqFhJoSbEI1Kr4lvvg==",
+    "signature_r_s_hex": "f3363bc15fade6b8ba305e4ada7c3378fcad2810a51917de51d6c72db60e0720757313ced7f9f4dceb6d4b15c23ca0514f243b8ea16126849b108d4aaf896fbe"
+  },
+  "legacy_signing_bytes_example": {
+    "note": "pre-canonical commits (author_key_id null) were signed over these bytes",
+    "bytes_utf8": "{\"schema\": \"commit_v1\", \"tree_id\": \"obj-cas-imm-1b397bef28b6\", \"message_enc\": \"XXi/cugHFTI2/X/ouElbp8nZWCrZeBuUfEui0qpidCSWuO6UDVHPWVZbz+ndp3KX\", \"branch_id\": \"branch-clone-0123456789abcdef\", \"signature\": null, \"author_key_id\": null, \"author_signature\": null, \"parents\": [], \"timestamp_ms\": 1759795200000, \"attestations\": []}"
+  }
+}

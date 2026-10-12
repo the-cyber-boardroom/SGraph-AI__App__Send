@@ -1,6 +1,6 @@
 # cli — Reality Index
 
-**Domain:** `cli/` | **Last updated:** 2026-04-28 | **Maintained by:** Librarian (daily run)
+**Domain:** `cli/` | **Last updated:** 2026-10-12 | **Maintained by:** Librarian (daily run)
 
 The sgit CLI: an external PyPI package (`sgit-ai`) that is the primary tool for vault operations
 from the command line and agent environments. **Not part of this repo's codebase** — lives at
@@ -45,6 +45,17 @@ no longer maintained. Use `sgit-ai` for all new work.
 | `sgit inspect` / `sgit cat-object` / `sgit fsck` | **Working** | Vault inspection tools |
 | `sgit uninit` | **Working** | Remove vault from folder (creates backup zip) |
 | `sgit export --output file.zip` | **Working** | Export vault as distributable zip |
+
+### sgit-ai 0.18.0 → 0.21.0 (7–10 Oct 2026) — verified from the CLI repo at `bc8016d`
+
+| Release | What shipped (CLI-side, EXISTS in sgit-ai) | Web-UI consequence |
+|---|---|---|
+| 0.18.0 | `clone --path` / `--depth` (partial clones), bulk-fetch clone sweep, pull guard for uncommitted edits, static publishing (`sgit publish`, `vault serve`, `vault mirror`, `vault attach`), HTTP keep-alive, **Simple Token / `sgit share` / `vault export` removed** | none |
+| 0.19.0 | **format gate** (`sgit vault format`: `format` 1/2, `--min-client`, `--feature`), **128-bit object ids** on raised vaults (mixed, no move), **branch index as a shared document** (pull merges + CAS), **ref monotonicity** (`last_remote_head`, REWOUND, `pull --accept-rewind`), **signature verification** (`check verify`, `fsck` summary, `signatures-required`), canonical JCS signing bytes + `author_key_id` | web must read the gate, write format-aware ids, merge the index, sign, detect rewinds — all DOES NOT EXIST, see `vault/index.md` |
+| 0.20.0 | owner warning on `vault format --set 2`; hint fixes | none |
+| 0.21.0 | security release: symlinks never followed, server pinned per vault, secret-file guard, signed tags (`sgit vault tag`), reflog / `history undo` / `commit --amend` / `revert --as-commit` / `push --force-with-lease`, `clone` verifies under `signatures-required`, unsigned push refused under it, lost-race push fails loudly, tag entries carried unread, branch-name clash refused at push | web must not drop `tags[]`; `signatures-required` vaults cannot be written from the web until it signs |
+
+Note: the "Extended Commands" table above predates 0.18.0 — `sgit share` and `sgit export` no longer exist; `log`/`reflog`/`stash` moved under `sgit history` / `sgit vault` (old names exit 2 and point to the new place).
 
 ### Verified Integrations
 
