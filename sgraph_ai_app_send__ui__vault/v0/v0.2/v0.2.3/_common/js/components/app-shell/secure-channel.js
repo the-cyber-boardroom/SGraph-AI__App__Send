@@ -67,6 +67,9 @@
             this._onPortMessage  = (event) => this._dispatch(event.data);
         }
 
+        // opts.timeoutMs — bound the handshake. Without it a port whose peer never answers
+        // (e.g. an init posted before the child's scripts ran) parks create() forever and
+        // every caller waiting on it. On timeout the port is closed and EUNREACH is thrown.
         static async create(iframeOrPort, opts) {
             opts = opts || {};
             const ch = new SecureChannel({ role: 'initiator', cid: opts.cid });
@@ -75,7 +78,22 @@
                 : await bootstrapFromIframe(iframeOrPort, ch._cid);
             ch._port.addEventListener('message', ch._onPortMessage);
             if (ch._port.start) ch._port.start();
-            await ch._handshakeAsInitiator(opts.sensitiveKey === true);
+            const handshake = ch._handshakeAsInitiator(opts.sensitiveKey === true);
+            if (opts.timeoutMs > 0) {
+                let timer;
+                const timeout = new Promise((_, reject) => {
+                    timer = setTimeout(() => reject(codeError('EUNREACH', 'handshake timeout after ' + opts.timeoutMs + 'ms')), opts.timeoutMs);
+                });
+                try { await Promise.race([handshake, timeout]); }
+                catch (err) {
+                    handshake.catch(function () {});          // abandoned: never an unhandled rejection
+                    try { ch.close(); } catch (_) {}
+                    throw err;
+                }
+                finally { clearTimeout(timer); }
+            } else {
+                await handshake;
+            }
             ch._handshakeDone = true;
             return ch;
         }
@@ -112,8 +130,23 @@
             const reply = new Promise((resolve, reject) => {
                 this._pending.set(id, { resolve, reject });
             });
-            await this._post({ type, payload, dir: 'down', id, enc: !!opts.sensitive });
-            return reply;
+            // opts.timeoutMs — a responder with no handler for `type` drops the envelope
+            // silently, so without this the promise never settles (found by the fs.move
+            // review: no child handler → the app's call would hang forever). On timeout the
+            // pending entry is removed so a late reply is ignored, not mis-delivered.
+            let timer = null;
+            const guarded = (opts.timeoutMs > 0)
+                ? Promise.race([reply, new Promise((_, reject) => {
+                    timer = setTimeout(() => {
+                        this._pending.delete(id);
+                        reject(codeError('EUNREACH', 'request ' + type + ' timed out after ' + opts.timeoutMs + 'ms'));
+                    }, opts.timeoutMs);
+                })])
+                : reply;
+            try {
+                await this._post({ type, payload, dir: 'down', id, enc: !!opts.sensitive });
+                return await guarded;
+            } finally { if (timer) clearTimeout(timer); }
         }
 
         handle(type, fn) { this._handlers.set(type, fn); return this; }

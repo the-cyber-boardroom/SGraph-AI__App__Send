@@ -78,5 +78,41 @@ const pJunk = AP.parsePermissions({ permissions: { fs: 'nope', vault: 42 } });
 ok('junk block → mutations denied',      !AP.can(pJunk, 'fs.write', 'x'));
 ok('junk block → reads still default',    AP.can(pJunk, 'fs.read',  'x'));
 
+// externalLinks grant (Options C/D) — default-deny; gates escape-sandbox.
+ok('externalLinks default false (no grant)',  AP.parsePermissions(null).externalLinks === false);
+ok('externalLinks false when omitted',        AP.parsePermissions({ permissions: {} }).externalLinks === false);
+ok('externalLinks true only when ===true',    AP.parsePermissions({ permissions: { externalLinks: true } }).externalLinks === true);
+ok('externalLinks truthy-but-not-true → false (e.g. "yes")',
+    AP.parsePermissions({ permissions: { externalLinks: 'yes' } }).externalLinks === false);
+
+// llm grants (sg.llm.*) — booleans, default-deny. These declare INTENT only; the real
+// capability is the intersection with the vault admin's .vault/llm/config.json.
+const pNoLlm  = AP.parsePermissions(null);
+const pLlm    = AP.parsePermissions({ permissions: { llm: { chat: true, models: true } } });
+ok('llm.chat denied with no permissions block',   !AP.can(pNoLlm, 'llm.chat',   ''));
+ok('llm.chat granted when declared',               AP.can(pLlm,   'llm.chat',   ''));
+ok('llm.models granted when declared',             AP.can(pLlm,   'llm.models', ''));
+ok('llm.usage denied when not declared',          !AP.can(pLlm,   'llm.usage',  ''));
+ok('unknown llm verb denied',                     !AP.can(pLlm,   'llm.destroy', ''));
+ok('llm truthy-but-not-true → false',
+    AP.parsePermissions({ permissions: { llm: { chat: 'yes' } } }).llm.chat === false);
+ok('junk llm block → all denied',
+    AP.parsePermissions({ permissions: { llm: 'nope' } }).llm.chat === false);
+// A limit an app author sets is not a limit — the manifest must not carry spend caps.
+ok('llm block exposes only the declared verbs (no app-set limits)',
+    Object.keys(AP.parsePermissions({ permissions: { llm: { chat: true, maxCostPerSession: 999 } } }).llm)
+        .sort().join(',') === 'chat,listen,models,usage');
+// The microphone is a separate grant on purpose: recording a room is categorically
+// different from sending text, so `chat` must never imply `listen`.
+ok('listen default-denies',                     AP.parsePermissions({ permissions: { llm: { chat: true } } }).llm.listen === false);
+ok('listen granted only when ===true',          AP.parsePermissions({ permissions: { llm: { listen: true } } }).llm.listen === true);
+ok('chat does not imply listen',               !AP.can(AP.parsePermissions({ permissions: { llm: { chat: true } } }), 'llm.listen', ''));
+ok('listen does not imply chat',               !AP.can(AP.parsePermissions({ permissions: { llm: { listen: true } } }), 'llm.chat', ''));
+
+// network — the CSP escape hatch. Default-deny: app frames get connect-src blob: data:.
+ok('network default false',                 AP.parsePermissions(null).network === false);
+ok('network true only when ===true',        AP.parsePermissions({ permissions: { network: true } }).network === true);
+ok('network truthy-but-not-true → false',   AP.parsePermissions({ permissions: { network: 1 } }).network === false);
+
 console.log(`\n[result] ${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

@@ -64,6 +64,7 @@ class SGVault {
         vault._initManagers()
 
         // 4. Create settings (stored as a blob in the initial commit's tree)
+        vault._settingsDefaulted = !options.name         // placeholder name → display may fall back to app.json title
         vault._settings = {
             vault_name:  options.name || 'Untitled Vault',
             vault_id:    vault._vaultId,
@@ -75,11 +76,16 @@ class SGVault {
         // 5. Create initial empty tree (in-memory)
         vault._tree = { '/': { type: 'folder', children: {} } }
 
-        // 6. Create initial commit — goes to both named and clone refs (they start in sync)
-        await vault._commit('Initial vault creation')
-        // Point named ref at the same commit so ahead count starts at 0
-        await vault._refManager.writeRef(vault._refFileId, vault._headCommitId)
-        vault._namedHeadId = vault._headCommitId
+        // 6. Create initial commit + both refs + branch index as ONE POST /batch.
+        //    _commit nests inside this batch (won't flush), the named ref + index stage, and the
+        //    outer _withBatch flushes everything together → a brand-new vault is one request.
+        await vault._withBatch(async () => {
+            await vault._commit('Initial vault creation')                         // tree + commit + clone-ref (staged)
+            await vault._refManager.writeRef(vault._refFileId, vault._headCommitId)   // named ref → ahead count starts at 0
+            vault._namedHeadId = vault._headCommitId
+            // Single-branch index so the vault is immediately clonable by the sgit CLI.
+            try { await vault._refManager.writeBranchIndex(vault._branchIndexFileId, vault._refFileId) } catch (_) {}
+        })
 
         return vault
     }
@@ -115,7 +121,11 @@ class SGVault {
         return vault
     }
 
-    static async open(sgSend, fullVaultKey) {
+    // options.cloneBranch — name of THIS client's private clone branch (default 'web-ui').
+    // A headless child kernel mounted by a parent passes 'viv:<parent vault id>' so two
+    // parents mounting the same child never share a clone ref (07 Sep analysis §6.3);
+    // the named ref stays the single published branch either way.
+    static async open(sgSend, fullVaultKey, options = {}) {
         const isSimpleToken = /^[a-z]+-[a-z]+-\d{4}$/.test(fullVaultKey)
 
         let passphrase, vaultId, keys
@@ -145,7 +155,8 @@ class SGVault {
         vault._hmacKey           = keys.hmacKey
         vault._refFileId         = keys.refFileId
         vault._branchIndexFileId = keys.branchIndexFileId
-        vault._cloneRefFileId    = await SGVaultCrypto.deriveBranchRefFileId(keys.hmacKey, vaultId, 'web-ui')
+        vault._cloneBranch       = (options && options.cloneBranch) || 'web-ui'
+        vault._cloneRefFileId    = await SGVaultCrypto.deriveBranchRefFileId(keys.hmacKey, vaultId, vault._cloneBranch)
 
         vault._initManagers()
 
@@ -168,7 +179,23 @@ class SGVault {
 
         // Clone ref created lazily on first commit; 404 is expected on read-only open
         const cloneCommitId = await vault._refManager.readRef(vault._cloneRefFileId)
-        vault._headCommitId = cloneCommitId || namedCommitId
+
+        // Reconcile-on-open (CLI interop): the named ref is canonical. If the clone branch is
+        // CLEANLY BEHIND the named head (clone is a strict ancestor of named — e.g. the CLI or
+        // another session published while this clone sat still), load the NAMED head, not the
+        // stale clone. This is the bug the CLI team flagged: `cloneCommitId || namedCommitId`
+        // pinned every web open to the clone branch once any web commit existed, silently
+        // shadowing CLI pushes. We only fast-forward the VIEW — we do NOT rewrite the clone ref
+        // here (no access token yet at open time; the next commit naturally advances it from the
+        // named head). Diverged / clone-ahead cases keep the clone head so unpushed web edits are
+        // never lost — the shell surfaces the divergence.
+        let head = cloneCommitId || namedCommitId
+        if (cloneCommitId && namedCommitId && cloneCommitId !== namedCommitId) {
+            let cleanBehind = false
+            try { cleanBehind = await vault._isAncestor(cloneCommitId, namedCommitId) } catch (_) {}
+            if (cleanBehind) head = namedCommitId
+        }
+        vault._headCommitId = head
 
         await vault._loadTreeFromCommit(vault._headCommitId)
 
@@ -183,13 +210,54 @@ class SGVault {
 
     get vaultId()   { return this._vaultId              }
     get name()      { return this._settings?.vault_name }
+
+    // True when the vault carries a REAL name (a .vault-settings.json existed, or the
+    // owner set one) — false when _settings was synthesized with the 'Untitled Vault'
+    // placeholder. Display surfaces use this to fall back to app.json's title instead
+    // of showing the placeholder.
+    get hasCustomName() { return !!this._settings?.vault_name && !this._settingsDefaulted }
+
+    // --- Embedded access token (.vault/access-token.json) -----------------------------
+    // ONE implementation shared by /app, /vault and the child kernel. The token lives
+    // INSIDE the vault, read_key-encrypted and beneath the .vault/** floor (no app can reach
+    // it through the bridge); it upgrades the ACCOUNT tier only. `.vault` is a lazy sub-tree
+    // after open, so expand it first or the file is never found. Never throws.
+    async readEmbeddedAccessToken() {
+        try {
+            if (this.needsLoading && this.needsLoading('/.vault')) await this.loadSubTreeOnDemand('/.vault')
+            const listed = this.listFolder('/.vault') || []
+            if (!listed.some(e => e.name === 'access-token.json')) return null
+            const bytes = await this.getFile('/.vault', 'access-token.json')
+            const obj   = JSON.parse(new TextDecoder().decode(bytes))
+            return (obj && obj.token) ? String(obj.token) : null
+        } catch (_) { return null }
+    }
     get created()   { return this._settings?.created    }
     get writable()  { return !!this._writeKey           }
+    get writeKeyHex() { return this._writeKey || null   }   // hex string (owner-secret store input); null in RO sessions
     get aheadOf()   { return this._namedHeadId          }
+
+    // Raw bytes of the read_key — needed to derive the inbox enum_key
+    // (enum_key = SHA256("sg-inbox-enum:" || read_key_bytes)). The read_key is
+    // imported extractable in the owner paths (deriveKeys / deriveKeysFromSimpleToken),
+    // so export succeeds; RO opens import it non-extractable, so this returns null and
+    // inbox enumeration is owner-only until an RO derivation path is added.
+    async readKeyRawBytes() {
+        if (!this._readKey) return null
+        try {
+            const raw = await crypto.subtle.exportKey('raw', this._readKey)
+            return new Uint8Array(raw)                                            // a fresh copy — callers may not mutate the key
+        } catch (_) {
+            return null                                                           // non-extractable (RO session)
+        }
+    }
 
     async setName(newName) {
         if (!this._settings) throw new Error('Vault not initialized')
+        if (this._settings.vault_name === newName) return     // no-op rename
         this._settings.vault_name = newName
+        this._settingsDefaulted = false                       // explicit name — no more fallback
+        this._settingsDirty = true
         await this._commit(`Rename vault to "${newName}"`)
     }
 
@@ -237,27 +305,84 @@ class SGVault {
 
     _initManagers() {
         this._objectStore   = new SGVaultObjectStore(this._sgSend, this._vaultId, this._writeKey)
-        this._refManager    = new SGVaultRefManager(this._sgSend, this._vaultId, this._writeKey, this._readKey)
+        this._refManager    = new SGVaultRefManager(this._sgSend, this._vaultId, this._writeKey, this._readKey, this._objectStore)
         this._commitManager = new SGVaultCommit(this._objectStore, this._readKey)
+    }
+
+    // Run `fn` with the object-store write-batch open, flushing all staged writes (objects +
+    // refs + index) as ONE POST /batch at the end. Re-entrant: if a batch is already open
+    // (e.g. addFile opened it, then _commit calls this), just run inline and let the OUTERMOST
+    // scope flush — so a file write and the commit it triggers collapse into a single request.
+    async _withBatch(fn) {
+        if (this._objectStore.batching) return fn()       // nested — the outermost scope owns flush + rollback
+        this._objectStore.beginBatch()
+        // Snapshot the head pointers BEFORE running fn. _commit advances _headCommitId (and clears
+        // _settingsDirty / sets _currentSettingsEntry) inside fn, but the writes don't land until
+        // flushBatch() below. If the flush throws (network drop — the waterfall showed a 9.77s
+        // write), the staged writes are discarded yet the client would otherwise be left AHEAD of
+        // the server, and the next commit would build on a phantom parent → a dangling pointer on
+        // the next push. Restoring these on failure preserves the pre-batch semantics (head only
+        // advances on a durable write), so a retry re-stages from the correct parent and self-heals.
+        // (The in-memory tree mutation is intentionally NOT rolled back — that was already the
+        // pre-batch behaviour and self-corrects once head is restored.)
+        const snap = {
+            head:          this._headCommitId,
+            namedHead:     this._namedHeadId,
+            settingsDirty: this._settingsDirty,
+            settingsEntry: this._currentSettingsEntry
+        }
+        try {
+            const result = await fn()
+            await this._objectStore.flushBatch()
+            return result
+        } catch (err) {
+            this._objectStore.discardBatch()
+            this._headCommitId         = snap.head
+            this._namedHeadId          = snap.namedHead
+            this._settingsDirty        = snap.settingsDirty
+            this._currentSettingsEntry = snap.settingsEntry
+            throw err
+        }
     }
 
     // --- Commit: serialize tree → create tree object → create commit → update ref
 
     async _commit(message) {
+      // Provenance trailer (07 Sep analysis §7): a kernel writing on behalf of ANOTHER vault
+      // sets _commitTrailer ('Via-Mount: <label> (declared|runtime)') so the child's own
+      // history records which door the write came through — without naming the vault
+      // behind the door. Messages are read_key-encrypted like every commit message.
+      if (this._commitTrailer) message = String(message || '') + '\n\n' + this._commitTrailer
+      return this._withBatch(async () => {
         const entries = await this._buildTreeEntries(this._tree['/'])
 
-        const settingsPlain     = new TextEncoder().encode(JSON.stringify(this._settings))
-        const settingsEncrypted = await this._sgSend.encrypt(settingsPlain, this._readKey)
-        const settingsBlobId    = await this._objectStore.store(settingsEncrypted)
-        const settingsHash      = await this._commitManager.computeContentHash(settingsPlain)
+        // .vault-settings.json: write it on the initial commit, and on subsequent commits
+        // ONLY when settings actually changed (`_settingsDirty`) — rewriting it on every commit
+        // makes it appear in the file browser as "auto-added orphan" content. Track the dirty
+        // flag via setName/setDescription/setSettings; clear it after a successful commit.
+        const isInitial    = !this._headCommitId
+        const settingsDirty = !!this._settingsDirty
+        let writeSettings  = isInitial || settingsDirty
 
-        entries.push({
-            name:         '.vault-settings.json',
-            size:         settingsPlain.byteLength,
-            content_hash: settingsHash,
-            blob_id:      settingsBlobId,
-            tree_id:      null
-        })
+        // Honour an existing settings entry from the parent tree if we're not rewriting:
+        // if a previous commit wrote one, carry it forward (re-emit the same blob ref).
+        if (!writeSettings && this._currentSettingsEntry) {
+            entries.push(this._currentSettingsEntry)
+        } else if (writeSettings) {
+            const settingsPlain     = new TextEncoder().encode(JSON.stringify(this._settings))
+            const settingsEncrypted = await this._sgSend.encrypt(settingsPlain, this._readKey)
+            const settingsBlobId    = await this._objectStore.store(settingsEncrypted)
+            const settingsHash      = await this._commitManager.computeContentHash(settingsPlain)
+            const settingsEntry = {
+                name:         '.vault-settings.json',
+                size:         settingsPlain.byteLength,
+                content_hash: settingsHash,
+                blob_id:      settingsBlobId,
+                tree_id:      null
+            }
+            entries.push(settingsEntry)
+            this._currentSettingsEntry = settingsEntry
+        }
 
         const treeId    = await this._commitManager.createTree(entries)
         const parentIds = this._headCommitId ? [this._headCommitId] : []
@@ -268,6 +393,8 @@ class SGVault {
         const targetRef = this._cloneRefFileId || this._refFileId
         await this._refManager.writeRef(targetRef, commitId)
         this._headCommitId = commitId
+        this._settingsDirty = false        // committed → no longer dirty
+      })
     }
 
     // --- Build tree entries with sub-tree objects for folders -------------------
@@ -315,12 +442,18 @@ class SGVault {
 
         this._tree     = { '/': { type: 'folder', children: {} } }
         this._settings = null
+        this._currentSettingsEntry = null
+        this._settingsDirty        = false
 
         for (const entry of tree.entries) {
             if (entry.name === '.vault-settings.json' || entry.name === '.vault-settings') {
                 const blob      = await this._objectStore.load(entry.blob_id)
                 const decrypted = await SGSendCrypto.decrypt(blob, this._readKey)
                 this._settings  = JSON.parse(new TextDecoder().decode(decrypted))
+                this._settingsDefaulted = false          // real settings record found
+                // Capture the original entry so subsequent commits can carry it forward
+                // un-rewritten (avoid producing a new blob_id when nothing changed).
+                this._currentSettingsEntry = entry
             } else if (entry.tree_id) {
                 this._tree['/'].children[entry.name] = {
                     type: 'folder', children: {}, _tree_id: entry.tree_id, _loaded: false
@@ -331,6 +464,7 @@ class SGVault {
         }
 
         if (!this._settings) {
+            this._settingsDefaulted = true               // no settings record — placeholder name
             this._settings = {
                 vault_name: 'Untitled Vault', vault_id: this._vaultId,
                 created: new Date().toISOString(), version: 2

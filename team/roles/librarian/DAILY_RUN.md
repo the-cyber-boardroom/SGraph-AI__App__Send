@@ -68,7 +68,7 @@ to the domain they extend — not in a central mega-file. When `proposed/index.m
 Work these when no urgent brief processing is needed. Pick **one per session**.
 
 ### B-001 · Reality — Extract vault PROPOSED content into domain files
-**Status:** QUEUED
+**Status:** DONE (2026-06-30)
 **What:** `vault/proposed/index.md` currently summarises the PROPOSED items. Expand into
 individual topic files: `structure-key-split.md`, `vault-architecture.md`, `vault-hub.md`,
 `vault-browser-ui.md`, `pki-modes.md`, `multi-remote.md`. Source: archived monolith
@@ -77,41 +77,147 @@ individual topic files: `structure-key-split.md`, `vault-architecture.md`, `vaul
 **Why:** Vault is the largest PROPOSED domain. Agents asking vault questions should not load a
 generic proposed index — they should get a targeted file.
 
+**Outcome:** Split 244-line monolith into six topic files: `vault-architecture.md`
+(overhaul + PKI + multi-remote + collab), `vault-platform.md` (hub + publishing + GitHub-as-vault
++ manager vaults + operational substrate), `vault-ux.md` (browser UI + web components + demo
++ testing framework), `vault-sub-vaults.md` (P-159–P-165), `vault-previews.md` (P-153–P-158,
+P-166–P-177, P-281–P-282, P-284), `vault-content.md` (P-248–P-249). The 244-line monolith is
+now a ~65-line TOC index. All P-numbers preserved. P-159–P-163 and P-174 are now EXISTS in
+ui/index.md; P-166–P-177 largely EXISTS in ui/index.md — both flagged in topic files.
+
 ### B-002 · Reality — Extract tools PROPOSED content into domain files
-**Status:** QUEUED
+**Status:** DONE (2026-07-20)
 **What:** Expand `tools/proposed/index.md` into topic files: `video-editing.md`,
 `wasm-tools.md`, `audio-tools.md`, `playbooklm.md`, `browser-video.md`. Source: archived
 monolith sections 17 (video editor expansion), 22 (WASM), 23 (audio/video), 24–28 (various
 tools proposals).
 **Why:** Tools PROPOSED is the second-largest domain. Topic files make it navigable.
 
+**Outcome:** Split 183-line mixed-content index into four topic files (groupings evolved
+from original spec to match actual content): `video-editing.md` (sg-tree + Video Editor
+Expansion + video crop/overlay/capture/playback/generation), `wasm-tools.md` (sg-wasm
+lifecycle + sg-audio-transcription Whisper + Pyodide sandbox + sg-public-viewer),
+`llm-components.md` (sg-llm component family + Agentic LLM suite + One-Shot IDE +
+Composite Tools + Infographic v0.1.1 + Infographic v2 + News Report Tool),
+`platform-tools.md` (Infrastructure/IFD + Social Previews + Audio tool distribution
+P-229–237 + TUI API P-202–203 + SG/Edge TUI P-200–201 + SG Labs Admin P-196 + SG Mail
+P-175–182 + Backup P-183–189). The 183-line index is now a ~45-line TOC with a
+P-number inventory table. All P-numbers preserved in topic files.
+
 ### B-003 · Reality — Extract ai-agents PROPOSED content into domain files
-**Status:** QUEUED
+**Status:** DONE (2026-06-28)
 **What:** Expand `ai-agents/proposed/index.md` into topic files: `llm-components.md`,
 `workflows.md`, `agent-communication.md`, `task-system.md`, `code-pipeline.md`. Source:
 archived monolith sections 16 (agent communication), 19 (one-shot LLM, scheduled tasks),
 20 (feedback loop, multi-agent chat), 22–28 (various agentic proposals), 31 (task components).
 **Why:** Agentic work is growing fast. Individual topic files are needed.
 
+**Outcome:** Split into five topic files (different names from spec, matching actual content
+growth): `llm-components.md`, `agent-communication.md`, `workflows.md`, `skills-economy.md`,
+`risk-mandate.md`. The skills-economy and risk-mandate files cover large post-spec June briefs.
+The 408-line monolith is now a ~65-line TOC index. All P-numbers preserved. Pre-existing
+P-numbering discrepancy (P-404–P-410 range) documented in risk-mandate.md but not resolved.
+
 ### B-004 · Reality — Extract infra PROPOSED content into domain files
-**Status:** QUEUED
+**Status:** DONE (2026-07-14)
 **What:** Expand `infra/proposed/index.md` into: `ami-marketplace.md`, `ephemeral.md`,
 `observability.md`, `playwright-service.md`. Source: archived monolith sections 16
 (deploy infra), 17 (browser automation), 23 (Playwright API), 24 (QA infra), 26 (Playwright
 architecture), 27 (ephemeral infra), 31 (ephemeral vault infrastructure, VNC streaming).
 
+**Outcome:** The 267-line index was split into three topic files (topic groupings evolved from
+original spec to match actual content growth): `vault-hosting.md` (vault hosting modes,
+Fargate, container hosts, instance sizing, serverless, multi-cloud, on-demand provisioning,
+DNS labs, MyFeeds — docs 384, 385, 389, 399, 401, 403, 424, 425, 428, 429, 437),
+`firecracker.md` (microVM substrate, 9 items — docs 408, 411, 412), `relay-and-storage.md`
+(SG/Relay P-337–P-346, S3 CLI, IAM graph, S3-compatible container — docs 400, 402, 06/16 pack,
+06/23 brief). Index is now a ~130-line TOC + 9 small retained sections. All P-numbers and
+source references preserved.
+
 ### B-005 · Reality — Extract identity PROPOSED content into domain files
-**Status:** QUEUED
+**Status:** DONE (2026-07-21)
 **What:** Expand `identity/proposed/index.md` into: `google-oauth.md`, `billing-credits.md`,
 `openrouter.md`. Source: archived monolith sections 16 (revenue + LLM features), 23
 (per-user vaults, credit experiment, OpenRouter), 28 (auth MVP), 31 (Google app:data, secrets
 manager, credits tool).
 
+**Outcome:** Split 182-line mixed-content index into four topic files (four groupings vs original
+three — email content warranted its own file): `google-oauth.md` (OAuth + Social Login + Secrets
+Management + P-314 PKI Identity Envelopes + P-322–P-336 NHI 2.0 Agent Identity Platform, 20+
+items), `billing-credits.md` (Per-User Vaults/Credits + Billing Automation + Free Tier +
+Pre-Auth/Micropayments + Dynamic Credential Delivery + USDC/Agentic Commerce, 26 items),
+`openrouter.md` (P-299 LLM API Billing Broker + P-385/P-386/P-388 OpenRouter Platform
+Expansion), `email.md` (Email + Outreach + P-165–P-170 SG Mail Email Client). The 182-line
+index is now a ~60-line TOC with a P-number inventory table. All P-numbers preserved in topic
+files. Non-P-numbered items noted with doc references.
+
+### B-012 · Update `.claude/explorer/CLAUDE.md` — stale reality and debrief references
+**Status:** DONE (2026-08-09)
+**What:** `.claude/explorer/CLAUDE.md` still references the archived reality monolith
+(`reality/v0.16.26__what-exists-today.md`) directly, instead of the current domain tree entry
+point (`reality/index.md`). The "Key References" table also lists stale pointers for "Latest
+debrief", "Session handoff", and "Master index" (all from 2026-03-18). The "Current Explorer
+Priorities" section cites the v0.3.2 daily brief, which is now many versions old.
+**Why:** Every new Explorer session reads this file first. Stale references erode trust and may
+send agents to an archived 237KB monolith instead of the current 13-domain tree.
+**Note:** This file governs all Explorer sessions. A Conductor check is appropriate before
+changing the priorities section. Date references and reality path are safe to update.
+
+### B-014 · Audit document count discrepancy (954 vs 956)
+**Status:** DONE (2026-08-29)
+**What:** The 08/18 master index file (`reviews/08/18/v0.33.61__master-index__briefs-09-14-aug-2026.md`) states "Cumulative document count: 954 (+18 from this session; previous 936)". The reality/index.md and DAILY_RUN COMPLETED rows for 08/17 and 08/18 both record 956 (+20 from the same 08/09+08/14 batch). Audit: count the actual brief files in `briefs/08/09/` and `briefs/08/14/` to confirm the correct total, then annotate the 08/18 master index with a correction note.
+**Why:** The master index is a permanent record. A wrong cumulative count will cascade into future indices. The correct count should be settled once and recorded.
+
+**Outcome:** Physical file audit confirmed 18 brief documents (6 from 08/09 + 12 from 08/14);
+the 08/18 master index (+18 = 954) was accurate when batch index files are excluded.
+The 08/17 session counted those 2 batch index files, producing the 2-doc overcount to 956.
+Decision: accept 956 as canonical (DAILY_RUN reconciliation established it as baseline);
+correcting to 954 would cascade through 12 subsequent master indexes. The 08/18 master index
+has been annotated with a B-014 audit note. Full audit:
+`reviews/08/29/v0.33.64__master-index__no-new-briefs-29-aug-2026.md`.
+
+### B-013 · Cross-reference vault publication guides in reality domain files
+**Status:** DONE (2026-08-14)
+**What:** Two new vault-html guides arrived in Aug 2026 that are not cross-linked from the reality
+domain files: `EXTRACT-AND-EMBED-A-SUB-VAULT.md` (Aug 12) and `PUBLISHING-SGIT-VAULT-TO-GITHUB.md`
+(Aug 12, merged post-session). Add "Guides" sections (or a "See Also" block) in `cli/index.md`
+and `vault/index.md` pointing to these documents. Check `library/guides/vault-html/` for any
+other guides that should be cross-linked but aren't.
+**Why:** The reality domain files are the first stop for agents. Guides that exist but are
+invisible to agents checking domain indexes may be re-authored from scratch unnecessarily.
+
+**Outcome:** Added `## Guides` sections to both `cli/index.md` (6 guides) and `vault/index.md`
+(7 guides). All 8 guides in `library/guides/vault-html/` are now cross-linked from at least one
+domain index. The two new Aug 2026 guides (`EXTRACT-AND-EMBED-A-SUB-VAULT.md`,
+`PUBLISHING-SGIT-VAULT-TO-GITHUB.md`) are now visible to agents querying both domain indexes.
+
+### B-015 · Update qa/index.md — Add sgit key prefix test count (08/25 feature)
+**Status:** DONE (2026-09-03)
+**What:** The 08/25 vault-key-readonly feature (commit `b3a9220`) added `test__sgit_key_prefixes.js`
+(109 lines) to the ViV loader test suite via `run-all.sh`. The `reality/qa/index.md` still reads
+"~3100+ (updated 2026-08-18)". Read the file to count its assertions and add it to the ViV suite
+table in qa/index.md.
+**Why:** Test count is the one accuracy promise on qa/index.md. A 109-line file likely carries
+~50–80 assertions; omitting it understates the suite.
+
+**Outcome:** 28 assertions counted (4 suites: KAT derivation 10, stripKeyPrefix 7, classifyKey 6, format detection 5). Table row added to ViV suite at "08/25 state". Total updated: ~1060+ ViV → ~1090+ ViV; ~3100+ overall → ~3130+. Header date updated to 2026-08-25.
+
 ### B-006 · Health scan — Check broken relative links across team/ and library/
-**Status:** QUEUED
+**Status:** DONE (2026-07-17)
 **What:** Walk all `.md` files under `team/` and `library/`, extract relative links, verify
 each resolves to a real file. Report broken links in a health scan review file.
 **Why:** Link rot accumulates silently. Last full scan: unknown.
+
+**Outcome:** 150+ files scanned. 19 broken links found — 9 fixed (depth-off-by-one in 5 files under `team/comms/changelog/05/09/` and `team/comms/briefs/05/12/`; all were one `../` short due to being 5 levels deep in `team/comms/`). 10 unfixable: `library/guides/agentic-setup/v0_4_0__role-ecosystem-guide.md` declares 9 companion Issues-FS files that were never imported into the directory. Added B-011 for that. All critical operating docs (reality tree, ROLE.md, DAILY_RUN.md, QA_START_HERE.md, all recent debriefs) are clean.
+
+Health scan report: `team/roles/librarian/reviews/07/17/v0.33.43__librarian-review__b006-broken-link-health-scan.md`
+
+### B-011 · Import or stub missing Issues-FS companion documents
+**Status:** DONE (2026-07-31)
+**What:** `library/guides/agentic-setup/v0_4_0__role-ecosystem-guide.md` declares 9 companion Issues-FS documents in its "Depends On" / "See Also" sections that don't exist in the repo (e.g. `v0_4_0__issues-fs__librarian-role.md`, `v0_4_0__issues-fs__thinking-in-graphs.md`). Same for one link in `v0.1.0__role-based-coordination.md`. The files may exist in an external vault or the Issues-FS system, or may never have been authored.
+**Why:** 10 dead links in key agentic-workflow guides. The role-ecosystem-guide is a likely starting point for new agents; broken "See Also" links erode trust.
+
+**Outcome:** 2 links had wrong filenames and were corrected to the actual files in the directory (`v0.1.0__role-based-coordination.md` and `v0.1.0__role-architecture-framework.md`). 7 documents are genuinely not in the repo — all annotated with *(not in repo — `<expected-filename>`)* so future agents can import them if/when they become available. The `v0.1.0__role-based-coordination.md` broken reference also annotated. All backlog tasks are now complete.
 
 ### B-007 · QA_START_HERE.md — Update to reflect v0.3.1 + post-April state
 **Status:** DONE (2026-05-19)
@@ -137,9 +243,15 @@ point to `reality/index.md` instead.
 - All other 9 key references confirmed valid.
 
 ### B-009 · library/docs/specs/README.md — Staleness audit
-**Status:** QUEUED
+**Status:** DONE (2026-07-16)
 **What:** Check whether `library/docs/specs/README.md` reflects current spec documents.
 Compare against actual files in `library/docs/specs/`. Update any missing or renamed entries.
+
+**Outcome:** All 6 original spec files verified present at expected paths. Discovered unlisted
+`v0.1.1/` subdirectory with 3 agent briefing documents (Claude Code brief, OpenAI Codex brief,
+dev-environment-workflows). Added second table to README documenting these 3 documents as "Agent
+Briefing Documents (v0.1.1)". Key Decisions section reviewed — all 9 decisions still accurate.
+No renames or missing files.
 
 ### B-010 · Activity log — Bring activity-log.md current
 **Status:** DONE (2026-05-04)
@@ -168,6 +280,35 @@ None currently active.
 | 2026-05-25 | No new briefs; code scan 24–25 May; B-008 | vault UI app.json resource injection documented; E2E test alignment noted; ROLE.md broken link fixed (project brief path) |
 | 2026-05-04 | No new briefs; backlog B-010 | Activity log updated: 33 entries added covering 04/01–05/04 |
 | 2026-05-03 | Process 04/29 late batch (4 briefs) | Docs 333–336 catalogued; infra/proposed + cli/proposed updated; master index, architect review, dev review, debrief produced |
+| 2026-06-28 | No new briefs; backlog B-003 | ai-agents/proposed 408-line monolith split into 5 topic files (llm-components, agent-communication, workflows, skills-economy, risk-mandate); TOC index; changelog + DAILY_RUN updated |
+| 2026-06-29 | Process 18 briefs from 06/24 (addendum) + 06/26 (new batch) | 12 new PROPOSED items (P-411–P-422); risk register architecture, digital twins, 22-node/35-edge ontology, directed-edge query engine, 2FA MVP build plan; Calendly as first RiskMandate review; healthcare data-protection pattern (P-412 in security/proposed); Architect + Dev reviews produced; reality doc + index + changelog updated |
+| 2026-07-01 | No new briefs; code scan 30 June | 2 EXISTS items: SGSend static-host mode (12 tests, HOSTING-ON-STATIC-STORAGE.md guide); `_buildVfsBridgeScript` bare-call fix (9-assertion regression guard). vault/index.md date errors corrected. qa/index.md, index.md, changelog.md updated. B-002 tools PROPOSED at 182 lines — no split needed yet. |
+| 2026-07-17 | No new briefs; no new dev commits; B-006 | 150+ files scanned for broken links. 9 depth-off-by-one links fixed in team/comms/ (changelog/05/09 ×5, briefs/05/12 ×4). 10 unfixable missing companion docs in library/guides/agentic-setup/. B-011 added. Health scan report produced. |
+| 2026-07-16 | No new briefs; no new dev commits; B-009 | library/docs/specs/README.md audited: all 6 spec files valid. 3 unlisted files found in v0.1.1/ subdir. README updated with Agent Briefing Documents table. changelog.md + DAILY_RUN.md updated. |
+| 2026-07-21 | No new briefs; no new dev commits; B-005 | identity/proposed/index.md (182 lines) split into 4 topic files: google-oauth.md, billing-credits.md, openrouter.md, email.md. Index now ~60-line TOC. All P-numbers preserved. changelog.md + DAILY_RUN.md updated. |
+| 2026-07-14 | No new briefs; no new dev commits; B-004 | infra/proposed/index.md (267 lines) split into 3 topic files: vault-hosting.md, firecracker.md, relay-and-storage.md. Index now ~130-line TOC + 9 small sections. All P-numbers preserved. changelog.md + DAILY_RUN.md updated. |
+| 2026-07-31 | No new briefs; CI version bump only; B-011 | 2 wrong-filename links fixed in role-ecosystem-guide (role-based-coordination, role-architecture-framework). 7 missing companion docs annotated *(not in repo)*. 1 missing link fixed in role-based-coordination. All 11 backlog tasks now DONE. |
+| 2026-08-04 | No new briefs; send-browse file split documented; test count updated to ~2800+ | send-browse--v0.3.3.js split into 4 files catalogued in ui/index.md; qa/index.md updated to ~2800+; base64 chunk open item marked FIXED (commit 1089596); 5 reality files updated; master index + debrief produced |
+| 2026-08-05 | No new briefs; vision/screenshot + auto-pull-off commits; test count updated to ~2950+ | 3 new EXISTS items (screenshots, sg.llm.imagePart(), auto-pull-off). developer already patched ui/index.md (7 lines). Updated: index.md v0.33.53, qa/index.md ViV suite ~780+→~930+, changelog. +150 assertions (+sg_vision 62, +no_auto_reload 27, vault_llm_chat 93→122, app_shell_llm_bridge 79→96, sg_llm_config 38→53). Master index + debrief produced |
+| 2026-08-06 | No new briefs; addendum to 08/05 session with deeper commit-level detail | 7 EXISTS items detailed (image paste, SGVision, sg.llm.imagePart, ledger fix, auto-sync data-loss fix, claude-sonnet-5 default, picker notice); index.md last-updated + Black Hat note updated; changelog 08/06 + 08/05 merged; master index + debrief produced |
+| 2026-08-09 | No new briefs; no new commits; B-012 completed — explorer/CLAUDE.md stale references fixed | reality path → index.md; 3 stale debrief/index pointers updated; index.md + qa/index.md → 2026-08-09; master index + debrief produced |
+| 2026-08-08 | No new briefs; no new commits; date/last-updated brought current; B-012 added | index.md + qa/index.md updated to 2026-08-08; master index + debrief produced |
+| 2026-08-25 | 6 new briefs (19 Aug: 5 briefs + 1 reference); NHI bootstrap + agent enrolment + service twin + PKI site review; vault/zip corrected PROPOSED→EXISTS (19 tests); 6 new PROPOSED items (P-NHI-001–006) | Master index (08/25), Architect review (08/25), Dev review (08/25), debrief (08/25) produced; send-api/index.md + ai-agents/proposed/agent-communication.md updated; cumulative docs 962 |
+| 2026-08-24 | 6 new items (19 Aug: 5 briefs + 1 reference); three-layer agent authority model; append lane correction; execution broker proposed; pki.sgit.ai site review | Master index (08/24), Architect review (08/24), AppSec review (08/24), debrief (08/24) produced; ai-agents/index.md updated (+6 PROPOSED: P-AGT-001–006); cumulative docs 960 (following 08/20 master index convention: 954 + 6; note B-014 for count discrepancy) |
+| 2026-08-22 | 7 new documents from 19 Aug 2026 (docs 955–961); briefs added to repo 08-21 after the 08-20 run; 3 architectures (agent enrolment, mandate exec broker, PKI registry); 5 corrections (append lane shipped, PKI key type, etc.); 4 new PROPOSED (P-ENR-001–003, P-MEB-001) | Master index (08/22), Architect review (08/22), Dev review (08/22), AppSec review (08/22), debrief (08/22) produced; 4 reality files updated; cumulative docs 956→961 |
+| 2026-08-20 | 18 new briefs (09 Aug: 6, 14 Aug: 12); addendum vault embed fixes + sg.llm P0-P4 to vault/ai-agents reality; updated ai-agents last-updated date | Master index (08/20), Architect review (08/20), Dev review (08/20), debrief (08/20) produced; vault/index.md + ai-agents/index.md updated; cumulative docs 956 |
+| 2026-08-19 | No new briefs; no new commits; quiet daily hold; B-014 added (doc count discrepancy audit) | Master index, 2 reality files updated (index.md, changelog), DAILY_RUN, debrief produced |
+| 2026-08-18 | 18 new briefs (08/09 + 08/14) — second pass; merge of 08/17 session; doc count reconciled to 956; 11 new PROPOSED items | Master index, Architect review, Dev review, 3 reality files updated (ui, qa, index), changelog, DAILY_RUN, debrief produced |
+| 2026-08-17 | 20 new briefs (08/09 + 08/14); 6 code commits documented (read-key open, sg.llm P0-P4, vault-settings listing, RO settings panel, vault subtree fix); docs 936→956; tests ~2970+→~3100+; v0.33.57→v0.33.61 | Master index, Architect review, Dev review, 3 reality files updated (index.md, ui/index.md, changelog.md), DAILY_RUN, debrief produced |
+| 2026-08-16 | No new briefs; no new code commits since 08/13; quiet daily hold | Master index, reality/index.md date, changelog, DAILY_RUN, debrief produced |
+| 2026-08-15 | No new briefs; test count corrections from Phase A/B/C1 (+19: container-app 9→16, auth 7→8, +3 port, +8 deploy smoke); total ~2950+→~2970+ | Master index, 2 reality files updated (index.md, qa/index.md), changelog, DAILY_RUN, debrief produced |
+| 2026-08-14 | No new briefs; Phase A/B/C1 multi-target deployment documented (missed by 08/13 concurrent session); CI bump v0.33.56 → v0.33.57; B-013 completed | Master index, 4 reality files updated (index.md, infra, cli, vault), changelog, DAILY_RUN, debrief produced |
+| 2026-08-13 | No new briefs; PUBLISHING-SGIT-VAULT-TO-GITHUB.md guide documented (missed by 08/12 session); CI bump v0.33.55 → v0.33.56; B-013 added | Master index, 2 reality files updated (index.md, changelog), DAILY_RUN, debrief produced |
+| 2026-08-12 | No new briefs; multi-target deployment plan (P-405–P-412 confirmed); "7 targets" corrected to 4 working + 8 PROPOSED; vault extract-and-embed guide noted; CI bump v0.33.54 → v0.33.55 | Master index, 4 reality files updated (index.md, qa, ui, changelog), DAILY_RUN, debrief produced |
+| 2026-08-11 | 26 new briefs (02 Aug + 06 Aug); 5 new code commits; 1 standing decision corrected; 11 new PROPOSED items | Master index, Dev review, AppSec review, 6 reality files updated, changelog, debrief produced; OpenRouter resale prohibition annotated in index.md |
+| 2026-09-02 | No new briefs; no new feature commits since 08/25; B-015 added (QA test count for sgit key prefix tests); branch 7 commits ahead of dev — merge pending | reality/index.md date updated; changelog entry; master index + debrief produced |
+| 2026-08-29 | No new briefs; no new feature commits; B-014 completed — document count discrepancy audited and annotated | 18 brief files counted in 08/09+08/14 batch; 956 accepted as canonical baseline; 08/18 master index annotated; master index + debrief produced |
+| 2026-08-07 | No new briefs; date/last-updated brought current to today | qa/index.md + index.md "Last updated" updated to 2026-08-07; master index + debrief produced |
 
 ---
 

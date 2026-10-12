@@ -38,6 +38,23 @@
             });
         },
 
+        // Read-only open (formats 4/6 + ro-tokens). Mirrors the real signature; the
+        // returned shape carries the RO markers the shells key off. Records the call
+        // so tests can assert the derived triple. Seed under 'ro:'+vaultId.
+        _openReadOnlyCalls: [],
+        openReadOnly: function (sgSend, vaultId, readKeyB64, refFileId) {
+            var calls = this._openReadOnlyCalls;
+            return new Promise(function (resolve, reject) {
+                calls.push({ vaultId: vaultId, readKeyB64: readKeyB64, refFileId: refFileId });
+                var data = _store.get('ro:' + vaultId);
+                if (!data) {
+                    reject(new Error('Vault not found: HEAD ref missing'));
+                } else {
+                    resolve({ name: data.name, _vaultId: vaultId, writable: false, _passphrase: null });
+                }
+            });
+        },
+
         _seed: function (vaultKey, name) {
             _store.set(vaultKey, { name: name || vaultKey });
         },

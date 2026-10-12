@@ -6,11 +6,14 @@ This guide is for anyone — human or AI — writing HTML files that will be sto
 > **deny-by-default** and must be declared in `app.json` `permissions`; `.vault/**` is off-limits.
 > Migrating an existing app? Read **[MIGRATING-TO-THE-PERMISSION-MODEL.md](MIGRATING-TO-THE-PERMISSION-MODEL.md)** first.
 
-> **Verified against the live bridge (`app-shell.js`) on 2026-05-26.** Corrections from the previous
-> revision: vault-relative `fetch()` is **not** auto-routed (use `sg.vfs.read`/`readText`); only an
-> `img.src = …` assignment **from JS** is intercepted (a declarative `<img src>` in the initial HTML
-> is **not**); the ready-log-line text was updated. New: `sg.sync` / `sg.auth` / `sg.ui` / `sg.history`
-> are documented, plus reading **sub-vaults**.
+> **Verified against the live bridge (`app-shell.js` v0.2.3) on 2026-07-30.** Newly documented in
+> this revision: `sg.append.*` (renamed from `sg.inbox.*` on 2026-06-15 — the write verb is `write`),
+> `sg.on`/`sg.off` host events, the expanded `sg.vault.*` verb set (`getKey`, `setAccessToken`,
+> `openApp`, `list`, `notify`), the current `vault.create(opts)` signature, and `sg.app.context`/
+> `totalSize`. Earlier corrections retained: vault-relative `fetch()` is **not** auto-routed (use
+> `sg.vfs.read`/`readText`); only an `img.src = …` assignment **from JS** is intercepted (a
+> declarative `<img src>` in the initial HTML is **not**). `sg.sync` / `sg.auth` / `sg.ui` /
+> `sg.history` / sub-vaults are documented below.
 
 > **TL;DR.** Inside a vault iframe, you cannot write `<link rel="stylesheet" href="theme.css">` or `<script src="helper.js"></script>` against vault-relative paths. Instead, call `sg.loadCss('theme.css')` or `sg.loadJs('helper.js')` at runtime. To read data, use **`sg.vfs.readText('cities.json')`** — a plain `fetch()` of a vault path does **not** work. `<a href="other.html">` navigation and `img.src = 'photo.png'` set **from JS** work automatically.
 
@@ -40,13 +43,15 @@ Anything that goes through a JavaScript API works without modification:
 
 | Pattern | Status | Why |
 |---|---|---|
-| `window.sg.vfs.read(path)` / `readText` / `list` / `write` | ✅ Works | Custom postMessage protocol — **the supported way to read/write vault data** |
+| `window.sg.vfs.read(path)` / `readText` / `list` / `write` / `download` | ✅ Works | Custom postMessage protocol — **the supported way to read/write/save vault data** |
+| `<a href="#section">` (clicked) | ✅ Works | Fixed 2026-07-31 — the interceptor scrolls in-frame (the browser default is broken in srcdoc frames). `location.hash` assignment from JS remains banned. |
+| `data-sg-native` on an anchor, or `preventDefault` in window-capture | ✅ Works | Added 2026-07-31 — sanctioned opt-out; the host never claims such clicks |
 | `sg.loadCss(path)` / `sg.loadJs(path)` | ✅ Works | loaders that read vault bytes over the bridge and inject `<style>`/`<script>` |
 | `img.src = 'photo.png'` (assigned **from JS**) | ✅ Works | `HTMLImageElement.prototype.src` setter is patched to decrypt + serve a `blob:` |
 | `<a href="other.html">` (clicked) | ✅ Works | Click handler postMessages parent, which re-renders the iframe |
 | `<a href="other.html#section">` (clicked) | ✅ Works | Fixed 2026-05-30 — the `?query`/`#fragment` is stripped before the extension check; the fragment is forwarded and scrolled-to in the new doc |
-| `<a href="https://example.com">` (clicked) | ✅ Opens in a new tab | Fixed 2026-05-30 — the iframe sandbox got `allow-popups allow-popups-to-escape-sandbox`; the click interceptor calls `window.open(href, '_blank', 'noopener,noreferrer')` synchronously from the gesture |
-| `sg.fs.*`, `sg.vault.*`, `sg.history.*`, `sg.sync.*`, `sg.auth.*`, `sg.ui.*`, `sg.state.*` | ✅ Works | postMessage command protocol (see below) |
+| `<a href="https://example.com">` (clicked) | ✅ Opens in a new tab | Default: a one-click host confirm opens it (no escape-sandbox). Opt into frictionless in-frame open with `permissions.externalLinks: true`. See "What the host does for you". |
+| `sg.fs.*`, `sg.vault.*`, `sg.history.*`, `sg.sync.*`, `sg.auth.*`, `sg.ui.*`, `sg.state.*`, `sg.append.*`, `sg.on`/`sg.off` | ✅ Works | postMessage command protocol (see below) |
 
 If you stick to these patterns, your page just works.
 
@@ -70,9 +75,46 @@ If you stick to these patterns, your page just works.
 | `new Worker('w.js')` | ❌ 404 | Worker loader, same problem |
 | `fetch('cities.json')` (vault-relative) | ❌ 404 | **`window.fetch` is NOT patched** — use `sg.vfs.readText('cities.json')` |
 | `XMLHttpRequest` | ❌ Not patched | Use `sg.vfs.*` |
+| `fetch('https://api.example.com/…')` (external host) | ❌ Blocked by CSP | Not a 404 — the frame ships `connect-src blob: data:`. See **Egress** below. |
 | `<img src="photo.png">` (declarative, in initial HTML) | ❌ 404 | Only `el.src = …` from JS is intercepted; for markup images, set `src` from JS (§6) |
 
-These all fail with a 404 in the iframe console, because the URL gets resolved against the iframe's opaque blob origin, which has nothing under it.
+These all fail with a 404 in the iframe console, because the URL gets resolved against the iframe's opaque blob origin, which has nothing under it. (The external-`fetch` row is the exception — that one is a CSP block, not a 404.)
+
+---
+
+## Egress: the frame cannot reach the network — and `permissions.network`
+
+Your app frame is served with this meta tag injected as the first thing in `<head>`:
+
+```html
+<meta http-equiv="Content-Security-Policy" content="connect-src blob: data:">
+```
+
+**No network host is reachable from your frame.** `fetch`, `XMLHttpRequest`, `WebSocket` and
+`EventSource` to any `http(s)://` origin fail immediately (typically "Load failed" in 1–15 ms),
+and the browser fires a `securitypolicyviolation` event with `effectiveDirective: "connect-src"`.
+This is deliberate: your app legitimately holds *decrypted* vault content, so the postMessage
+bridge is made the only way out, and everything that leaves it is permission-checked.
+
+`blob:` and `data:` are allowed because the print RPC needs them to inline images and stylesheets;
+neither can reach the network. `img.src` and dynamic `import()` are governed by `img-src` /
+`script-src`, so vault images and CDN component imports are unaffected.
+
+### The escape hatch
+
+Declaring `network` omits the meta tag entirely:
+
+```json
+{ "permissions": { "network": true } }
+```
+
+The HUD then shows a standing "direct network access" chip, so the exception is never silent.
+
+> **This is all-or-nothing.** It reopens egress to *every* host, from a frame holding decrypted
+> vault content. Treat it as a last resort. Before reaching for it, check whether an `sg.*`
+> namespace already covers what you need — `sg.llm.*` for models, `sg.append.write` for
+> delivering into another vault's lane. Those run in the host, keep credentials out of your
+> frame, and need no CSP change.
 
 ---
 
@@ -84,18 +126,24 @@ Every vault HTML file gets a `<script>` injected into its `<head>` that exposes:
 window.sg = {
     vfs: {
         write   : (path, content)        => Promise<{path, size}>,   // string | Uint8Array | ArrayBuffer
-        read    : (path)                  => Promise<ArrayBuffer>,
+        read    : (path)                  => Promise<ArrayBuffer>,    // raw bytes; no read-size cap
         readText: (path)                  => Promise<string>,
         list    : (prefix)                => Promise<[{path,name,size,type}]>,
+        // Save a vault file to the user's device (host-fulfilled — see "Downloading files").
+        download: (path, opts?)           => Promise<{ok, path, filename, bytes}>,  // opts: {filename}
     },
     loadCss : (path) => Promise<HTMLStyleElement>,    // load + inject CSS
     loadJs  : (path) => Promise<HTMLScriptElement>,   // load + execute JS
     app: {
+        context  : 'app',               // 'app' in the /en-gb/app/ surface ('preview' planned for the editor's inline preview)
         selfPath : 'demos/hub.html',    // path of the currently-open file
         writable : true,                // false for read-only (share-token / sub-vault) views
         vaultName: 'My Vault',
         vaultId  : 'abcd1234',
         fileCount: 12,
+        pinned   : false,               // true when mounted from a published release, not HEAD
+        release  : null,                // when pinned: {name, label, commit} — otherwise null
+        totalSize: 0,                   // reserved (currently always 0)
     },
     // History — read past commits / trees / blobs (read-only). See "Reading history".
     history: {
@@ -128,6 +176,10 @@ window.sg = {
         // top-level kernel's localStorage so repeated calls don't re-prompt. vault.delete
         // ALWAYS re-confirms regardless of cache.
         requestPermission: (verb, path) => Promise<{granted: boolean}>,
+        // Host-rendered "quick look" overlay for a vault file (NEW 2026-07-31). Same
+        // permission chain as vfs.read, no confirm. PDFs work here (host origin) — they
+        // are blocked in-frame. kind: 'pdf'|'image'|'video'|'audio'|'text'|'binary'.
+        preview          : (path) => Promise<{ok, path, type, bytes}>,
     },
     // Mutations against the host vault — gated by app.json `permissions.fs.*` grants
     // AND a user-consent overlay on first call per (vault, appId, verb). Reads use the
@@ -141,13 +193,38 @@ window.sg = {
     // cross-vault reads/writes through this kernel. Each verb is independently grantable
     // and consent-gated (vault.delete always re-confirms regardless of cache).
     vault: {
-        create  : (path, label)  => Promise<{vaultKey, path}>,
+        // create(opts) takes an opts OBJECT (matches mount(opts)):
+        //   { label, link: {path} | false, returnKey, custody, seedFrom, accessToken }
+        create  : (opts)         => Promise<{...}>,               // composed key only if returnKey
+        getKey  : (ref)          => Promise<{key}>,               // custodied key re-share (always-confirm consent)
+        setAccessToken: (ref, value) => Promise<{ok}>,            // value: 'inherit' | '<token>'
+        openApp : (ref, opts?)   => Promise<{ok}>,                // launch a vault as an app; opts: {deepLink, target}
+        list    : ()             => Promise<{vaults: [{ref_id, vault_id, label, tier}]}>,
         unlink  : (path)         => Promise<{ok: true}>,
-        delete  : (path)         => Promise<{ok: true}>,
+        delete  : (ref)          => Promise<{ok: true}>,
         mount   : ({prefix, ref, label}) => Promise<{mountId}>,
         unmount : (mountId)      => Promise<{ok: true}>,
         mounts  : ()             => Promise<[{mountId, prefix, label, ref}]>,
+        notify  : (mountId, name, payload) => Promise<{mountId, checked}>,  // run a DECLARED mount's lane check now (needs vault.notify)
+        // Open ANOTHER vault inside an iframe in YOUR app. See "Embedding another vault".
+        embed   : (mountEl, key, opts?) => Promise<{vaultName, fileCount, hasApp, iframe}>,
     },
+    // Append-only transport (renamed from sg.inbox.* on 2026-06-15; the write verb is `write`).
+    // Gated by app.json `permissions.append.*` (note: `fetch` needs the `append.read`
+    // grant). `write` is the ONLY verb that crosses vaults — it takes an explicit
+    // vault_id. Every other verb acts on the currently open vault and ignores any
+    // vault you name. See "Receiving messages".
+    append: {
+        configure    : ({append_anchors})  => Promise<{...}>,
+        write        : ({vault_id, append_token, payload}) => Promise<{...}>,   // → ANOTHER vault
+        list         : ({inbox, after_file_id, limit, include_content, path?}) => Promise<{...}>,  // path → a declared mount's lane
+        fetch        : ({inbox, file_ids, path?}) => Promise<{...}>,
+        markProcessed: ({inbox, file_ids, path?}) => Promise<{...}>,
+        purge        : ({folder, inbox, file_ids}) => Promise<{...}>,
+    },
+    // Kernel→app events (gated by app.json `host_events` allowlist).
+    on : (name, cb) => void,     // e.g. sg.on('append.new-messages', cb) / 'append.error'
+    off: (name, cb) => void,
     // Device-local preferences for THIS app on THIS browser (NEW 2026-05-30).
     // Backed by the top-level kernel's localStorage, namespaced as
     // sg-app-state:<vaultId>:<appEntryPath>:<key>. Values are JSON-encoded, capped
@@ -159,6 +236,20 @@ window.sg = {
         remove: (key)        => Promise<{ok: true}>,
         clear : ()           => Promise<{ok: true, removed}>,    // only this app's keys
         keys  : ()           => Promise<string[]>,               // un-namespaced (just the key part)
+    },
+    // Call an LLM with the VAULT'S key — which never enters your frame (NEW 2026-08-02).
+    // Requires `permissions.llm.*` in app.json. See "Calling an LLM" below.
+    llm: {
+        available: ()               => Promise<{ok, reason?, model?, remaining?}>,
+        models   : ()               => Promise<[{id, name, pricing, context}]>,   // policy-filtered
+        usage    : ()               => Promise<{calls, promptTokens, completionTokens, cost, remaining}>,
+        chat     : (req, onToken?)  => Promise<{content, model, finishReason, usage, cost, id, aborted}>,
+        cancel   : (requestId)      => Promise<{cancelled}>,
+        // imagePart(blob|bytes|dataURL) → an image_url content part, encoded in-frame.
+        // Host checks the model can actually read images. See "Send an image".
+        // Host-owned microphone → text. Requires `permissions.llm.listen`. See "Voice input".
+        // listenStop()/listenCancel() end a take from your own UI; listening() → {recording}.
+        listen   : (opts?)          => Promise<{text, model, id, durationMs, bytes, format, cost}>,
     },
 };
 ```
@@ -253,6 +344,29 @@ Notes:
 - Use chained `.then` for assets that depend on each other (e.g. `app.js` depends on `chart-lib.js` already being on the page).
 - The loaders inject `<style>` / `<script>` elements into `document.head` with a `data-sg-loaded="<path>"` attribute, so you can inspect them in DevTools.
 
+> **Permission model: `loadCss`/`loadJs` are NOT a separate grant.** Internally both loaders are
+> `_readText(path)` (the exact same bridge call as `sg.vfs.readText`) plus a DOM-injection step —
+> there is no `load` verb in `app.json` `permissions`. They are gated by **`fs.read`**, same as any
+> other read. Today `fs.read` is **default-allow** (`READ_DEFAULT = true` in `app-permissions.js`),
+> so a plain app.json with no `permissions` block at all can call `sg.loadCss`/`sg.loadJs` without
+> declaring anything — they will not throw `EPERM`. **But `fs.read` is planned to flip to
+> deny-by-default** (see [MIGRATING-TO-THE-PERMISSION-MODEL.md](MIGRATING-TO-THE-PERMISSION-MODEL.md)
+> "What's coming"), and `loadCss`/`loadJs` will flip with it since they share the verb. To be safe
+> against that flip, declare read access explicitly now:
+> ```json
+> { "permissions": { "fs": { "read": true } } }
+> ```
+> or scope it to just the assets you load (trailing `/` = folder prefix, no slash = exact file):
+> ```json
+> { "permissions": { "fs": { "read": ["theme.css", "chart-lib.js", "app.js"] } } }
+> ```
+> **If a load fails today, it is not a permission problem.** With reads still default-allow, a
+> rejected `sg.loadCss`/`sg.loadJs` promise is almost always `ENOENT` (typo'd path, or the file was
+> written locally but never `sgit commit` + `sgit push`ed so the published vault doesn't have it
+> yet) or a syntax error thrown while executing the injected script — not `EPERM`. Always attach a
+> `.catch` (as above) so a failure surfaces in the console with its real code instead of a silent
+> blank/unstyled page.
+
 ### 3. Reading data files at runtime
 
 Use `sg.vfs.readText` (or `sg.vfs.read` for binary). **Do not use `fetch()` for vault paths — it is
@@ -283,6 +397,21 @@ await sg.vfs.write('responses/2026-05-09.json', JSON.stringify(data, null, 2));
 > grant — e.g. `{ "permissions": { "fs": { "write": ["responses/"] } } }`. The vault must also be
 > writable (an access token). See **[MIGRATING-TO-THE-PERMISSION-MODEL.md](MIGRATING-TO-THE-PERMISSION-MODEL.md)**.
 
+> **Size limit (single write).** A single `sg.vfs.write` is capped at **~3 MB** of plaintext
+> (`EFBIG`). One `write` becomes one commit → one `POST /api/vault/batch` carrying the new
+> blob + new tree + commit + ref + index, all base64-encoded inside JSON. AWS Lambda URL
+> Functions cap the request payload at 6 MB, base64 inflates ~1.33×, and the rest of the
+> batch eats some room — so 3 MB is the conservative ceiling the host enforces. Above it,
+> the write rejects with code `EFBIG` (no partial state — nothing was committed).
+>
+> **Reads scale further than writes.** Reads above ~4 MB use a presigned-S3 URL that bypasses
+> Lambda's response cap; there's no equivalent presigned-PUT for writes yet. So an app can
+> read multi-MB blobs (videos, PDFs, datasets) but can't `write` them in one call. Until
+> presigned-PUT ships, large writes must be split across multiple files at the app layer.
+>
+> (Note: the historical "Bad encoding" cap at ~8 KB was a base64 chunking bug, fixed
+> 2026-06-11. Anything ≤ 3 MB now Just Works in a single `write`.)
+
 Always check `sg.app.writable` before showing UI that suggests editing — in a share-token (read-only) view, writes will reject with `Read-only vault`.
 
 ```js
@@ -302,23 +431,68 @@ Just use anchor tags. Click handling is intercepted automatically:
 <a href="https://example.com">External link — opens in a new tab</a>
 ```
 
+> **Bare-`#` anchors now work (fixed 2026-07-31)** — the host interceptor claims
+> `<a href="#section">` clicks and scrolls in-frame (`preventDefault` + `scrollIntoView`;
+> a missing target is a safe no-op). The browser default they used to fall through to is
+> broken in a null-origin `srcdoc` frame (the fragment resolves against the *inherited parent
+> base URL*, causing a real cross-document navigation to the vault-key screen), which is also
+> why **assigning `location.hash` from JS is still BANNED** — that's srcdoc spec behaviour the
+> host cannot intercept. Scroll with `element.scrollIntoView()` instead.
+> (Analysis: architect review `team/roles/architect/reviews/07/30/` on the click interceptor.)
+
+**Opting out of the interceptor (2026-07-31):** if your app wants to handle an anchor click
+itself, either call `e.preventDefault()` in a **window-capture** listener (it runs before the
+host's document-capture handler; the host now honours `e.defaultPrevented`), or mark the anchor
+`data-sg-native` — the host will never claim clicks on such anchors (any href form, including
+`.html` and external).
+
 **What the host does for you (so your app shouldn't reinvent these):**
 
 - **Hash anchors** — `<a href="page.html#section">` was historically broken (the `.html`
   endsWith check failed because the href ended in `#section`, the click fell through,
   the static host 403'd). Fixed 2026-05-30. The fragment is forwarded to the new srcdoc
-  and applied on `DOMContentLoaded` via a postMessage from the parent. Apps don't need
-  any workaround.
-- **External links** (`http://`, `https://`, protocol-relative `//`) open in a new tab
-  via `window.open(..., '_blank', 'noopener,noreferrer')`. The iframe sandbox has
-  `allow-popups allow-popups-to-escape-sandbox`, so the new window is unrestricted.
-  Don't add `target="_blank"` markup — the host handles it.
+  and applied on `DOMContentLoaded` via a postMessage from the parent. If the target id
+  doesn't exist yet (content rendered later from data) the scroll is a safe no-op — the
+  hazardous `location.hash` fallback that used to re-navigate the frame was removed
+  2026-07-31. Apps whose anchor targets render asynchronously should carry the target in
+  an `sg.state.*` stash and scroll after render.
+- **External links** (`http://`, `https://`, protocol-relative `//`) open in a new tab.
+  Don't add `target="_blank"` — the host handles it. **By default** (least privilege) the
+  app frame has **no** popup/escape-sandbox capability: clicking an external link surfaces a
+  one-click **"This app wants to open `<url>` — Open ↗"** confirm on the host chrome, and the
+  host opens it. This also means the user sees where a link leads before it opens.
+  If your app opens external links often and you want the **frictionless** in-frame open
+  (no confirm), declare it:
+
+  ```json
+  { "permissions": { "externalLinks": true } }
+  ```
+
+  That grants the frame `allow-popups allow-popups-to-escape-sandbox`. Only opt in if your
+  app genuinely needs it — it's the one grant that lets the frame open an unsandboxed window,
+  so default-off is the safe posture (see "Embedding another vault" for the same principle).
 - **`mailto:` and `javascript:`** are passed through unchanged.
-- **Pure-fragment links** (`<a href="#section">`) are passed through — the browser
-  scrolls within the current page without the host being involved.
+- **Pure-fragment links** (`<a href="#section">`) are claimed by the interceptor and scrolled
+  in-frame (fixed 2026-07-31 — the browser default is a broken cross-document navigation in a
+  null-origin srcdoc frame). A missing target is a no-op. Your app can still take over any
+  anchor with `data-sg-native` or a window-capture `preventDefault`.
+- **Query strings on vault links** (`<a href="page.html?node=42">`) are currently
+  **unsupported** — the query is not stripped before the file lookup, so the link lands on the
+  broken-link overlay. Carry cross-page state in the `#fragment` (delivered to the new doc) or
+  an `sg.state.*` stash instead.
 - **Friendly 404** — clicks pointing to files that don't exist (or are inside the
   `.vault/**` floor) land on a host-rendered "Page not found in this vault" overlay
   with a back arrow. You don't need to handle broken-link routing yourself.
+- **Blank-app detection** — if your entry file is empty, the host shows a clear
+  "Entry file is empty" error instead of a blank screen. And ~2.5 s after load, if
+  your `<body>` is still showing nothing (hidden via `display:none`/`visibility`/
+  `opacity:0`, has no children, or rendered zero-height content) the host surfaces a
+  *"App loaded but is showing nothing…"* hint on the HUD. A working app that has
+  painted by then never trips this. **If your app legitimately reveals later than
+  2.5 s** (heavy async init), paint *something* — even a spinner — before then so the
+  hint doesn't fire. (Errors thrown during init are already caught by the host's
+  `window.onerror` bridge and surfaced as an error toast — you don't need to do that
+  yourself.)
 - **Back / forward / Home / Reload / Recent pages** — the SG/App HUD has a browser-style
   nav row above your iframe with all five. The path is editable like a real URL bar
   (click → type a vault-absolute path → Enter to navigate). Apps that used to build
@@ -380,6 +554,8 @@ declare how much of this chrome they want via `app.json`:
       "copyLink":   true,
       "print":      true,
       "debug":      true,
+      "activity":   true,
+      "llm":        true,
       "navBar":     true,
       "navArrows":  true,
       "navPath":    true,
@@ -394,16 +570,44 @@ declare how much of this chrome they want via `app.json`:
 
 - **`"full"`** *(default)* — chrome row + nav row both visible. Best for apps with
   multiple pages where users benefit from back/forward.
-- **`"minimal"`** — chrome row collapsed to vault name + title only; no nav row;
-  no Debug button. Best for single-page reading-mode apps that want to feel less
-  "appy". Defaults: `vaultName, appTitle: true`, everything else off.
+- **`"minimal"`** — chrome row collapsed to vault name + title + **Open Vault** button;
+  no nav row; no Debug button. Best for single-page reading-mode apps that want to feel
+  less "appy" while still giving the user a visible way back. Defaults:
+  `vaultName, appTitle, openVault: true`, everything else off. (Copy Link / Print / Debug
+  now live behind a `⋯` overflow button in `full` mode — they don't need their own slots.)
 - **`"hidden"`** — chrome row + nav row both hidden; iframe takes the full viewport.
   A **corner `× Exit app` pill** (`position: fixed; top: 8px; right: 8px; z-index: 9999`)
   remains visible regardless. Best for immersive experiences (lightbox-first
   galleries, presentations, kiosk mode).
+- **`"none"`** — like `hidden`, but **the escape pill is gone too**. The app is visually
+  indistinguishable from a standalone web page; the **only** way back to the vault is to
+  edit the URL. Use this deliberately for a patient/end-user-facing surface (e.g. a
+  check-in form) where *any* host chrome — even a corner pill — would break the illusion
+  that this is "just an app". Because there's no visual clue, reach for `none` only when
+  that invisibility is the point; prefer `hidden` otherwise. Consent prompts still render
+  (see the sovereignty rail).
 
 `hud.show.*` granular flags override the per-mode defaults. Set to `false` to hide;
 omit to use the default.
+
+**`llm` — the AI Chat button** (`full`-default on, `minimal`/`hidden`/`none` off).
+A `✨ AI` button in the top row that opens the host's own AI Chat panel beside your app —
+the same panel the vault file browser has, voice input included. It is **host chrome, not
+your app**: it runs at the real origin, so it holds the vault key and the microphone
+directly and your frame never sees either. You do not need `permissions.llm.*` for it, and
+you cannot read the conversation. Turn it off with `"llm": false` if a chat button would
+confuse your app's own UI; turn it on in `minimal` with `"llm": true`.
+
+(If you want AI *inside* your app rather than beside it, that's `sg.llm.chat()` /
+`sg.llm.listen()` — those do need grants. See "Talking to a model".)
+
+**`activity` — the file-activity meter** (`full`-default on, `minimal`/`hidden`/`none` off).
+A compact `⇅ R N  W N` chip in the top row that tallies the files this app has **read**
+(`vfs.read`/`vfs.list`) vs **written** (`vfs.write`/`fs.move`/`fs.delete`/`fs.mkdir`) this
+session, flashes green/red per op, and expands on click to the last 15 ops (path · size ·
+ms · outcome). It's a transparency surface for power users — *"what is this app actually
+touching?"* — so it's only shown in `full` (the mode power users see). Purely passive; it
+doesn't change what the app can do.
 
 ### Sovereignty rail — what apps **cannot** suppress
 
@@ -411,13 +615,17 @@ The HUD config is for *app preferences*, not *app authority*. Three guarantees t
 host enforces no matter what `app.json` says:
 
 1. **Consent prompts always render.** When the app calls `sg.fs.delete(...)` or
-   `sg.vault.create(...)` etc., the host's HUD consent overlay appears for the user
-   to allow/deny — regardless of `hud.mode`.
+   `sg.vault.create(...)` etc., the host's consent bar appears for the user to allow/deny
+   — **regardless of `hud.mode`, including `none`**. The consent bar is a full-width
+   sibling of the chrome row (not inside it), so hiding the chrome never hides consent.
 2. **The escape pill is non-suppressible** in `mode: "hidden"`. Users always have a
-   one-click way back to the vault file browser.
+   one-click way back to the vault file browser. (`mode: "none"` *does* drop the pill by
+   design — that's the whole point of `none` — so for those apps the user-side override
+   below is the escape hatch.)
 3. **User-side override.** Power users can set
    `localStorage['sg-app-force-show-hud'] = '1'` and reload to force `mode: "full"`
-   regardless of what `app.json` requests. (Read at page-script level — not bypassable
+   regardless of what `app.json` requests — this upgrades **both `hidden` and `none`**, so
+   a curious user can always reveal the chrome. (Read at page-script level — not bypassable
    by app code.)
 
 ### Recommendation
@@ -430,11 +638,26 @@ then, prefer `minimal` first.
 
 ---
 
+## Running on static storage (GitHub Pages / S3)
+
+The **same app HTML** runs against the live FastAPI backend or a 100% static file host —
+the app only talks to `window.sg` and never knows the difference. Reads are deterministic
+GETs; a static host is read-only (`sg.app.writable === false`). Set `window.SG_STATIC = true`
++ `window.SG_ENDPOINT = '<static base>'` and open the vault without a token. Full guide:
+**[HOSTING-ON-STATIC-STORAGE.md](HOSTING-ON-STATIC-STORAGE.md)**.
+
+---
+
 ## Reading other vaults (sub-vaults)
 
 A vault can link to **other vaults** (the "vault-in-vault" feature). Linked vaults are mounted into
 the file tree as folders and are **read-only**. To your app, an inner-vault file is **just another
 path** — read it through the same `sg.vfs.*` API:
+
+> **Want to go the other direction — split a folder OUT of the current vault into its own vault,
+> then bring it back?** See **[EXTRACT-AND-EMBED-A-SUB-VAULT.md](EXTRACT-AND-EMBED-A-SUB-VAULT.md)**
+> — covers `sg.vault.create({seedFrom, link})` plus all three ways to re-surface the result (a
+> read-only link like the one below, `sg.vault.embed`, or the `sg.vault.mount` ViV relay).
 
 ```js
 // 'subvaults/' is where links commonly live; the mount path is the link-file name without
@@ -454,6 +677,66 @@ const txt = await sg.vfs.readText('subvaults/patient-alice/knee-score.json');
 
 This is the workflow that lets an app (e.g. a clinician dashboard) read across many per-user vaults
 without the user ever seeing the raw vault UI.
+
+---
+
+## Embedding another vault inside your app (`sg.vault.embed`)
+
+Sometimes you don't want to *read* another vault's files — you want to **show the whole
+other vault** (its app, its files) inside a panel in your app. A doctor console opening
+each patient's vault is the canonical case. Use **`sg.vault.embed`**:
+
+> Creating the child vault to embed by extracting it from a folder in the current vault?
+> **[EXTRACT-AND-EMBED-A-SUB-VAULT.md](EXTRACT-AND-EMBED-A-SUB-VAULT.md)** walks the full
+> `seedFrom` → `embed` flow end to end, including where the raw key in the call below comes from.
+
+```js
+const pane = document.querySelector('#patient-pane');
+const info = await sg.vault.embed(pane, patientKey);
+// → { vaultName, fileCount, hasApp, iframe }
+```
+
+That's the whole thing. `sg.vault.embed` creates the iframe, runs the key handshake over
+`postMessage` (**the key never touches the URL or storage**), uses the **minimum sandbox
+privileges**, and resolves once the embedded vault is interactive.
+
+`key` is the full vault key (`passphrase:vault-id` — the same string that follows `#` in a
+share link). Options (all optional):
+
+| option | default | meaning |
+|---|---|---|
+| `host` | the host your app was served from | e.g. `'https://dev.vault.sgraph.ai'` |
+| `surface` | `'app'` | `'app'` runs the embedded vault's app; `'vault'` is the file browser (file-browser embed is a planned follow-on) |
+| `deepLink` | — | a file path to open inside the embedded vault |
+| `mode` | `'auto'` | `'app'` / `'vault'` / `'auto'` |
+| `sandbox` | *(none)* | extra sandbox tokens **beyond `allow-scripts`** — narrow opt-ins only (see below) |
+| `timeoutMs` | `14000` | handshake timeout |
+
+### Security — least privilege by default
+
+The embedded iframe is sandboxed with **`allow-scripts` only**. That's all the handshake
+and rendering need, and it keeps the vault in an opaque origin with no storage. The host
+**refuses** the two dangerous tokens even if you ask for them:
+
+- **`allow-same-origin`** — would dissolve the isolation boundary (the embedded vault could
+  read your app's storage/DOM). Never granted.
+- **`allow-popups-to-escape-sandbox`** — the embedded frame renders HTML apps authored by
+  *whoever shared that vault*; this token would let that content open a **full-privilege,
+  unsandboxed** window. Never granted.
+
+If a specific in-vault action needs more, add the **narrow** token for *that action* via
+`opts.sandbox` — `['downloads']` to let the embedded vault download a file, `['popups']`
+for new-tab links (they stay sandboxed), `['modals']` for `window.print()`/dialogs. Reach
+for the smallest set that works; never the escape token.
+
+### Don't hand-roll the handshake
+
+Earlier this required ~70 lines of `postMessage` plumbing plus a list of gotchas (opaque
+origins, `parent=null`, target-origin rules). `sg.vault.embed` is the platform-maintained,
+tested version of exactly that — **don't** point an iframe at `https://host/#<key>` (that's
+the entry-form flow and depends on `localStorage`, which is blocked in a sandboxed app).
+Always keep an `<a href="https://host/#<key>" target="_blank">` **Open in new tab** link as a
+fallback for environments where framing is blocked by the host's CSP.
 
 ---
 
@@ -482,6 +765,614 @@ const blob = await sg.history.readBlob('obj-cas-imm-…');
 Use it to build a "file history" view, a diff, or a "restore previous version" button (write the
 old bytes back with `sg.vfs.write` in a writable vault). History currently covers the **current
 vault**; reading a sub-vault's own history is a planned follow-on.
+
+---
+
+## Device-local app state (`sg.state.*`)
+
+Your app runs in a **null-origin sandboxed iframe**, so it has **no `localStorage` of its own** —
+`window.localStorage` throws on an opaque origin. When you need to remember something small on *this*
+device (theme choice, panel widths, a "don't show this again" flag, the last tab the user was on),
+`sg.state.*` gives you a key/value store **without a vault write**. Under the hood it postMessages the
+request to the top-level kernel, which owns the real `localStorage`, reads/writes on your behalf, and
+replies — the same bridge every other `sg.*` call uses. You never touch storage directly.
+
+```js
+await sg.state.set('theme', 'dark');          // value is JSON-encoded (any JSON-serialisable value)
+await sg.state.set('layout', { cols: 3, sort: 'name' });
+
+const theme  = await sg.state.get('theme');    // → 'dark'  (null if never set)
+const layout = await sg.state.get('layout');   // → { cols: 3, sort: 'name' }
+
+const keys   = await sg.state.keys();          // → ['theme', 'layout']  (just the key part)
+await sg.state.remove('theme');
+await sg.state.clear();                         // wipes only THIS app's keys → { ok: true, removed: N }
+```
+
+**Isolation.** Every key is stored under `sg-app-state:<vaultId>:<appEntryPath>:<key>`, so state is
+scoped **per-vault and per-app-entry-path**. One vault's apps can't read another's, and `clear()`
+only removes your app's slice — it never touches other apps' state. `keys()` returns the
+un-namespaced key part, so you read back exactly what you passed to `set()`.
+
+**Limits & safety.**
+
+- **64 KiB per key** (the JSON-encoded value). It's for *preferences*, not documents — a larger value
+  is rejected with `value too large (max 64 KiB)`.
+- `vaultId` is a **derived, non-secret** identifier — the vault **key is never** written to
+  localStorage. Don't put secrets (vault keys, access tokens) in `sg.state.*`.
+- Every op is wrapped in try/catch on the host side, so a quota or parse error returns a rejected
+  promise rather than breaking the bridge.
+
+### `sg.state.*` vs `sg.fs.write('.app-state/…')` — pick the right one
+
+This is the decision that trips people up. They are **not** interchangeable:
+
+| You want state that… | Use | Persistence | Travels with the vault? |
+|---|---|---|---|
+| Is a per-device **preference** (theme, panel sizes, dismissals) | **`sg.state.*`** | Kernel `localStorage` on **this browser** | ❌ No — device-local only |
+| Should **sync across devices** and be visible to anyone opening the same vault key | **`sg.fs.write('.app-state/…')`** | A real, encrypted **vault write** (a commit) | ✅ Yes — it *is* vault content |
+
+Rule of thumb: if losing it when the user switches browsers would be **fine** (or even expected),
+use `sg.state.*`. If losing it would be a **bug**, write it into the vault. Reach for `sg.state.*`
+specifically to avoid a vault commit on every trivial UI toggle.
+
+> **Why this exists as a separate namespace.** The device-local-prefs case deliberately deviates from
+> the "everything is a vault file" doctrine: a theme toggle shouldn't create a commit. Recorded in
+> `team/comms/changelog/05/30/changelog__app-state-print-rpc.md`.
+
+**No permission grant required.** Unlike `sg.fs.*` / `sg.vault.*`, `sg.state.*` needs no `app.json`
+`permissions` entry and no consent overlay — it's sandboxed to your own namespace in device-local
+storage and can't touch the vault or other apps. It works on **read-only opens too** (share-token /
+sub-vault views), since it never writes to the vault.
+
+---
+
+## Receiving messages (`sg.append.*` + `sg.on`)
+
+> **Renamed 2026-06-15** (v0.32.7): this transport was previously `sg.inbox.*` with an `append`
+> verb. It is now **`sg.append.*`** and the write verb is **`write`**. Update any older app code.
+
+The append transport lets a vault receive messages/files from other agents or vaults through an
+**append-only lane** that lives outside the version-controlled commit tree (raw vault-pointer API,
+not the commit/push flow). The kernel holds the keys and attaches the gate header per verb.
+
+### Declare the grants
+
+All six verbs are **booleans, default-deny**, and are *not* path-scoped (append lanes are
+server-held, not vault paths). Note the verb-to-grant mapping is not 1:1 — **`fetch` is gated by
+`append.read`**:
+
+```json
+{ "permissions": { "append": { "write": true, "list": true, "read": true } } }
+```
+
+| Method | Grant it needs |
+|---|---|
+| `sg.append.configure` | `append.configure` |
+| `sg.append.write` | `append.write` |
+| `sg.append.list` | `append.list` |
+| `sg.append.fetch` | **`append.read`** |
+| `sg.append.markProcessed` | `append.markProcessed` |
+| `sg.append.purge` | `append.purge` |
+
+Only `true` grants — `1`, `"yes"` and an array of paths all deny.
+
+> **A read-only session does not block `sg.append.write`.** The grant above is the only gate on
+> it; `sg.app.writable === false` is irrelevant to the append namespace. What *does* fail closed
+> in a read-only session are the **read** verbs (`list`/`fetch`/`markProcessed`): their
+> `enum_key` is derived from the vault's read key, and a read-only open imports that key
+> non-extractable, so the host cannot derive it and answers `ENOAUTH` without a request.
+>
+> **Security note — the read key *is* the enum key.** `enum_key = SHA256("sg-inbox-enum:" ||
+> read_key_bytes)` is a pure function of the read key. The non-extractable import is a courtesy
+> of the web UI, not a boundary: anyone holding a vault's read key can compute its `enum_key`
+> elsewhere and list, fetch and mark-processed that vault's lane. So **never publish the read key
+> of a vault that receives a lane.** The telemetry pattern (a public games vault that *writes*,
+> a private telemetry vault that *receives*) is the right shape precisely because the receiving
+> vault's read key stays private.
+
+### Errors carry a `code` — check that, not the message
+
+Every rejection from `sg.append.*` is an `Error` with a stable `.code`, and `.status` when the
+transport saw an HTTP status. The same is true of every namespace that goes through the command
+bridge (`sg.fs`, `sg.vault`, `sg.sync`, `sg.auth`, `sg.state`, `sg.ui`, `sg.history`) and of
+`sg.vfs.*` (`EPERM`, `EPROTECTED`, `EREADONLY`, `ENOENT`, `EPROTO`). Branch on the code; the
+message is for humans and will change.
+
+| Code | Meaning |
+|---|---|
+| `EPERM` | the grant is missing — the message names the `app.json` key to add |
+| `EINVAL` | bad arguments, or no vault id — **nothing was sent** |
+| `ENOAUTH` | this session has no key for that verb (a read-only session calling a read verb) |
+| `E2BIG` | payload over 5 MB, or a batch over 100 `file_ids` |
+| `ENOSPC` | the lane is at its 1000-file ceiling |
+| `EUNREACH` | the request never completed (offline, DNS, CSP) |
+| `ENOTRANSPORT` | no vault open, or the transport isn't loaded on this surface |
+| `EEDGE` | **an HTML error page came back instead of JSON — see below** |
+| `EHTTP` | any other HTTP failure; read `.status` |
+| `EAPPEND` | the append layer threw something without a code of its own (a client bug, not a server answer) |
+
+> **`EEDGE` — an HTML page came back, so the status is not the API's.** A CDN error page can
+> replace both the body *and* the status code. There is a live case of this: the static site's
+> `403 → /404.html` custom error response also applies to `/api/*`, so a genuine gate failure —
+> a wrong `append_token`, a mismatched `enum_key` — reaches the browser as **404 with the
+> "Page Not Found" HTML page**. A real route miss still answers 404 with *JSON*, so the HTML
+> body is the reliable tell, not the status. **If you get `EEDGE`, check your credential before
+> you suspect your URL.** (Verified against dev, 7 Sep 2026.)
+
+### Only `write` crosses vaults
+
+This is the asymmetry to internalise, because nothing else in the API hints at it:
+
+- **`write` takes an explicit `vault_id`** and posts to *that* vault's lane with no headers at
+  all — the `append_token` in the body is the entire gate. This is the account-less delivery
+  path, and it is how a published app sends telemetry or messages **into a different vault**.
+- **Every other verb is bound to the currently open vault.** `list`, `fetch`, `markProcessed`,
+  `purge` and `configure` ignore any vault you name and act on the vault the app is running in,
+  using that vault's derived `enum_key`. **You cannot list or drain a remote lane from an app**,
+  and that is deliberate: the `enum_key` is the recipient's, and handing it to a published app
+  would give every visitor read access to the whole lane. Drain a lane where its key legitimately
+  lives — the recipient vault's own dashboard app, or `sgit`.
+
+```js
+// Verbs (all take a single opts object — see the API block above for fields):
+await sg.append.configure({ append_anchors: [...] });
+
+// Outbound to ANOTHER vault — the only cross-vault verb:
+await sg.append.write({ vault_id, append_token, payload });
+
+// Inbound, always against the CURRENTLY OPEN vault. `inbox` is required on all four:
+const { entries } = await sg.append.list({ limit: 20 });
+const inbox = entries[0].inbox;                                  // the lane id — see below
+await sg.append.fetch({ inbox, file_ids: [...] });
+await sg.append.markProcessed({ inbox, file_ids: [...] });
+await sg.append.purge({ folder: 'processed', inbox, file_ids: [...] });
+
+// Event push — declare in app.json (an OBJECT allowlist, explicit true — NOT an array):
+//   "host_events": { "append.new-messages": true, "append.error": true }
+sg.on('append.new-messages', (evt) => { /* {total, per_anchor, entries, new_count, trigger} */ });
+sg.on('append.error',        (evt) => { /* {code, message, http?, trigger} */ });
+```
+
+`payload` may be a `Uint8Array` (it is base64-encoded for you) or a base64 string you built
+yourself. Ceiling is **5 MB per message**, **1000 pending files per lane**, and **100 `file_ids`
+per batch** for `fetch`/`markProcessed`/`purge`.
+
+### Draining the lanes of your **declared** sub-vaults — NEW 2026-09-07
+
+The monitoring pattern: a parent vault declares data vaults as `*.link.json` mounts; each data
+vault *receives* append messages from elsewhere; the parent's app watches and drains them. The
+three read verbs take an optional **`path`** — any path under a declared mount — and the host
+binds the transport to **that child**:
+
+```js
+const { entries } = await sg.append.list({ path: 'data/vault-a/' });
+await sg.append.fetch({ path: 'data/vault-a/', inbox, file_ids });
+await sg.append.markProcessed({ path: 'data/vault-a/', inbox, file_ids });
+// then commit the processed events INTO the child through the same declared mount:
+await sg.vfs.write('data/vault-a/events/2026-09-07.jsonl', bytes);
+```
+
+What crosses and what does not:
+
+| | |
+|---|---|
+| `list` / `fetch` / `markProcessed` with `path` | cross to the declared mount's child |
+| `purge` / `configure` with `path` | **`EPERM`** — owner verbs need the child's write key, which the lane never carries |
+| `path` under a **runtime** `sg.vault.mount` | **`ENOLANE`** — only the owner's `*.link.json` declaration is a trust anchor |
+| `path` under no mount | `ENOENT` |
+| the mount's credential yields no read key | `ENOLANE` |
+
+The grants are the same booleans (`append.list` / `append.read` / `append.markProcessed`).
+Nothing new is exposed to the app: the parent already holds each child's credential (that is
+what makes the mount work), and the child's `enum_key` is a pure function of its read key. The
+child vault is **never opened** for this — keys are derived from the credential string alone.
+
+**Events per mount.** With `"host_events": { "append.new-messages": true }` declared (an object allowlist — an array parses to **nothing**, silently), the host runs one
+checker per declared mount alongside the root's, on tab focus and app open. Each event carries
+`mount` (the declared prefix in its canonical form, with a trailing slash — `data/vault-a/`) and
+`mountId`, so the app knows which vault spoke:
+
+```js
+sg.on('append.new-messages', (evt) => {
+    if (evt.mount) refreshLane(evt.mount, evt.total);   // a data vault's lane
+    else           refreshOwnLane(evt.total);           // this vault's own lane
+});
+```
+
+**`sg.vault.notify(mountId)`** — now implemented (it was documented and permission-parsed
+since v0.33.5 but had no host handler; every call returned "Unsupported vault action"). It runs
+the named declared mount's lane check immediately and resolves `{mountId, checked: true}`.
+Needs `"vault": { "notify": true }`. `name` and `payload` are accepted for the documented
+signature but not forwarded anywhere — there is no child-side listener to forward to.
+
+> **Nested kernels have no append transport.** An app running *inside* a mounted child (a
+> child kernel) cannot call `sg.append.*` at all — the child kernel's bundle does not carry the
+> transport and its handler set is `vfs.*` only. This is why lane-draining lives in the top
+> kernel. The reality document previously recorded only the `sg.llm.*` parity gap; this one is
+> the same shape.
+
+### `inbox` is the lane id, and today it *is* the append token
+
+`inbox` is **not** a folder name or an enum — it is the lane identifier that `list` returns in
+every entry, and the value you must pass back to `fetch` / `markProcessed` / `purge`. Always take
+it from `list` output rather than constructing it.
+
+> **Be aware:** as currently implemented the lane id is the **append token itself**, byte for
+> byte — not its hash. So anyone who can `list` a lane (i.e. an `enum_key` holder) learns that
+> lane's write token. In practice the append token is designed as a *public* lane address
+> (`H(recipient public key)`), it grants write only, and `list` already requires the `enum_key`
+> — so this is not a privilege escalation. It is recorded here so integrators are not surprised,
+> and it is expected to change to a hash in a future contract version. Do not build anything that
+> depends on `inbox` being the raw token.
+
+The `folder` argument to `purge` is a separate thing entirely: it is `'pending'` or `'processed'`
+(the value `'inbox'` was removed in v0.32.7 and now returns HTTP 400). `purge` with
+`folder: 'processed'` and no `file_ids` bulk-purges the whole processed set.
+
+### What actually fires `append.new-messages`
+
+The kernel's checker runs on **tab focus and app open** — your app does not poll; it declares the
+`host_events` allowlist, subscribes with `sg.on`, and reacts. It is built only when **all** of
+these hold, so if your handler never fires, check them in order:
+
+1. your `app.json` declares the event in `host_events` **as an object with `true`** — `{ "append.new-messages": true }`. An array (`["append.new-messages"]`) is accepted without error and parses to an empty allowlist, so nothing ever fires (default-deny);
+2. the app is running on the app surface (`/en-gb/app`), which is where the transport is loaded;
+3. a vault is open whose `enum_key` can be derived (i.e. not a read-only session);
+4. **that open vault has a lane of its own.** The checker lists the *currently open* vault — so
+   an app in a vault with no lane can never receive this event, no matter what it declares. Put
+   the receiving app in the vault that owns the lane.
+
+`entries` is `null` in the payload: the shell runs the checker with `auto_fetch` off, so you pull
+ciphertext on demand with `sg.append.fetch` when you get the notification.
+
+---
+
+## Your app may be running as a published release — NEW 2026-08-02
+
+A vault can publish **named releases** (`.vault/releases.json`), and a viewer can pin to one from
+the HUD or via a link (`#key|@v1-2`). When that happens your app is mounted from that **commit**,
+not from HEAD: its `app.json`, its resources and every `sg.vfs.read` come from that version.
+
+You do not need to do anything for this to work — but two consequences matter:
+
+1. **A pinned mount is read-only, for everyone including the vault owner.** `sg.app.writable` is
+   `false`, and writes reject with `EPINNED`. (Committing on top of an old tree would fork the
+   branch, so this is a safety rule, not a missing feature.) If your app writes, you already have
+   to handle `writable === false` — this is one more reason it happens.
+2. **You can detect that you are pinned, but you cannot change it — UPDATED 2026-09-07.**
+   `sg.app.pinned` is `true` when you are mounted from a release, and `sg.app.release` then
+   carries `{name, label, commit}`; both are read-only mirrors of the host's decision. Which
+   version runs stays the host's call, not the versioned code's — `.vault/**` is still inside
+   the permission floor, so you cannot read or edit the release map. Don't build version logic
+   that assumes you are always the newest.
+
+   ```js
+   if (sg.app.pinned) {
+       banner.textContent = `Viewing release ${sg.app.release.name} — read-only`;
+   }
+   ```
+
+   This exists because its absence was expensive: an author pushed a new `app.json`, saw no
+   change, and had no way to learn the mount was pinned to an older commit. If a push of yours
+   appears to do nothing, check `sg.app.pinned` first.
+
+The practical upshot for authors: **write apps that degrade cleanly to read-only**, and put any
+"what's new" copy in the content rather than in code that assumes it is running at HEAD.
+
+---
+
+## Calling an LLM (`sg.llm.*`) — NEW 2026-08-02
+
+Your app can call a language model **without ever holding an API key**. The key lives in
+`.vault/llm/config.json` (inside the permission floor — your app cannot read it), and the host
+makes the call on your behalf. You send messages and receive text.
+
+### 1. Declare the grants
+
+Default-deny, like every other capability. In `app.json`:
+
+```json
+{
+  "entry": "index.html",
+  "permissions": {
+    "llm": { "chat": true, "models": true, "usage": true }
+  }
+}
+```
+
+`chat` is the one that spends money; `models` and `usage` are read-only. Grant only what you use.
+
+### 2. Check availability BEFORE you render a chat UI
+
+`sg.llm.available()` is not optional politeness. Unlike other namespaces, LLM access depends on
+*runtime* state: whether the vault has a key configured, whether this is a read-only session,
+whether the budget is spent. Ask first, then decide what to draw.
+
+```js
+const a = await sg.llm.available();
+if (!a.ok) {
+    // 'ENOKEY'  — no key configured for this vault (tell the user: Settings → AI models)
+    // 'EPERM'   — this app wasn't granted permissions.llm.chat
+    // 'EREADONLY' — owner-sealed key, and this is a read-only session
+    showFallbackUI(a.reason);
+    return;
+}
+console.log('ready:', a.model, 'remaining:', a.remaining);   // {calls, cost} — null = uncapped
+```
+
+### 3. Chat, with streaming
+
+```js
+const res = await sg.llm.chat(
+    { messages: [{ role: 'user', content: 'Summarise this vault in one line.' }] },
+    (delta, acc) => { out.textContent = acc; }        // optional — called as text arrives
+);
+console.log(res.content, res.usage, res.cost, res.id);
+```
+
+Three properties worth relying on:
+
+- **The terminal reply is authoritative.** An app that ignores `onToken` entirely still gets the
+  complete `content`. Deltas are a UX affordance, never the source of truth.
+- **Deltas carry only the increment** (`delta`), plus the running `acc` for convenience. The host
+  coalesces them on a ~50 ms timer, so you get readable chunks rather than a postMessage per token.
+- **`cost` is labelled**: `{value, source, estimated}`. `estimated: true` means it was computed
+  from token counts × list price, not billed. Render estimates with a `~`. Never show one as a bill.
+
+Optional request fields: `model`, `maxTokens`, `temperature`, `topP`, `stream: false`.
+
+### 4. Cancel a call in flight
+
+The promise carries the request id:
+
+```js
+const p = sg.llm.chat({ messages }, onToken);
+stopBtn.onclick = () => sg.llm.cancel(p.requestId);
+try { await p; } catch (e) { if (e.code === 'EABORT') { /* partial text is already rendered */ } }
+```
+
+### 5. Show what it costs
+
+```js
+const u = await sg.llm.usage();
+meter.textContent = `${u.calls} calls · $${u.cost.toFixed(4)} · ${u.remaining.cost ?? '∞'} left`;
+```
+
+`usage()` reports the **whole session**, including calls made by the vault UI's own chat panel —
+one bill per session, not one per surface.
+
+### 6. Send an image (a screenshot, a chart, a scan) — NEW 2026-08-03
+
+A message's `content` can be an array of parts instead of a string:
+
+```js
+const part = await sg.llm.imagePart(blobOrBytes);          // or a data: URL you already have
+const res  = await sg.llm.chat({
+    messages: [{ role: 'user', content: [
+        { type: 'text', text: 'What is wrong in this screenshot?' },
+        part
+    ] }]
+});
+```
+
+**Use `sg.llm.imagePart()` rather than encoding it yourself.** It runs in your frame (no host
+round trip — the bytes are already yours) and chunks base64 at **8190, not 8192**. `8192 % 3
+=== 2`, so a 8192-sized chunk emits `=` padding mid-string and `atob()` rejects it; this
+codebase has shipped that exact bug three times. It accepts a `Blob`/`File`, a `Uint8Array`, an
+`ArrayBuffer`, or passes a `data:` URL straight through.
+
+Accepted types: **png, jpeg, webp, gif**. Not svg — it is a scriptable document, not a bitmap,
+and no provider takes it.
+
+**The model must be able to read images**, and the host checks before spending the call:
+
+- capability is read from the **live model catalogue** (`architecture.modality` /
+  `input_modalities`), not a hard-coded list, so a new vision model works the day it ships;
+- a model that cannot see gets you `EMODEL` **naming the model**, instead of a provider error
+  that names nothing;
+- note that `text->image` is an image *generator*, not a reader — it is correctly refused.
+
+The host also caps the total image payload (`EIMGSIZE`). That ceiling is not yours to raise: it
+is spending the vault's key.
+
+Images appear in the request ledger as their own count, never folded into the character total —
+`sg.llm.usage()` and the AI Requests pane both stay honest about what the expensive calls were.
+
+> **Not a new grant.** An image is an ordinary `chat()` call under `permissions.llm.chat`.
+
+### What the host does that you don't have to
+
+| Concern | Who handles it |
+|---|---|
+| Holding the API key | Host. It is never in your frame, your bundle, or any message you receive. |
+| Which models you may use | Host — `models()` is already filtered by the vault's allow-list, so a picker you build from it is automatically correct. |
+| Spend caps | Host. `maxCostPerSession` / `maxCallsPerSession` are enforced before the call; you get `EBUDGET`. |
+| `maxTokens` | Host **clamps** it to the vault policy. Asking for more is not an error, it is just capped. |
+| Consent | Host. The first `chat()` raises a HUD prompt the user must accept; declining gives you `ECONSENT`. |
+| Whether the model can read an image | Host, from the live catalogue. You get `EMODEL` naming the model, not a provider error naming nothing. |
+| Image size ceiling | Host (`EIMGSIZE`). It is spending the vault's key, so the limit is not the app's to set. |
+| Cost reconciliation | Host, two-source (stream `usage.cost`, then the authoritative `/generation` lookup). |
+
+### Error codes
+
+`EPERM` (no grant) · `ECONSENT` (user declined) · `ENOKEY` (no key configured) ·
+`EREADONLY` (owner-sealed key, read-only session) · `EBUDGET` (cap reached) ·
+`EMODEL` (model not in the allow-list, none selected, or it cannot read the image/audio you
+sent) · `EABORT` (cancelled) · `EIMGSIZE` (image payload over the host ceiling) ·
+`EPROTO` (upstream failure). They arrive as `err.code`, so branch on that rather than on message text.
+
+### Voice input (`sg.llm.listen`) — NEW 2026-08-03
+
+Speak instead of type. One call: the **host** opens the microphone, shows a red recording bar
+with a Stop button, transcribes with the vault's key, and hands you back text.
+
+```json
+{ "permissions": { "llm": { "chat": true, "listen": true } } }
+```
+
+```js
+micBtn.onclick = async () => {
+    try {
+        const { text } = await sg.llm.listen();     // opts: {maxMs, model, prompt}
+        input.value = text;                          // then send it as a normal chat message
+    } catch (e) {
+        if (e.code === 'ECONSENT') return;           // user declined — not an error worth showing
+        if (e.code === 'ENOMIC')   showTypeInstead();
+    }
+};
+```
+
+**`listen` is a separate grant and is never implied by `chat`.** Recording a room is a
+categorically different act from sending text, so an app that can talk to a model does not
+thereby get a microphone. It also **asks for consent every time** by default (tune with
+`permissions.consent["llm.listen"]` if you are building a kiosk).
+
+**Your frame never touches audio.** A sandboxed app frame has no `navigator.mediaDevices` at
+all, so capture happens in the host — which is also why the recording indicator is on host
+chrome where the user can always see it. You receive `{text, durationMs, bytes, format, cost}`
+and nothing else; the recording itself never crosses into your frame.
+
+The transcription is an ordinary paid call: it counts against the vault's spend caps, appears in
+the request ledger, and its cost is labelled `estimated` like any other.
+
+### Driving the take from your own UI
+
+`listen()` stays pending until the take ends. By default the **host's** bar ends it (Stop &
+send / Cancel) or `maxMs` expires — but an app that renders its own record button needs its own
+stop, so:
+
+```js
+const p = sg.llm.listen({ maxMs: 120000 });     // do NOT await yet — you need the stop path
+myStopBtn.onclick   = () => sg.llm.listenStop();      // → p resolves with the transcript
+myCancelBtn.onclick = () => sg.llm.listenCancel();    // → p rejects with EABORT, mic released
+const { text } = await p;
+```
+
+- The transcript comes back through the **original `listen()` promise** — stopping does not
+  open a second channel to read.
+- Both resolve `{stopped:false}` when nothing is recording, so calling stop defensively (on
+  unmount, on a route change) is safe and needs no error handling.
+- `sg.llm.listening()` → `{recording}` if you need to render button state.
+- All three sit behind the **same `llm.listen` grant** and raise **no consent prompt** — ending
+  a take you already started is strictly less authority than starting one, and nobody should
+  have to approve stopping.
+- **The host's own Stop/Cancel stay on the bar.** An app gaining a stop button must not cost
+  the user theirs.
+- A second `listen()` while one is running is refused with `EBUSY` rather than opening a second
+  microphone.
+
+**Leave `model` alone unless you know the model hears.** Transcription does **not** use the
+vault's chat model — most chat models have no audio endpoint and OpenRouter answers
+`404 No endpoints found that support input audio`. `listen()` defaults to
+`google/gemini-3.5-flash`; passing a model that does not accept audio is refused up front with
+`EMODEL` and a message naming one that does. Currently accepted:
+`google/gemini-3.5-flash`, `google/gemini-3.1-flash-lite`, `google/gemini-3-flash-preview`,
+`google/gemini-3.1-flash-lite-preview`, `openai/gpt-audio`, `openai/gpt-audio-mini`,
+`mistralai/voxtral-small-24b-2507`. The vault's `models.allow` list still applies on top.
+
+Extra error codes: `ENOMIC` (no microphone / sandboxed / permission refused by the browser),
+`EINSECURE` (not HTTPS), `EABORT` (user pressed Cancel).
+
+> **iPad note.** This works on iPad Safari — the host records `audio/mp4`, which OpenRouter
+> accepts as `m4a` with no conversion. Desktop Chrome records `webm`, which is *not* accepted, so
+> the host transcodes to WAV automatically. You do not need to care which happened.
+
+### What this is not
+
+There is no tool-calling loop. `sg.llm.chat` is a **reader**: it takes messages and returns text.
+If you want the model to act on the vault, *your app* decides what to do with the reply and calls
+`sg.vfs.*` / `sg.fs.*` itself — under the grants you already declared. That separation is
+deliberate: the LLM never gets ambient authority over the vault.
+
+> **Honest limitation.** The key still lives in the vault, so sharing a vault key still shares the
+> credential with anyone who can open it. Short-lived minted credentials are planned (Phase 4) and
+> would remove that; until then, treat a vault with an AI key configured as a vault that carries a
+> secret.
+
+---
+
+## Downloading files (`sg.vfs.download`) — NEW 2026-07-31
+
+The sanctioned way to put a vault file in the user's Downloads folder:
+
+```js
+await sg.vfs.download('exports/report.pdf');                          // saves as report.pdf
+await sg.vfs.download('exports/report.pdf', { filename: 'EU-AI-Act.pdf' });
+// → {ok: true, path, filename, bytes}   ·   rejects: ENOENT / EPERM / EPROTECTED /
+//   'Download not approved' (user dismissed the confirm)
+```
+
+**How it works — and why you don't need `allow-downloads`.** The bytes travel the same guarded
+read path as `sg.vfs.read` (floor → mounts → `fs.read` grant), but the `<a download>` click
+happens in the **host document** (real origin, unsandboxed). The app frame's sandbox is
+untouched. This is deliberate: a blob-URL + programmatic-anchor download **inside** the app
+frame is silently dropped by Chromium because the sandbox has no `allow-downloads` token —
+don't build that workaround, call `sg.vfs.download`.
+
+**Consent.** Same model as external links: by default each call surfaces a one-click HUD
+confirm naming the file and size ("This app wants to save a file to your device"); dismissing
+rejects the promise. Declare `"permissions": { "downloads": true }` in `app.json` for
+frictionless saves (e.g. a downloads page where saving is the whole point).
+
+**Related contracts, stated explicitly:**
+
+- `sg.vfs.read(path)` returns a raw **`ArrayBuffer`** (postMessage structured clone). There is
+  **no read-size cap** — the 3 MB `EFBIG` guard is write-only. Errors: rejection with message
+  `No such file: <path>`, or `EPERM` / `EPROTECTED` codes.
+- **Direct vault-file URLs are banned in app markup.** `<a href="/exports/x.pdf" download>` or
+  `<iframe src="/exports/x.pdf">` cannot work — vault files are encrypted objects, not URLs;
+  the href resolves against the static host and answers `AccessDenied`. For inline **images**,
+  read the bytes over the bridge and use a blob URL (or just assign `img.src` — the bridge
+  patches it). For PDFs, see the next section — a blob iframe is NOT enough.
+
+---
+
+## Displaying PDFs inline — verified 2026-07-31
+
+The obvious pattern — `sg.vfs.read` → `Blob` → `URL.createObjectURL` → `<iframe src>` —
+**does not work in App Mode**: Chromium refuses to load its PDF viewer inside a sandboxed
+frame that lacks `allow-same-origin` (you get the grey sad-document placeholder). Verified
+empirically with the exact App Mode sandbox (`allow-scripts allow-forms`): identical markup
+renders fine unsandboxed, is blocked in-frame. This is also why the same blob-iframe pattern
+*does* work in the host's own file-preview overlay (`vault-file-preview`) — that surface runs
+at the real origin. There is no sandbox token short of `allow-same-origin` (never granted —
+it would collapse the app isolation boundary) that re-enables the viewer.
+
+What actually works, in order of preference:
+
+0. **`sg.ui.preview(path)` — one call, host-fulfilled (NEW 2026-07-31, the default choice).**
+   ```js
+   await sg.ui.preview('docs/report.pdf');   // → {ok, path, type: 'pdf', bytes}
+   ```
+   The host reads the bytes through the vfs.read permission chain and renders a modal
+   quick-look overlay in **its own document** — real origin, so Chrome's native PDF viewer
+   works (toolbar, zoom, text selection). Also previews images, video, audio, and text.
+   No grant and no confirm: the bytes never leave the browser, and the overlay is host DOM
+   the app can't fake or suppress (user closes via ✕ / Escape / backdrop). One overlay at a
+   time — a new call replaces the current one. Errors mirror `vfs.read`
+   (`ENOENT`/`EPERM`/`EPROTECTED`). Use the options below only when the PDF must render
+   *inside your own layout* rather than as an overlay:
+
+1. **PDF.js rendered to canvas** — the real in-frame PDF experience:
+   ```js
+   await sg.loadJs('assets/pdf.min.js');            // classic/UMD build — ESM import() 404s
+   const wsrc = await sg.vfs.readText('assets/pdf.worker.min.js');
+   pdfjsLib.GlobalWorkerOptions.workerSrc =
+       URL.createObjectURL(new Blob([wsrc], { type: 'text/javascript' }));   // blob worker
+   const data = await sg.vfs.read('docs/report.pdf');
+   const pdf  = await pdfjsLib.getDocument({ data, isEvalSupported: false }).promise;
+   const page = await pdf.getPage(1);
+   const vp   = page.getViewport({ scale: 1.5 });
+   canvas.width = vp.width; canvas.height = vp.height;
+   await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+   ```
+   (`new Worker('path')` against a vault path 404s — hence the blob worker; PDF.js also
+   falls back to a main-thread "fake worker" if you skip `workerSrc`.)
+2. **Pre-rasterise at build time** (`pdftoppm` / PyMuPDF → one image per page in the vault,
+   rendered via `img.src`) — zero runtime dependencies, loses text selection.
+3. **`sg.vfs.download('docs/report.pdf')`** — hand the file to the OS viewer instead of
+   rendering inline. One call, host-fulfilled (see "Downloading files").
 
 ---
 
@@ -620,3 +1511,62 @@ If a typo accidentally introduces a declarative `<link>` or `<script src>`, the 
 - [Creating vaults-in-vaults and external-resource links](./SUB-VAULTS-AND-LINKS.md) — the `*.link.json` + `.vault/owner/ro-links.json` file formats and how to set them up from `sgit`
 - [Driving a vault app's `sg.*` from Playwright](./PLAYWRIGHT-VAULT-APP-ACCESS.md) — open a vault by key, reach the app iframe, call `sg.vfs`/`sg.history` headless
 - [Service Worker future architecture](./service-worker-future.md) — the planned upgrade that will lift the declarative-tag restriction
+
+---
+
+## Writing through a declared mount: receipts, `sg.fs.*`, and what is refused (2026-09-08)
+
+A folder declared by the vault owner with `<name>.link.json` is another vault. Your app uses plain
+`sg.vfs.*` / `sg.fs.*` on `<name>/…` and does not need to know. What you get back, and the edges:
+
+**Every mutation resolves with a receipt** — local or mounted, one shape:
+
+```js
+const r = await sg.vfs.write('data/report.json', bytes);
+// { path, size, commit_id: 'obj-cas-imm-…', published: true|false }
+await sg.fs.mkdir('data/poc');            // { created: true, commit_id, published }
+await sg.fs.move('data/a.txt', 'data/b.txt');   // { moved: true, to, commit_id, published }
+```
+
+- `commit_id` is the commit your mutation produced. `published: true` means the vault that holds
+  the file publishes it to its named branch **before** the call resolves (a mounted child kernel
+  does this with a compare-and-swap). It witnesses *that* publish; it does **not** guarantee the
+  commit survives a later blind push by another clone that was behind. Treat it as necessary, not
+  sufficient, before an irreversible follow-up (purge lazily on your next run, after a read-back).
+- A write to the host vault itself resolves `published: false` — it is committed at once and
+  published by the debounced auto-push. Declare `"host_events": { "vfs.published": true }` and
+  subscribe with `sg.on('vfs.published', ({ commit_id, count }) => …)` to be told when it lands.
+
+**`sg.fs.*` across a mount**
+
+| Call | Result |
+|---|---|
+| `sg.fs.mkdir('<mount>/…')` | ✅ relayed to the child kernel; receipt as above |
+| `sg.fs.move(a, b)` with **both** inside the **same** mount | ✅ relayed; rename or move inside the child |
+| `sg.fs.move(a, b)` across a mount boundary (in↔out, mount↔mount) | ❌ `EXDEV` — a move between two vaults is a copy plus a delete on two stores and can only leave partial state |
+| `sg.fs.delete('<mount>/…')` | ❌ `EUNDERPRIVILEGED` — destructive verbs across a vault boundary require per-request elevation (credential tiers); the issuance path does not exist yet. This is a stated decision, not a gap |
+
+Both gates still apply to every relayed verb: your own manifest's grant on the parent path
+(`"fs": { "write": ["data/"], "mkdir": ["data/"], "move": ["data/"] }`) **and** the child's own
+`.vault/app.json`. **The child's manifest is the real bound** — grant narrowly there
+(`"write": ["events/"]`), not `true`.
+
+**`sg.vault.mounts()`** returns a projection, one row per mount:
+
+```js
+[{ prefix: 'data/', access: 'rw'|'ro', declared: true, state: 'idle'|'unknown'|'clean'|'ahead'|'behind'|'diverged', at: 1725800000000|null }]
+```
+
+`state` is as of the host's last behind-check (tab focus, 30 s debounce) — **a write does not
+update it.** Use the write's receipt for your own write; use `state` for the mount's health.
+The child's vault id is not in the row; the owner's `<name>.link.json` is where it lives, readable
+by your app only because the owner put it there.
+
+**Three things that cost other teams days**
+
+- `.vault/app.json` **replaces** the root `app.json`, and a folder-level manifest replaces both —
+  nothing merges. Adding `fs` grants in the new location silently drops `append.*`, `network`,
+  `llm.*` unless you copy them forward.
+- `permissions.network: true` is what lets the frame reach any network at all (see *Egress* above).
+- `sg.vfs.write` refuses bodies over **3 MB** with `EFBIG`.
+

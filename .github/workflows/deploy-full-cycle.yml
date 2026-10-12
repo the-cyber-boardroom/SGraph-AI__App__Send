@@ -1,0 +1,185 @@
+# Deploy Full Cycle (ADR-16 / C1) — deploy every target → smoke every target → destroy
+# every target, in sequence, leaving the account empty. Proof that create AND destroy work.
+#
+# Auth: GitHub OIDC only (secret AWS_DEPLOY_ROLE_ARN = role to assume). No long-lived keys
+# in this workflow, ever. Without the secret, deploy jobs skip gracefully (image job still
+# runs). Bootstrap for the role is documented in deploy/aws/README.md's companion (Phase C3).
+#
+# Cost note: lambda-cfn is ~free; ec2/fargate cost real money while up — this pipeline
+# tears them down at the end of the same run (and on failure, via `if: always()`).
+
+name: Deploy Full Cycle
+
+on:
+  workflow_dispatch:
+    inputs:
+      targets:
+        description: 'Which targets to cycle'
+        type: choice
+        default: 'lambda'
+        options: [lambda, lambda+fargate, lambda+fargate+ec2]
+  schedule:
+    - cron: '0 3 * * *'        # nightly — catches teardown rot early
+
+env:
+  AWS_REGION: eu-west-2
+  STACK_PREFIX: sgsend-fullcycle
+
+permissions:
+  id-token: write               # OIDC
+  contents: read
+
+jobs:
+
+  build-image:
+    name: Build container image
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: meta
+        run: echo "tag=fullcycle-${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+      - name: Build (amd64 — the cycle's Lambda/Fargate arch)
+        run: docker build -f sgraph_ai_app_send__docker/Dockerfile -t sg-send-vault:${{ steps.meta.outputs.tag }} .
+      - name: Self-contained invariant (ADR-14) — network-isolated memory-mode smoke
+        run: |
+          docker run -d --name inv --network=none -e SEND__STORAGE_MODE=memory sg-send-vault:${{ steps.meta.outputs.tag }}
+          sleep 8
+          docker exec inv python -c "import urllib.request; assert b'ok' in urllib.request.urlopen('http://127.0.0.1:8080/api/info/health').read()"
+          docker exec inv python -c "import urllib.request; assert urllib.request.urlopen('http://127.0.0.1:8080/').status == 200"
+          docker rm -f inv
+      - name: Save image for deploy jobs
+        run: docker save sg-send-vault:${{ steps.meta.outputs.tag }} | gzip > /tmp/sg-send-image.tar.gz
+      - uses: actions/upload-artifact@v4
+        with: { name: sg-send-image, path: /tmp/sg-send-image.tar.gz, retention-days: 1 }
+
+  lint-templates:
+    name: Lint CFN templates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pipx install cfn-lint && cfn-lint deploy/aws/*.yml
+
+  check-oidc:
+    name: Check OIDC role configured
+    runs-on: ubuntu-latest
+    outputs:
+      has-role: ${{ steps.check.outputs.has-role }}
+    steps:
+      - id: check
+        run: |
+          if [ -n "${{ secrets.AWS_DEPLOY_ROLE_ARN }}" ]; then
+            echo "has-role=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has-role=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::AWS_DEPLOY_ROLE_ARN not set — deploy jobs skipped (image + lint still validated)"
+          fi
+
+  full-cycle:
+    name: Deploy → smoke → destroy
+    runs-on: ubuntu-latest
+    needs: [build-image, lint-templates, check-oidc]
+    if: needs.check-oidc.outputs.has-role == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: actions/download-artifact@v4
+        with: { name: sg-send-image, path: /tmp }
+
+      - name: Push image to ECR
+        id: ecr
+        run: |
+          docker load < /tmp/sg-send-image.tar.gz
+          ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+          REPO_URI=$ACCOUNT.dkr.ecr.$AWS_REGION.amazonaws.com/sg-send-vault
+          aws ecr describe-repositories --repository-names sg-send-vault >/dev/null 2>&1 || \
+            aws ecr create-repository --repository-name sg-send-vault >/dev/null
+          aws ecr get-login-password | docker login --username AWS --password-stdin $ACCOUNT.dkr.ecr.$AWS_REGION.amazonaws.com
+          docker tag sg-send-vault:${{ needs.build-image.outputs.image_tag }} $REPO_URI:${{ needs.build-image.outputs.image_tag }}
+          docker push $REPO_URI:${{ needs.build-image.outputs.image_tag }}
+          echo "image_uri=$REPO_URI:${{ needs.build-image.outputs.image_tag }}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate cycle access token (ephemeral — lives only in this run)
+        id: token
+        run: echo "value=$(openssl rand -hex 32)" >> "$GITHUB_OUTPUT"
+
+      # ── deploy + smoke, one target after another (sequential by design) ──
+
+      - name: 'Deploy: lambda.cfn'
+        run: |
+          aws cloudformation deploy --template-file deploy/aws/lambda.cfn.yml \
+            --stack-name $STACK_PREFIX-lambda --capabilities CAPABILITY_IAM --no-fail-on-empty-changeset \
+            --parameter-overrides ImageUri=${{ steps.ecr.outputs.image_uri }} \
+                                  Stage=fullcycle StorageMode=memory \
+                                  AccessToken=${{ steps.token.outputs.value }}
+          echo "LAMBDA_URL=$(aws cloudformation describe-stacks --stack-name $STACK_PREFIX-lambda \
+            --query 'Stacks[0].Outputs[?OutputKey==`FunctionUrl`].OutputValue' --output text)" >> "$GITHUB_ENV"
+
+      - name: 'Smoke: lambda'
+        run: |
+          pip install pytest requests
+          SG_BASE_URL=$LAMBDA_URL SG_ACCESS_TOKEN=${{ steps.token.outputs.value }} \
+            python -m pytest tests/deploy/targets/test_smoke__deployed_target.py -q
+
+      - name: 'Deploy: ecs-fargate.cfn'
+        if: contains(inputs.targets, 'fargate')
+        run: |
+          aws cloudformation deploy --template-file deploy/aws/ecs-fargate.cfn.yml \
+            --stack-name $STACK_PREFIX-fargate --capabilities CAPABILITY_IAM --no-fail-on-empty-changeset \
+            --parameter-overrides ImageRef=${{ steps.ecr.outputs.image_uri }} \
+                                  StorageMode=memory AccessToken=${{ steps.token.outputs.value }}
+          echo "FARGATE_URL=$(aws cloudformation describe-stacks --stack-name $STACK_PREFIX-fargate \
+            --query 'Stacks[0].Outputs[?OutputKey==`PublicUrl`].OutputValue' --output text)" >> "$GITHUB_ENV"
+
+      - name: 'Smoke: fargate'
+        if: contains(inputs.targets, 'fargate')
+        run: |
+          for i in $(seq 1 20); do curl -sf "$FARGATE_URL/api/info/health" -H "x-sgraph-access-token: ${{ steps.token.outputs.value }}" && break || sleep 15; done
+          SG_BASE_URL=$FARGATE_URL SG_ACCESS_TOKEN=${{ steps.token.outputs.value }} \
+            python -m pytest tests/deploy/targets/test_smoke__deployed_target.py -q
+
+      - name: 'Deploy: ec2.cfn (Docker Hub image — public path)'
+        if: contains(inputs.targets, 'ec2')
+        run: |
+          aws cloudformation deploy --template-file deploy/aws/ec2.cfn.yml \
+            --stack-name $STACK_PREFIX-ec2 --capabilities CAPABILITY_IAM --no-fail-on-empty-changeset \
+            --parameter-overrides StorageMode=memory AccessToken=${{ steps.token.outputs.value }}
+          echo "EC2_URL=$(aws cloudformation describe-stacks --stack-name $STACK_PREFIX-ec2 \
+            --query 'Stacks[0].Outputs[?OutputKey==`PublicUrl`].OutputValue' --output text)" >> "$GITHUB_ENV"
+
+      - name: 'Smoke: ec2 (first boot installs docker — allow time)'
+        if: contains(inputs.targets, 'ec2')
+        run: |
+          for i in $(seq 1 40); do curl -sf "$EC2_URL/api/info/health" -H "x-sgraph-access-token: ${{ steps.token.outputs.value }}" && break || sleep 15; done
+          SG_BASE_URL=$EC2_URL SG_ACCESS_TOKEN=${{ steps.token.outputs.value }} \
+            python -m pytest tests/deploy/targets/test_smoke__deployed_target.py -q
+
+      # ── destroy everything, reverse order, even on failure ──
+
+      - name: 'Destroy: all cycle stacks'
+        if: always()
+        run: |
+          for s in ec2 fargate lambda; do
+            aws cloudformation delete-stack --stack-name $STACK_PREFIX-$s 2>/dev/null || true
+          done
+          for s in ec2 fargate lambda; do
+            aws cloudformation wait stack-delete-complete --stack-name $STACK_PREFIX-$s 2>/dev/null || true
+          done
+
+      - name: 'Orphan sweep: assert nothing tagged sg-send survived from this cycle'
+        if: always()
+        run: |
+          LEFT=$(aws cloudformation list-stacks \
+            --stack-status-filter CREATE_COMPLETE UPDATE_COMPLETE DELETE_FAILED \
+            --query "StackSummaries[?starts_with(StackName, '$STACK_PREFIX')].StackName" --output text)
+          if [ -n "$LEFT" ]; then
+            echo "::error::Orphaned full-cycle stacks remain: $LEFT"
+            exit 1
+          fi
+          echo "Account clean — full cycle complete."

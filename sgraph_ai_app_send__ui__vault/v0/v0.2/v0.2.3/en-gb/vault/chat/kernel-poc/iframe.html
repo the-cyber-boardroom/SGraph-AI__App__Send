@@ -1,0 +1,82 @@
+<!doctype html>
+<!--
+  Vault Chat — kernel-PoC iframe (Phase 3 MVP)
+
+  Runs in a NULL-ORIGIN sandbox (the parent loads this with sandbox="allow-scripts"
+  and NO allow-same-origin). It loads:
+    - SecureChannel + Envelope (the real RPC transport from the kernel work)
+    - sg-app-stub (registers window.sg as a thin RPC layer to the parent)
+    - The Vault Chat library (memory working set, execution center, agentic loop)
+    - The product chat pane
+
+  No vault key, no access token, no dataSource lives in this frame. Every sg.vfs.*
+  call goes to the parent over the encrypted channel; the parent enforces
+  AppPermissions.isFloor (e.g. /.vault/** denied) before serving from its dataSource.
+-->
+<html lang="en-gb"><head>
+<meta charset="utf-8">
+<title>Vault Chat (kernel app)</title>
+<style>html,body{margin:0;height:100%;background:#0a0a18}vault-chat-pane{display:block;height:100vh}</style>
+
+<!-- SecureChannel transport (the new architecture's RPC primitive) -->
+<script src="../../../../_common/js/components/app-shell/secure-channel-envelope.js"></script>
+<script src="../../../../_common/js/components/app-shell/secure-channel.js"></script>
+
+<!-- App-side window.sg.* — PoC-scoped, uses ONLY SecureChannel.request/handle. -->
+<script src="./chat-app-stub.js"></script>
+
+<!-- Optional CDN LLM transport (may not load in null-origin sandbox; mock LLM works keyless) -->
+<script type="module" src="https://dev.tools.sgraph.ai/components/llm/sg-llm-events/v0/v0.1/v0.1.1/sg-llm-events.js"></script>
+<script type="module" src="https://dev.tools.sgraph.ai/components/llm/sg-llm-request/v0/v0.1/v0.1.6/sg-llm-request.js"></script>
+</head><body>
+
+<vault-chat-pane></vault-chat-pane>
+
+<!-- Vault Chat library (classic IIFEs attaching to window.VaultChat) -->
+<script src="../../../../_common/js/lib/vault-chat/memory-vfs.js"></script>
+<script src="../../../../_common/js/lib/vault-chat/tool-policies.js"></script>
+<script src="../../../../_common/js/lib/vault-chat/builtin-tools.js"></script>
+<script src="../../../../_common/js/lib/vault-chat/execution-center.js"></script>
+<script src="../../../../_common/js/lib/vault-chat/vault-flush-controller.js"></script>
+<script src="../../../../_common/js/lib/vault-chat/chat-session.js"></script>
+<script src="../../../../_common/js/lib/vault-chat/vault-chat-loop.js"></script>
+<script src="../../../../_common/js/lib/vault-chat/tools/consolidate-memory.js"></script>
+<script src="../../../../_common/js/lib/vault-chat/mock-sg.js"></script>
+<script src="../../../../_common/js/lib/vault-chat/llm-bus-adapter.js"></script>
+<script src="../test/mock-llm.js"></script>
+<script src="../../../../_common/js/components/vault-chat/vault-chat-pane.js"></script>
+
+<!-- After sg-app-stub finishes its handshake: wire the bridge into the chat pane,
+     then run a few probes from inside the iframe (the only place that can reach
+     window.sg, because the iframe is null-origin to the parent). Probe results are
+     reported via sg.ui.message events — the parent renders them in its side panel. -->
+<script>
+  function report(label, ok, detail) {
+    var text = (ok ? '✓ ' : '✗ ') + label + (detail ? '  ' + detail : '');
+    try { window.sg.ui.message(text, ok ? 'info' : 'error'); } catch (_) {}
+  }
+  async function probe(label, fn) {
+    try { var r = await fn(); report(label, true, r === undefined ? '' : '→ ' + String(typeof r === 'string' ? r : JSON.stringify(r)).slice(0, 80)); }
+    catch (e) { report(label, false, '→ ' + (e.code || 'E?') + ' ' + (e.message || '')); }
+  }
+
+  window.addEventListener('sg-app:ready', async function () {
+    var pane = document.querySelector('vault-chat-pane');
+    if (pane && window.sg) pane.setBridge(window.sg);
+    report('SecureChannel up — sg.* now over the encrypted channel', true);
+
+    // Functional probes (proves the kernel handlers serve real requests over the channel)
+    await probe('sg.vfs.list("/")',             function () { return window.sg.vfs.list('/').then(function (e) { return e.length + ' entries'; }); });
+    await probe('sg.vfs.readText("/notes.md")', function () { return window.sg.vfs.readText('/notes.md').then(function (s) { return s.length + 'B'; }); });
+    await probe('sg.vfs.write("/work/from-iframe.md") — needs grant + tier', function () {
+      var d = new TextEncoder().encode('hello from the null-origin iframe');
+      return window.sg.vfs.write('/work/from-iframe.md', d);
+    });
+
+    // Floor probes — these MUST be denied by the kernel even though the model
+    // could be jailbroken to ask for them. AppPermissions.isFloor is the boundary.
+    await probe('sg.vfs.list("/.vault") — must be EPROTECTED',                                function () { return window.sg.vfs.list('/.vault'); });
+    await probe('sg.vfs.readText("/.vault/secrets/openrouter.key") — must be EPROTECTED',     function () { return window.sg.vfs.readText('/.vault/secrets/openrouter.key'); });
+  });
+</script>
+</body></html>

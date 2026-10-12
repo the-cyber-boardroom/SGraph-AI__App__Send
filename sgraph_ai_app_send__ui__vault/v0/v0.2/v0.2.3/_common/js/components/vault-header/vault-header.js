@@ -61,6 +61,7 @@
                             <div class="vh-menu vh-sync-menu" style="display:none"></div>
                         </div>
                         <button class="vh-open-app-btn" style="display:none" title="Open app">&#9654; Open App</button>
+                        <button class="vh-llm-btn" type="button" title="AI Chat — ask about the files you attach">&#10024; AI Chat</button>
                         <div class="vh-overflow">
                             <button class="vh-overflow-btn" type="button" title="More" aria-haspopup="true" aria-expanded="false">&#8943;</button>
                             <div class="vh-menu vh-overflow-menu" style="display:none">
@@ -89,6 +90,7 @@
                 if (e.target.closest('.vh-mi--debug')) { this._closeMenus(); this._emit('vault-header-debug'); }
                 if (e.target.closest('.vh-mi--raw'))   { e.preventDefault(); this._closeMenus(); this._emit('vault-header-raw'); }
 
+                if (e.target.closest('.vh-llm-btn'))      this._emit('vault-header-llm');
                 if (e.target.closest('.vh-open-app-btn')) this._openApp();
                 if (e.target.closest('.vh-vault-name') && !e.target.closest('input')) this._startNameEdit();
             });
@@ -348,11 +350,20 @@
         }
 
         _fetchAppVersion() {
-            const el    = this.shadowRoot.querySelector('.vh-version');
-            const build = window.SGRAPH_BUILD;
-            if (el && build) {
-                el.textContent = `${build.appVersion}  .  UI ${build.uiVersion} (IFD)`;
-            }
+            // window.SGRAPH_BUILD is set by /_common/js/build-info.js, generated on every
+            // CI deploy by scripts/inject_build_version.py (and locally by build-vault-static.sh)
+            // from sgraph_ai_app_send/version. Showing this in the header is the reliable way
+            // to confirm you're looking at the latest version of the files. Falls back to the
+            // hardcoded UI version if build-info.js wasn't loaded (which would itself be a
+            // deploy bug — the script tag is in index.html).
+            const el = this.shadowRoot.querySelector('.vh-version');
+            if (!el) return;
+            const build      = window.SGRAPH_BUILD || {};
+            const appVersion = build.appVersion || '';
+            const uiVersion  = build.uiVersion  || 'v0.2.3';
+            el.textContent = appVersion
+                ? `${appVersion}  .  UI ${uiVersion} (IFD)`
+                : `UI ${uiVersion} (IFD)`;
         }
 
         _openApp() {
@@ -474,6 +485,15 @@
             font-weight: 700; white-space: nowrap;
         }
         .vh-open-app-btn:hover { background: var(--color-primary-hover, #3dbdb5); border-color: var(--color-primary-hover, #3dbdb5); }
+
+        /* --- AI Chat (secondary) — the top-level way in, independent of any open file --- */
+        .vh-llm-btn {
+            font-size: var(--text-small); padding: 0.3rem 0.6rem; border-radius: var(--radius-sm);
+            border: 1px solid var(--color-border); background: transparent;
+            color: var(--color-text-secondary); cursor: pointer; font-family: var(--font-family);
+            white-space: nowrap;
+        }
+        .vh-llm-btn:hover { color: var(--color-text); border-color: var(--color-primary); }
 
         /* --- Overflow --- */
         .vh-overflow { position: relative; }

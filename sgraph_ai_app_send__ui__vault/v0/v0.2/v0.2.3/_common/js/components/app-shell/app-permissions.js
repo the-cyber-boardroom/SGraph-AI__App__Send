@@ -13,7 +13,8 @@
      appId(bytes)              — SHA-256 hex of the canonical app.json bytes (consent-cache identity)
 
    Verbs: 'fs.read' 'fs.list' 'fs.write' 'fs.move' 'fs.delete' 'fs.mkdir'
-          'vault.create' 'vault.unlink' 'vault.delete'
+          'vault.create' 'vault.createKey' 'vault.standalone' 'vault.seedFrom'
+          'vault.openApp' 'vault.embedAccessToken' 'vault.unlink' 'vault.mount' 'vault.delete'
    ================================================================================= */
 
 (function () {
@@ -83,11 +84,33 @@
     // Parse app.json.permissions into a normalised shape. Defensive: missing/junk blocks
     // collapse to deny-all-mutations (reads still follow READ_DEFAULT). `fs.read` absent is
     // kept as undefined so `can` can apply the default; present-but-false denies reads.
+    // Consent policy per verb (how the HUD confirmation behaves). Declared by the app's author
+    // in app.json — the same trust boundary as the grants themselves. Values:
+    //   'always' — re-confirm every time (default for createKey/delete; never cached)
+    //   'once'   — prompt once per (vault, app, verb), then remember
+    //   'auto'   — never prompt (trust the grant alone). For high-privilege verbs this is a
+    //              deliberate "I trust this app" choice by whoever authored the manifest.
+    // Anything malformed → undefined (callers fall back to the per-verb default).
+    function _consentPolicy(c) {
+        var out = {};
+        if (c && typeof c === 'object') {
+            for (var k in c) {
+                if (!Object.prototype.hasOwnProperty.call(c, k)) continue;
+                var v = c[k];
+                if (v === 'always' || v === 'once' || v === 'auto') out[k] = v;
+            }
+        }
+        return out;
+    }
+
     function parsePermissions(appJson) {
         var p     = (appJson && appJson.permissions) || {};
         var fs    = (p.fs    && typeof p.fs    === 'object') ? p.fs    : {};
         var vault = (p.vault && typeof p.vault === 'object') ? p.vault : {};
+        var append = (p.append && typeof p.append === 'object') ? p.append : {};
+        var llm    = (p.llm    && typeof p.llm    === 'object') ? p.llm    : {};
         return {
+            consent: _consentPolicy(p.consent),
             fs: {
                 read:  ('read' in fs) ? _grant(fs.read) : undefined,
                 write:  _grant(fs.write),
@@ -96,11 +119,67 @@
                 mkdir:  _grant(fs.mkdir)
             },
             vault: {
-                create:   _grant(vault.create),
-                unlink:   _grant(vault.unlink),
-                mount:    _grant(vault.mount),       // ViV Phase 2: parent → child kernel spawn
-                'delete': vault['delete'] === true   // bool only (always consent-gated)
-            }
+                create:           _grant(vault.create),      // read-through create (existing)
+                createKey:        _grant(vault.createKey),   // create + RETURN key / getKey (stronger; path-grant)
+                standalone:       vault.standalone === true,   // allow create with no parent link (bool)
+                seedFrom:         _grant(vault.seedFrom),    // source paths/refs allowed as seedFrom (path-grant)
+                openApp:          vault.openApp === true,       // allow sg.vault.openApp (bool)
+                embedAccessToken: vault.embedAccessToken === true, // embed a backend access token in a vault (bool)
+                unlink:           _grant(vault.unlink),
+                mount:            _grant(vault.mount),       // ViV Phase 2: parent → child kernel spawn
+                notify:           vault.notify === true,       // cross-vault peer wake (sg.vault.notify) — bool, default-deny
+                'delete':         vault['delete'] === true     // bool only (always consent-gated)
+            },
+            // Append transport (sg.append.*) — all booleans, default-deny. Not path-scoped:
+            // append anchors are server-held, not vault paths. The kernel holds the keys and
+            // attaches the gate headers; these grants decide which verbs an app may call.
+            append: {
+                configure:     append.configure     === true,
+                write:         append.write         === true,
+                list:          append.list          === true,
+                read:          append.read          === true,   // fetch ciphertext
+                markProcessed: append.markProcessed === true,
+                purge:         append.purge         === true
+            },
+            // externalLinks (bool, default-deny). When TRUE the app frame is granted
+            // allow-popups + allow-popups-to-escape-sandbox so external <a href> links
+            // open as real new tabs via in-frame window.open (frictionless). When FALSE
+            // (default) the frame gets NEITHER token; external clicks are routed to the
+            // host, which opens them after a one-click user confirm (no escape-sandbox).
+            // Default-deny is the least-privilege posture: escape-sandbox is opt-in only.
+            externalLinks: (p.externalLinks === true),
+
+            // downloads (bool, default-deny). When TRUE sg.vfs.download saves without a
+            // per-file confirm. When FALSE (default) each download surfaces a one-click
+            // HUD confirm naming the file and size. Either way the save itself runs in
+            // the HOST document (real origin) — the app frame never needs allow-downloads.
+            downloads: (p.downloads === true),
+
+            // LLM access (sg.llm.*) — all booleans, default-deny. These declare INTENT
+            // only. The capability is the INTERSECTION of this and the vault admin's
+            // `.vault/llm/config.json` (key, allowed models, spend caps): an app that
+            // declares chat in a vault with no key gets ENOKEY, and a configured vault
+            // grants nothing to an app that didn't declare it. Deliberately NO limits
+            // here — a cap the app author sets is not a cap.
+            // `listen` (microphone) is its OWN grant, never implied by `chat`: recording a
+            // room is a categorically different act from sending text, and an app that can
+            // talk to a model should not thereby be able to open a microphone.
+            llm: {
+                chat  : llm.chat   === true,
+                models: llm.models === true,
+                usage : llm.usage  === true,
+                listen: llm.listen === true
+            },
+
+            // network (bool, default-deny) — the CSP escape hatch. App frames are served with
+            // `<meta http-equiv="Content-Security-Policy" content="connect-src blob: data:">`
+            // (no network hosts reachable), so the postMessage bridge is the only way out and
+            // everything that leaves the frame is permission-checked. TRUE omits that meta for
+            // apps that genuinely need to call a third-party API directly, and the HUD then
+            // shows a standing "direct network access" chip so the exception is never silent.
+            // Enforced in app-shell._buildVfsBridgeScript (the CSP is prefixed to the injected
+            // bridge, which AppFrameBootstrap puts first in <head> on all four srcdoc paths).
+            network: (p.network === true)
         };
     }
 
@@ -137,8 +216,18 @@
             return _match(perm.fs[act], path);
         }
         if (grp === 'vault') {
-            if (act === 'delete') return perm.vault['delete'] === true;
-            return _match(perm.vault[act], path);
+            if (act === 'delete')           return perm.vault['delete'] === true;
+            if (act === 'standalone')       return perm.vault.standalone === true;
+            if (act === 'openApp')          return perm.vault.openApp === true;
+            if (act === 'embedAccessToken') return perm.vault.embedAccessToken === true;
+            if (act === 'notify')           return perm.vault.notify === true;
+            return _match(perm.vault[act], path);   // create, createKey, seedFrom, unlink, mount
+        }
+        if (grp === 'append') {
+            return !!(perm.append && perm.append[act] === true);   // all booleans, default-deny
+        }
+        if (grp === 'llm') {
+            return !!(perm.llm && perm.llm[act] === true);         // all booleans, default-deny
         }
         return false;
     }

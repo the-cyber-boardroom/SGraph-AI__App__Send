@@ -8,11 +8,23 @@
      3  passphrase:alnum_id <pass>:<4–24 a-z0-9>         (rw) derivation: PBKDF2
      4  read-only cred      <vault_id> <64-hex read_key>  (ro) no derivation needed
      5  ro-token            ro-word-word-NNNN             (ro) resolve via transfers API
-     6  server access token opaque string — orthogonal axis, not handled here
+     6  read-key cred       <64-hex read_key>:<vault_id>  (ro) sgit CLI clone parity
+     —  server access token opaque string — orthogonal axis, not handled here
 
    Detection order matters: #2 is a strict subset of #3, so it must be checked first.
+   Format 6 must be checked BEFORE #2/#3 — a 64-hex head would otherwise parse as a
+   passphrase, PBKDF2 into garbage keys, and fail late as "HEAD ref missing". The
+   sgit CLI made the same call (a 64-hex head always routes to read-only clone), so
+   the one edge case — a passphrase that IS 64 lowercase hex — resolves identically
+   in both tools.
    The passphrase may itself contain colons (e.g. "pass:with:colons:vault_id") — the
    vault_id is always the segment after the LAST colon, matching SGVaultCrypto.parseVaultKey.
+
+   Prefixed keys: the sgit CLI's self-identifying prefixes (sgit_private_vault_,
+   sgit_private_read_, sgit_public_read_, and legacy sgit_vk1_ / sgit_rk1_) are
+   stripped before detection — the value after the prefix is byte-identical to the
+   bare key, so `sgit_public_read_{64hex}:{id}` detects as format 6 and
+   `sgit_private_vault_{pass}:{id}` as format 2/3.
 
    Load order: no dependencies (pure regex, no globalThis reads).
    ================================================================================= */
@@ -25,10 +37,26 @@
     var RE_ALNUM_PART   = /^[a-z0-9]{4,24}$/;
     var RE_READ_ONLY    = /^([a-z0-9]{4,24})\s+([a-f0-9]{64})$/;
     var RE_RO_TOKEN     = /^ro-([a-z]+-[a-z]+-\d{4})$/;
+    var RE_READ_KEY     = /^([a-f0-9]{64}):([a-z0-9]{4,24})$/;
+
+    // Inline twin of SGVaultCrypto.stripKeyPrefix (sgit-ai KEY_PREFIXES, naming
+    // revised 08/17) — this module is pure/dep-free by contract (loaded before the
+    // crypto lib on some pages), so it cannot call it. Kept in the SAME order as the
+    // crypto list and guarded against drift by test__format_detection.js.
+    var KEY_PREFIXES = ['sgit_private_vault_', 'sgit_private_read_', 'sgit_public_read_',
+                        'sgit_vk1_', 'sgit_rk1_'];
+
+    function _stripKeyPrefix(s) {
+        for (var i = 0; i < KEY_PREFIXES.length; i++) {
+            if (s.indexOf(KEY_PREFIXES[i]) === 0) return s.slice(KEY_PREFIXES[i].length);
+        }
+        return s;
+    }
 
     function detectFormat(input) {
         var s = (input || '').trim();
         if (!s) throw new Error('Vault key cannot be empty');
+        s = _stripKeyPrefix(s);
 
         // Format 5 — ro-token: ro-word-word-NNNN (must be checked before Format 1)
         var m5 = RE_RO_TOKEN.exec(s);
@@ -46,6 +74,18 @@
                 format: 1,
                 kind:   'simple-token',
                 parts:  { passphrase: s, vaultId: null, raw: s }
+            };
+        }
+
+        // Format 6 — read-key credential: <64-hex read_key>:<vault_id>. MUST be
+        // checked before formats 2/3 (see header). Same shape the sgit CLI clones
+        // read-only from; same {vault_id, read_key} pair as format 4, colon-joined.
+        var m6 = RE_READ_KEY.exec(s);
+        if (m6) {
+            return {
+                format: 6,
+                kind:   'read-key',
+                parts:  { vaultId: m6[2], readKeyHex: m6[1], passphrase: null, raw: s }
             };
         }
 
@@ -87,7 +127,7 @@
 
         throw new Error(
             'Unrecognised vault key format. Expected: word-word-NNNN, passphrase:vault_id, ' +
-            'or "vault_id read_key_hex". Got: ' + s.slice(0, 60)
+            'read_key_hex:vault_id, or "vault_id read_key_hex". Got: ' + s.slice(0, 60)
         );
     }
 

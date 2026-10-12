@@ -30,15 +30,22 @@
                     var icon = c.method === 'vfs.read'    ? '📖'
                              : c.method === 'vfs.write'   ? '✏️'
                              : c.method === 'vfs.list'    ? '📂'
+                             : c.method === 'vfs.commit'  ? '💾'
                              : c.method === 'vfs.nav'     ? '→'
                              : c.method === 'ui.message'  ? '💬'
+                             : c.method && c.method.startsWith('tool') ? '🛠'
+                             : c.method && c.method.startsWith('llm')  ? '🤖'
                              : c.method && c.method.startsWith('git') ? '↕'
                              : c.method && c.method.startsWith('auth') ? '🔑' : '•';
                     var detail = '';
                     if (c.path)  detail += _esc(c.path);
                     if (c.bytes != null) detail += ' ' + _fmtBytes(c.bytes);
                     if (c.count != null) detail += ' ' + c.count + ' entries';
+                    if (c.mode)  detail += ' [' + _esc(c.mode) + ']';
                     if (c.text)  detail += ' "' + _esc(String(c.text).slice(0, 60)) + '"';
+                    if (c.cost)  detail += ' $' + Number(c.cost).toFixed(4);
+                    if (c.refused) detail += ' REFUSED:' + _esc(c.reason || 'budget');
+                    if (c.denied)  detail += ' denied';
                     if (c.err)   detail += ' ERR: ' + _esc(c.err);
                     var okClass = c.ok === false ? ' row-err' : '';
                     return '<div class="row' + okClass + '">' +

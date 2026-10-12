@@ -25,6 +25,33 @@
             // HUD config from app.json (resolved with defaults — see _resolvedHudCfg).
             this._hudCfg    = null;
             this._menuOpen  = false;
+            // Live file-activity meter (power-user value): session-cumulative read/write
+            // counts + a recent-ops list, fed by the `app-debug:bridge-call` event the
+            // kernel already emits for every vfs/fs op. Pure consumer — no kernel change.
+            this._actR = 0; this._actW = 0; this._actErr = 0; this._actRecent = [];
+            this._actA = 0;   // AI calls — their own lane; folding them into R hides them
+
+            // The session cost pill (A1 of the 08/16 brief). Ledger-driven and standing:
+            // "this app is spending money" must be observable at ANY moment, not only in
+            // the six seconds after the first call (the old toast). subscribe() also fires
+            // on reconciliation, so the ~estimate upgrades to the billed figure in place.
+            if (globalThis.VaultLlmLog) {
+                this._llmCostUnsub = VaultLlmLog.subscribe(() => this._renderLlmCost());
+                this._renderLlmCost();
+            }
+        }
+
+        // Whole-session figure by design (one bill per session — the 08/13 decision);
+        // per-app enforcement happens in the kernel against totals(appId).
+        _renderLlmCost() {
+            var el = this.shadowRoot && this.shadowRoot.querySelector('.hud-llm-cost');
+            if (!el || !globalThis.VaultLlmLog) return;
+            var t = VaultLlmLog.totals();
+            if (!t.calls) { el.style.display = 'none'; return; }
+            el.style.display = '';
+            el.textContent = '✨ ' + (t.estimatedCost > 0 ? '~' : '') + '$' + t.totalCost.toFixed(4) +
+                             ' · ' + t.calls + (t.pending ? ' …' : '');
+            el.classList.toggle('hud-llm-cost--busy', t.pending > 0);
         }
 
         connectedCallback() {
@@ -39,19 +66,34 @@
                         </div>
                         <div class="hud-center">
                             <span class="hud-msg" style="display:none"></span>
-                            <span class="hud-consent" style="display:none">
-                                <span class="hud-consent-text"></span>
-                                <button class="hud-consent-allow">Allow</button>
-                                <button class="hud-consent-deny">Deny</button>
-                            </span>
                         </div>
                         <div class="hud-right">
-                            <a class="hud-vault-link" data-hud-el="openVault" href="#" style="display:none" title="Open vault">Open Vault</a>
-                            <button class="hud-copy-btn" data-hud-el="copyLink" style="display:none" title="Copy app link">⎘ Copy Link</button>
-                            <button class="hud-print-btn" data-hud-el="print" style="display:none" title="Print this app (opens a print-friendly preview)">&#128424; Print</button>
-                            <span class="hud-privs-chip" style="display:none" title="What this app is allowed to do"></span>
+                            <a class="hud-vault-link" data-hud-el="openVault" href="#" style="display:none" title="Open the vault file browser">&#8612; Open Vault</a>
+                            <button class="hud-llm-btn" data-hud-el="llm" type="button" title="AI Chat — ask about this vault, by text or voice">&#10024; AI</button>
+                            <button class="hud-llm-cost" data-hud-el="llmCost" type="button" style="display:none" title="AI spend this session, all surfaces — click for the request ledger"></button>
+                            <div class="hud-privs-wrap" style="display:none">
+                                <button class="hud-privs-chip" type="button" aria-haspopup="true" aria-expanded="false" title="What this app is allowed to do"></button>
+                                <div class="hud-privs-pop" style="display:none"></div>
+                            </div>
+                            <div class="hud-activity-wrap" data-hud-el="activity">
+                                <button class="hud-activity-chip" type="button" aria-haspopup="true" aria-expanded="false" title="Files this app has read / written this session">⇅ <span class="hud-act-r">R0</span> <span class="hud-act-w">W0</span></button>
+                                <div class="hud-activity-pop" style="display:none"></div>
+                            </div>
                             <span class="hud-ro-badge" style="display:none">👁 Read-only</span>
-                            <button class="hud-debug-btn" data-hud-el="debug" title="Toggle debug panel">🔍 Debug</button>
+                            <div class="hud-rel-wrap" style="display:none">
+                                <select class="hud-rel-sel" title="Version of this app"></select>
+                            </div>
+                            <span class="hud-rel-badge" style="display:none" title="You are viewing a published release, not the latest version"></span>
+                            <button class="hud-update-btn" style="display:none" type="button"
+                                    title="Someone published new content. Click to load it — anything unsaved in the app will be lost.">&#8635; <span class="hud-update-text">New version available</span></button>
+                            <div class="hud-more-wrap" data-hud-el="more">
+                                <button class="hud-more-btn" type="button" aria-haspopup="true" aria-expanded="false" title="More actions">&#8943;</button>
+                                <div class="hud-more-panel" style="display:none">
+                                    <button class="hud-mi hud-copy-btn"  data-hud-el="copyLink" style="display:none">⎘ Copy app link</button>
+                                    <button class="hud-mi hud-print-btn" data-hud-el="print"    style="display:none">&#128424; Print…</button>
+                                    <button class="hud-mi hud-debug-btn" data-hud-el="debug">🔍 Debug panel</button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div class="navrow" data-hud-el="navBar" style="display:none">
@@ -72,14 +114,73 @@
                         </div>
                     </div>
                 </div>
+                <!-- Consent bar — a SIBLING of .hud-wrap so it renders even when the chrome row
+                     is hidden (modes 'hidden'/'none'). Full-width so the message never truncates;
+                     co-locates the request, the app's standing grants, and Allow/Deny. -->
+                <div class="hud-consent-bar" style="display:none"
+                     role="alertdialog" aria-label="Vault permission request" aria-live="assertive"
+                     data-testid="hud-consent">
+                    <span class="hud-consent-icon" aria-hidden="true">🔐</span>
+                    <div class="hud-consent-body">
+                        <div class="hud-consent-text" data-testid="hud-consent-text"></div>
+                        <div class="hud-consent-grants" data-testid="hud-consent-grants" style="display:none"></div>
+                    </div>
+                    <div class="hud-consent-actions">
+                        <button class="hud-consent-deny"  data-testid="hud-consent-deny"  aria-label="Deny">Deny</button>
+                        <button class="hud-consent-allow" data-testid="hud-consent-allow" aria-label="Approve">Allow</button>
+                    </div>
+                </div>
+                <!-- External-link confirm (Option D): an app without the externalLinks grant
+                     asked to open a URL. Shown as a full-width sibling so it works in every hud
+                     mode; the Open button click is the user gesture that lets window.open run. -->
+                <div class="hud-extlink-bar" style="display:none" role="alertdialog" aria-label="Open external link" data-testid="hud-extlink">
+                    <span class="hud-extlink-icon" aria-hidden="true">↗</span>
+                    <div class="hud-extlink-body">
+                        <span class="hud-extlink-label">This app wants to open an external site:</span>
+                        <span class="hud-extlink-url" data-testid="hud-extlink-url"></span>
+                    </div>
+                    <div class="hud-extlink-actions">
+                        <button class="hud-extlink-dismiss" data-testid="hud-extlink-dismiss">Dismiss</button>
+                        <button class="hud-extlink-open" data-testid="hud-extlink-open">Open ↗</button>
+                    </div>
+                </div>
                 <button class="hud-escape" style="display:none" title="Exit app and return to vault">×&nbsp;Exit app</button>
             `;
 
+            // Release picker. The HUD never owns which version is running — it emits the
+            // request and app-shell re-mounts, same contract as the nav row.
+            this.shadowRoot.addEventListener('change', (e) => {
+                if (e.target.closest('.hud-rel-sel')) {
+                    this.dispatchEvent(new CustomEvent('app-hud:release-change', {
+                        detail: { name: e.target.value }, bubbles: true, composed: true
+                    }));
+                }
+            });
+
             this.shadowRoot.addEventListener('click', (e) => {
-                if (e.target.closest('.hud-copy-btn'))   this._copyLink();
-                if (e.target.closest('.hud-print-btn'))  this._onPrintClick();
-                if (e.target.closest('.hud-debug-btn'))  this._toggleDebug();
-                if (e.target.closest('.hud-privs-chip')) this._onPrivsClick();
+                if (e.target.closest('.hud-rec-stop'))   { this._recOpts && this._recOpts.onStop   && this._recOpts.onStop();   return; }
+                if (e.target.closest('.hud-rec-cancel')) { this._recOpts && this._recOpts.onCancel && this._recOpts.onCancel(); return; }
+                // ⋯ overflow menu + privileges popover (expand-on-click).
+                // AI Chat — host chrome, not app UI. It runs at the real origin, so it holds
+                // the vault key and the microphone directly; the app frame never sees either.
+                if (e.target.closest('.hud-update-btn')) {
+                    if (this._onUpdate) this._onUpdate();
+                    return;
+                }
+                if (e.target.closest('.hud-llm-btn')) {
+                    return this.dispatchEvent(new CustomEvent('app-hud:llm', { bubbles: true, composed: true }));
+                }
+                if (e.target.closest('.hud-llm-cost')) {
+                    return this.dispatchEvent(new CustomEvent('app-hud:llm-ledger', { bubbles: true, composed: true }));
+                }
+                if (e.target.closest('.hud-more-btn'))     { e.stopPropagation(); return this._toggleMore(); }
+                if (e.target.closest('.hud-privs-chip'))   { e.stopPropagation(); return this._togglePrivsPop(); }
+                if (e.target.closest('.hud-privs-reset'))  { return this._resetConsents(); }
+                if (e.target.closest('.hud-activity-chip')){ e.stopPropagation(); return this._toggleActivityPop(); }
+                // Menu actions — run, then collapse the menu.
+                if (e.target.closest('.hud-copy-btn'))   { this._copyLink();      this._toggleMore(false); }
+                if (e.target.closest('.hud-print-btn'))  { this._onPrintClick();  this._toggleMore(false); }
+                if (e.target.closest('.hud-debug-btn'))  { this._toggleDebug();   this._toggleMore(false); }
                 // Nav row buttons — dispatch events that app-shell listens to.
                 if (e.target.closest('.navrow-back'))    this._emitNavEvent('back');
                 if (e.target.closest('.navrow-forward')) this._emitNavEvent('forward');
@@ -113,14 +214,130 @@
             // Listen for nav-state changes from app-shell (back/forward arrows + path display).
             this._navChangeHandler = (ev) => this.setNavState(ev.detail || {});
             document.addEventListener('app-nav:change', this._navChangeHandler);
+
+            // Live file-activity meter: the kernel already dispatches `app-debug:bridge-call`
+            // for every vfs/fs op (it's what the debug pane consumes). We just tally it.
+            this._bridgeCallHandler = (ev) => this._onBridgeCall(ev.detail || {});
+            document.addEventListener('app-debug:bridge-call', this._bridgeCallHandler);
         }
 
         disconnectedCallback() {
             if (this._navChangeHandler) document.removeEventListener('app-nav:change', this._navChangeHandler);
+            if (this._bridgeCallHandler) document.removeEventListener('app-debug:bridge-call', this._bridgeCallHandler);
             if (this._docClickHandler) document.removeEventListener('click', this._docClickHandler);
+            if (this._llmCostUnsub) { try { this._llmCostUnsub(); } catch (_) {} this._llmCostUnsub = null; }
+            clearTimeout(this._actPulseTimer);
         }
 
         // Called by page script with vault/app metadata.
+        // ── Voice capture bar ────────────────────────────────────────────────────
+        // A full-width sibling of the chrome row (same structural slot as the consent
+        // bar), so it shows in EVERY hud mode including `hidden`/`none`. An app must not
+        // be able to run the microphone without the user seeing it — that is the whole
+        // reason capture lives on host chrome rather than in the app frame.
+        //
+        // `onStop`/`onCancel` are supplied by app-shell; the HUD owns no audio.
+        showRecording(opts) {
+            opts = opts || {};
+            this._recOpts = opts;
+            var bar = this.shadowRoot.querySelector('.hud-rec-bar');
+            if (!bar) {
+                bar = document.createElement('div');
+                bar.className = 'hud-rec-bar';
+                var host = this.shadowRoot.querySelector('.hud') || this.shadowRoot;
+                host.appendChild(bar);
+            }
+            this._recStart = Date.now();
+            var render = () => {
+                var secs = Math.floor((Date.now() - this._recStart) / 1000);
+                var mm = String(Math.floor(secs / 60)).padStart(2, '0');
+                var ss = String(secs % 60).padStart(2, '0');
+                bar.innerHTML =
+                    '<span class="hud-rec-dot"></span>' +
+                    '<span class="hud-rec-label">Recording — your microphone is on</span>' +
+                    '<span class="hud-rec-time">' + mm + ':' + ss + '</span>' +
+                    '<button class="hud-rec-stop" type="button">■ Stop &amp; send</button>' +
+                    '<button class="hud-rec-cancel" type="button">Cancel</button>';
+            };
+            render();
+            clearInterval(this._recTimer);
+            this._recTimer = setInterval(render, 1000);
+            bar.style.display = 'flex';
+            setTimeout(() => { this.shadowRoot.querySelector('.hud-rec-stop')?.focus(); }, 0);
+        }
+
+        setRecordingBusy(text) {
+            var bar = this.shadowRoot.querySelector('.hud-rec-bar');
+            if (!bar) return;
+            clearInterval(this._recTimer);
+            bar.innerHTML = '<span class="hud-rec-dot hud-rec-dot--busy"></span>' +
+                            '<span class="hud-rec-label">' + AppHud._escapeHtml(text || 'Transcribing…') + '</span>';
+        }
+
+        hideRecording() {
+            clearInterval(this._recTimer);
+            var bar = this.shadowRoot.querySelector('.hud-rec-bar');
+            if (bar) { bar.style.display = 'none'; bar.innerHTML = ''; }
+            this._recOpts = null;
+        }
+
+        // ── Release channels ─────────────────────────────────────────────────────
+        // Rendered ONLY when the vault publishes releases (`.vault/releases.json`), so a
+        // vault that never opted in gains no chrome at all. The picker is host chrome by
+        // design: which version is running is not a decision the versioned app gets to make.
+        setReleases(config, current) {
+            const wrap  = this.shadowRoot.querySelector('.hud-rel-wrap');
+            const sel   = this.shadowRoot.querySelector('.hud-rel-sel');
+            const badge = this.shadowRoot.querySelector('.hud-rel-badge');
+            if (!wrap || !sel || !badge) return;
+
+            if (!config || !config.releases || !config.releases.length) {
+                wrap.style.display = 'none'; badge.style.display = 'none';
+                return;
+            }
+            const live = !current || current.live;
+            const opts = [];
+            if (config.allowLive !== false) {
+                opts.push('<option value="live"' + (live ? ' selected' : '') + '>Live (latest)</option>');
+            }
+            config.releases.forEach((r) => {
+                const text = r.label ? (r.label + ' · ' + r.name) : r.name;
+                const on   = !live && current && current.name === r.name;
+                opts.push('<option value="' + AppHud._escapeHtml(r.name) + '"' + (on ? ' selected' : '') + '>' + AppHud._escapeHtml(text) + '</option>');
+            });
+            sel.innerHTML = opts.join('');
+            wrap.style.display = '';
+
+            // The gentle clue: a calm amber pill whenever this is NOT the latest version.
+            // Someone who cannot edit, or who is demoing an older build, must be able to
+            // see why at a glance — without it, "the app is broken" is the natural reading.
+            if (live) {
+                badge.style.display = 'none';
+            } else {
+                badge.textContent   = '⏱ ' + (current.label || current.name);
+                badge.style.display = '';
+            }
+        }
+
+        // A NOTICE, not an action. The host used to fast-forward and remount the app frame
+        // the moment someone else published — taking any unsaved state in the running app
+        // with it. Detection is worth keeping; applying is the user's call, and the tooltip
+        // says plainly what clicking costs.
+        showUpdate(text, onApply) {
+            this._onUpdate = onApply || null;
+            var btn = this.shadowRoot && this.shadowRoot.querySelector('.hud-update-btn');
+            if (!btn) return;
+            var label = btn.querySelector('.hud-update-text');
+            if (label && text) label.textContent = text;
+            btn.style.display = '';
+        }
+
+        hideUpdate() {
+            this._onUpdate = null;
+            var btn = this.shadowRoot && this.shadowRoot.querySelector('.hud-update-btn');
+            if (btn) btn.style.display = 'none';
+        }
+
         setInfo(vaultName, appTitle, vaultKey, isRO) {
             this._vaultKey = vaultKey;
             this._vaultName = vaultName;
@@ -169,60 +386,365 @@
         // makes the otherwise-invisible grants legible to the user. Phase 4 makes it clickable
         // (permissions panel / revoke). No grants beyond default reads → chip hidden.
         setPrivileges(perm) {
+            var wrap = this.shadowRoot.querySelector('.hud-privs-wrap');
             var chip = this.shadowRoot.querySelector('.hud-privs-chip');
-            if (!chip) return;
-            var labels = [];
+            if (!wrap || !chip) return;
+
+            // Map raw grant verbs to user-facing language + a risk tier. Destructive
+            // (irreversible) grants are flagged so they can be visually separated from
+            // benign ones — collapsing them all into one neutral yellow blob hid the risk.
             var fs = (perm && perm.fs) || {};
             var vault = (perm && perm.vault) || {};
             function granted(v) { return v === true || (Array.isArray(v) && v.length > 0); }
-            if (granted(fs.write))  labels.push('write');
-            if (granted(fs.move))   labels.push('move');
-            if (granted(fs['delete'])) labels.push('delete');
-            if (granted(fs.mkdir))  labels.push('mkdir');
-            if (granted(vault.create)) labels.push('create-vault');
-            if (granted(vault.unlink)) labels.push('unlink-vault');
-            if (vault['delete'] === true) labels.push('delete-vault');
-            if (labels.length === 0) { chip.style.display = 'none'; return; }
-            chip.textContent = '🔓 ' + labels.join(' · ');
-            chip.title = 'This app is allowed to: ' + labels.join(', ');
-            chip.style.display = '';
+            var list = [];
+            if (granted(fs.write))        list.push({ label: 'write files',    danger: false });
+            if (granted(fs.move))         list.push({ label: 'move files',     danger: false });
+            if (granted(fs.mkdir))        list.push({ label: 'create folders', danger: false });
+            if (granted(vault.create))    list.push({ label: 'create vaults',  danger: false });
+            if (granted(fs['delete']))    list.push({ label: 'delete files',   danger: true  });
+            if (granted(vault.unlink))    list.push({ label: 'unlink vaults',  danger: true  });
+            if (vault['delete'] === true) list.push({ label: 'delete vaults',  danger: true  });
+            // LLM access spends the vault owner's money — surface it as a standing grant,
+            // not just a transient toast on first use.
+            var llm = (perm && perm.llm) || {};
+            if (llm.chat   === true) list.push({ label: 'use AI models (costs money)', danger: false });
+            if (llm.listen === true) list.push({ label: 'use the microphone',          danger: true  });
+            // `network` removes the connect-src CSP from the app frame: this app can reach
+            // any host directly, so decrypted vault content it holds is no longer contained
+            // by the bridge. Flagged danger because it is the one grant that re-opens egress.
+            if (perm && perm.network === true) list.push({ label: 'direct network access (uncontained egress)', danger: true });
+            // Destructive grants sort last so the expanded list ends on the ones that matter.
+            list.sort(function (a, b) { return (a.danger ? 1 : 0) - (b.danger ? 1 : 0); });
+            this._privList = list;
+
+            if (list.length === 0) { wrap.style.display = 'none'; return; }
+            var hasDanger = list.some(function (p) { return p.danger; });
+            // Compact chip: a lock + count. Click expands the full list (see _renderPrivsPop).
+            chip.innerHTML = '🔒 <span class="hud-privs-count">' + list.length + '</span>';
+            chip.title = 'This app is allowed to: ' + list.map(function (p) { return p.label; }).join(', ')
+                       + ' — click for details';
+            chip.classList.toggle('hud-privs-chip--danger', hasDanger);
+            wrap.style.display = '';
+            this._renderPrivsPop();
+        }
+
+        // Build the expanded privileges popover content from the parsed grant list.
+        _renderPrivsPop() {
+            var pop = this.shadowRoot && this.shadowRoot.querySelector('.hud-privs-pop');
+            if (!pop) return;
+            var rows = (this._privList || []).map(function (p) {
+                return '<div class="hud-priv-row' + (p.danger ? ' hud-priv-row--danger' : '') + '">'
+                     + (p.danger ? '⚠ ' : '• ') + AppHud._escapeHtml(p.label) + '</div>';
+            }).join('');
+            pop.innerHTML = '<div class="hud-priv-head">This app is allowed to</div>'
+                          + rows
+                          + '<button class="hud-privs-reset" type="button">Reset granted consents…</button>';
+        }
+
+        // Hide every popover EXCEPT the selector passed (so only one is open at a time).
+        _closeOtherPops(except) {
+            ['.hud-privs-pop', '.hud-more-panel', '.hud-activity-pop'].forEach((sel) => {
+                if (sel === except) return;
+                var el = this.shadowRoot.querySelector(sel);
+                if (el) el.style.display = 'none';
+            });
+        }
+
+        _togglePrivsPop(force) {
+            var pop  = this.shadowRoot && this.shadowRoot.querySelector('.hud-privs-pop');
+            var chip = this.shadowRoot && this.shadowRoot.querySelector('.hud-privs-chip');
+            if (!pop) return;
+            var open = (typeof force === 'boolean') ? force : (pop.style.display === 'none');
+            if (open) this._closeOtherPops('.hud-privs-pop');
+            pop.style.display = open ? '' : 'none';
+            if (chip) chip.setAttribute('aria-expanded', open ? 'true' : 'false');
+            this._armOutsideClose(open, () => this._togglePrivsPop(false));
+        }
+
+        _toggleMore(force) {
+            var panel = this.shadowRoot && this.shadowRoot.querySelector('.hud-more-panel');
+            var btn   = this.shadowRoot && this.shadowRoot.querySelector('.hud-more-btn');
+            if (!panel) return;
+            var open = (typeof force === 'boolean') ? force : (panel.style.display === 'none');
+            if (open) this._closeOtherPops('.hud-more-panel');
+            panel.style.display = open ? '' : 'none';
+            if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+            this._armOutsideClose(open, () => this._toggleMore(false));
+        }
+
+        // ── File-activity meter ─────────────────────────────────────────────────────────
+        // Consumes `app-debug:bridge-call` (one per vfs/fs op). Tallies reads vs writes,
+        // tracks the last 15 ops, and flashes the chip green (ok) / red (error) per event.
+        _onBridgeCall(detail) {
+            var method = detail.method || '';
+            var kind;
+            if (method === 'vfs.read' || method === 'vfs.list') kind = 'r';
+            else if (method === 'vfs.write' || method === 'fs.move'
+                  || method === 'fs.delete' || method === 'fs.mkdir') kind = 'w';
+            // AI calls get their own lane (A2 of the 08/16 brief). The old `return` made
+            // the single most consequential bridge call — llm.chat, which spends money and
+            // ships attached content to a third party — the one thing the meter ignored.
+            else if (method.indexOf('llm.') === 0) kind = 'a';
+            else return;   // everything else (vault.*, ui.*, state.* …) stays off the meter
+
+            if (kind === 'r') this._actR++; else if (kind === 'w') this._actW++; else this._actA++;
+            var okFlag = detail.ok !== false;     // ok defaults true unless explicitly false
+            if (!okFlag) this._actErr++;
+
+            this._actRecent.unshift({
+                method: method, kind: kind,
+                path: detail.path || detail.from || detail.to || '',
+                bytes: (typeof detail.bytes === 'number') ? detail.bytes : null,
+                count: (typeof detail.count === 'number') ? detail.count : null,
+                ms: (typeof detail.ms === 'number') ? detail.ms : null,
+                ok: okFlag, err: detail.err || ''
+            });
+            if (this._actRecent.length > 15) this._actRecent.length = 15;
+            this._renderActivity(okFlag);
+        }
+
+        _renderActivity(lastOk) {
+            var sr = this.shadowRoot; if (!sr) return;
+            var chip = sr.querySelector('.hud-activity-chip');
+            var r = sr.querySelector('.hud-act-r');
+            var w = sr.querySelector('.hud-act-w');
+            if (!chip) return;
+            if (r) r.textContent = 'R' + this._actR;
+            if (w) w.textContent = 'W' + this._actW;
+            // The AI lane appears only once used — zero-cost chrome for apps that never call it.
+            var a = chip.querySelector('.hud-act-a');
+            if (this._actA > 0) {
+                if (!a) { a = document.createElement('span'); a.className = 'hud-act-a'; chip.appendChild(document.createTextNode(' ')); chip.appendChild(a); }
+                a.textContent = 'A' + this._actA;
+            }
+            // Error tally only appears once something has failed.
+            var e = chip.querySelector('.hud-act-e');
+            if (this._actErr > 0) {
+                if (!e) { e = document.createElement('span'); e.className = 'hud-act-e'; chip.appendChild(document.createTextNode(' ')); chip.appendChild(e); }
+                e.textContent = '!' + this._actErr;
+            } else if (e) { e.remove(); }
+
+            var last = this._actRecent[0];
+            chip.title = last
+                ? (last.method + ' ' + (last.path || '')
+                   + (last.bytes != null ? ' · ' + AppHud._fmtBytes(last.bytes) : '')
+                   + (last.count != null ? ' · ' + last.count + ' items' : '')
+                   + (last.ms != null ? ' · ' + last.ms + ' ms' : '')
+                   + (last.ok ? '' : ' · FAILED'))
+                : 'Files this app has read / written this session';
+
+            // Flash: add the pulse class, then remove after a beat (CSS transitions it back).
+            chip.classList.remove('pulse-ok', 'pulse-err');
+            // force reflow so a back-to-back event re-triggers the transition
+            void chip.offsetWidth;
+            chip.classList.add(lastOk ? 'pulse-ok' : 'pulse-err');
+            clearTimeout(this._actPulseTimer);
+            this._actPulseTimer = setTimeout(function () {
+                chip.classList.remove('pulse-ok', 'pulse-err');
+            }, 500);
+
+            if (this._actPopOpen) this._renderActivityPop();
+        }
+
+        _renderActivityPop() {
+            var pop = this.shadowRoot && this.shadowRoot.querySelector('.hud-activity-pop');
+            if (!pop) return;
+            var rows = (this._actRecent || []).map(function (o) {
+                var meta = [];
+                if (o.bytes != null) meta.push(AppHud._fmtBytes(o.bytes));
+                if (o.count != null) meta.push(o.count + ' items');
+                if (o.ms != null)    meta.push(o.ms + ' ms');
+                return '<div class="hud-act-row' + (o.ok ? '' : ' hud-act-row--err') + '">'
+                     + '<span class="hud-act-tag hud-act-tag--' + o.kind + '">' + (o.kind === 'r' ? 'R' : 'W') + '</span>'
+                     + '<span class="hud-act-path">' + AppHud._escapeHtml(o.path || o.method) + '</span>'
+                     + '<span class="hud-act-meta">' + AppHud._escapeHtml(meta.join(' · ')) + '</span>'
+                     + '</div>';
+            }).join('');
+            pop.innerHTML = '<div class="hud-priv-head">File activity · this session</div>'
+                + '<div class="hud-act-summary">' + this._actR + ' read · ' + this._actW + ' written'
+                + (this._actErr ? ' · <span class="hud-act-e">' + this._actErr + ' failed</span>' : '') + '</div>'
+                + (rows || '<div class="hud-act-empty">No file activity yet</div>');
+        }
+
+        _toggleActivityPop(force) {
+            var pop  = this.shadowRoot && this.shadowRoot.querySelector('.hud-activity-pop');
+            var chip = this.shadowRoot && this.shadowRoot.querySelector('.hud-activity-chip');
+            if (!pop) return;
+            var open = (typeof force === 'boolean') ? force : (pop.style.display === 'none');
+            if (open) { this._closeOtherPops('.hud-activity-pop'); this._renderActivityPop(); }
+            pop.style.display = open ? '' : 'none';
+            this._actPopOpen = open;
+            if (chip) chip.setAttribute('aria-expanded', open ? 'true' : 'false');
+            this._armOutsideClose(open, () => this._toggleActivityPop(false));
+        }
+
+        static _fmtBytes(n) {
+            if (n == null) return '';
+            if (n < 1024) return n + ' B';
+            if (n < 1024 * 1024) return (n / 1024).toFixed(n < 10240 ? 1 : 0) + ' KB';
+            return (n / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        // Shared one-shot outside-click closer for the ⋯ menu / privs popover. Armed on the
+        // next tick so the opening click (which bubbles up composed from the shadow root)
+        // doesn't immediately close it.
+        _armOutsideClose(open, closeFn) {
+            if (this._popClickHandler) {
+                document.removeEventListener('click', this._popClickHandler);
+                this._popClickHandler = null;
+            }
+            if (!open) return;
+            var self = this;
+            setTimeout(function () {
+                self._popClickHandler = function () { closeFn(); self._popClickHandler = null; };
+                document.addEventListener('click', self._popClickHandler, { once: true });
+            }, 0);
         }
 
         // Render a consent prompt in the HUD (host chrome — the app cannot draw or dismiss this).
         // Resolves cb(true/false) only on a real user click. Called by app-shell._consent.
+        // External-link confirm (Option D). Shows the URL + an Open button; the Open click
+        // is the user gesture that lets onConfirm() call window.open without a popup block.
+        // Called by app-shell._promptExternalOpen for apps that lack the externalLinks grant.
+        promptExternalLink(url, onConfirm) {
+            const bar     = this.shadowRoot.querySelector('.hud-extlink-bar');
+            const urlEl   = this.shadowRoot.querySelector('.hud-extlink-url');
+            const openBtn = this.shadowRoot.querySelector('.hud-extlink-open');
+            const disBtn  = this.shadowRoot.querySelector('.hud-extlink-dismiss');
+            if (!bar || !urlEl || !openBtn || !disBtn) { try { onConfirm && onConfirm(); } catch (_) {} return; }
+
+            urlEl.textContent = url;
+            bar.style.display = '';
+            const done = (go) => {
+                bar.style.display = 'none';
+                openBtn.removeEventListener('click', onOpen);
+                disBtn.removeEventListener('click', onDis);
+                if (go) { try { onConfirm && onConfirm(); } catch (_) {} }   // runs inside this click gesture
+            };
+            const onOpen = () => done(true);
+            const onDis  = () => done(false);
+            openBtn.addEventListener('click', onOpen);
+            disBtn.addEventListener('click', onDis);
+        }
+
+        // Download confirm — same host-chrome bar as promptExternalLink, different copy.
+        // onDecision(true|false) ALWAYS fires (dismiss included) so the app's
+        // sg.vfs.download promise can settle instead of hanging. The confirm click is the
+        // user gesture the host's <a download> click runs inside. Called by
+        // app-shell for apps that lack the `downloads` grant.
+        promptDownload(filename, sizeLabel, onDecision) {
+            const bar     = this.shadowRoot.querySelector('.hud-extlink-bar');
+            const labelEl = this.shadowRoot.querySelector('.hud-extlink-label');
+            const urlEl   = this.shadowRoot.querySelector('.hud-extlink-url');
+            const iconEl  = this.shadowRoot.querySelector('.hud-extlink-icon');
+            const openBtn = this.shadowRoot.querySelector('.hud-extlink-open');
+            const disBtn  = this.shadowRoot.querySelector('.hud-extlink-dismiss');
+            if (!bar || !urlEl || !openBtn || !disBtn) { try { onDecision && onDecision(true); } catch (_) {} return; }
+
+            const prev = { label: labelEl && labelEl.textContent, icon: iconEl && iconEl.textContent, btn: openBtn.textContent };
+            if (labelEl) labelEl.textContent = 'This app wants to save a file to your device:';
+            if (iconEl)  iconEl.textContent  = '⬇';
+            openBtn.textContent = 'Download ⬇';
+            urlEl.textContent   = filename + (sizeLabel ? ' (' + sizeLabel + ')' : '');
+            bar.style.display   = '';
+            const done = (go) => {
+                bar.style.display = 'none';
+                if (labelEl) labelEl.textContent = prev.label;
+                if (iconEl)  iconEl.textContent  = prev.icon;
+                openBtn.textContent = prev.btn;
+                openBtn.removeEventListener('click', onGo);
+                disBtn.removeEventListener('click', onNo);
+                try { onDecision && onDecision(go); } catch (_) {}    // confirm runs inside this click gesture
+            };
+            const onGo = () => done(true);
+            const onNo = () => done(false);
+            openBtn.addEventListener('click', onGo);
+            disBtn.addEventListener('click', onNo);
+        }
+
         requestConsent(verb, path, cb) {
-            const c = this.shadowRoot.querySelector('.hud-consent');
-            const t = this.shadowRoot.querySelector('.hud-consent-text');
-            const allow = this.shadowRoot.querySelector('.hud-consent-allow');
-            const deny  = this.shadowRoot.querySelector('.hud-consent-deny');
-            if (!c || !t || !allow || !deny) { try { cb(false); } catch (_) {} return; }
-            t.textContent = AppHud._consentLabel(verb, path);
-            c.style.display = '';
+            const bar    = this.shadowRoot.querySelector('.hud-consent-bar');
+            const t      = this.shadowRoot.querySelector('.hud-consent-text');
+            const grants = this.shadowRoot.querySelector('.hud-consent-grants');
+            const allow  = this.shadowRoot.querySelector('.hud-consent-allow');
+            const deny   = this.shadowRoot.querySelector('.hud-consent-deny');
+            if (!bar || !t || !allow || !deny) { try { cb(false); } catch (_) {} return; }
+
+            const info = AppHud._consentInfo(verb, path);
+            t.textContent = info.message;
+            bar.classList.toggle('hud-consent-bar--danger', info.danger);
+
+            // Surface the cumulative power the app already holds (destructive ones flagged),
+            // so a single-verb prompt doesn't understate what saying "Allow" repeatedly means.
+            if (grants) {
+                if (this._privList && this._privList.length) {
+                    grants.innerHTML = '<span class="hud-grants-label">Already allowed:</span> '
+                        + this._privList.map(function (p) {
+                            return '<span class="hud-grant' + (p.danger ? ' hud-grant--danger' : '') + '">'
+                                 + AppHud._escapeHtml(p.label) + '</span>';
+                        }).join('');
+                    grants.style.display = '';
+                } else {
+                    grants.style.display = 'none';
+                    grants.innerHTML = '';
+                }
+            }
+
+            bar.style.display = '';
+            // Remember focus so we can restore it after the decision (a11y).
+            this._consentPrevFocus = (document.activeElement && document.activeElement !== document.body)
+                ? document.activeElement : null;
+
+            const onKey = (ev) => {
+                if (ev.key === 'Escape') { ev.preventDefault(); done(false); }
+            };
             const done = (ok) => {
-                c.style.display = 'none';
+                bar.style.display = 'none';
+                bar.classList.remove('hud-consent-bar--danger');
                 allow.removeEventListener('click', onAllow);
                 deny.removeEventListener('click', onDeny);
+                bar.removeEventListener('keydown', onKey);
+                try { if (this._consentPrevFocus && this._consentPrevFocus.focus) this._consentPrevFocus.focus(); } catch (_) {}
                 try { cb(ok); } catch (_) {}
             };
             const onAllow = () => done(true);
             const onDeny  = () => done(false);
             allow.addEventListener('click', onAllow);
             deny.addEventListener('click', onDeny);
+            bar.addEventListener('keydown', onKey);
+            // Safe default: focus DENY (not Allow) so a stray Enter/keypress never grants —
+            // the user must deliberately move to Allow. Esc also denies.
+            setTimeout(() => { try { deny.focus(); } catch (_) {} }, 0);
         }
 
-        static _consentLabel(verb, path) {
+        // Returns { message, danger } for a consent verb. Destructive (irreversible) verbs
+        // get a ⚠ prefix and flip the bar to a danger colour.
+        static _consentInfo(verb, path) {
             const map = {
-                'vault.create': 'create a vault',
-                'vault.delete': 'permanently delete a vault',
-                'vault.unlink': 'unlink a vault'
+                'vault.create':           { what: 'create a vault',                     danger: false },
+                'vault.createKey':        { what: 'create a vault and receive its key', danger: false },
+                'vault.delete':           { what: 'permanently delete a vault',         danger: true  },
+                'vault.unlink':           { what: 'unlink a vault',                     danger: false },
+                'vault.embedAccessToken': { what: 'embed an access token in a vault',    danger: true  },
+                'vfs.write':              { what: 'write files',                        danger: false },
+                'vfs.delete':             { what: 'delete files',                       danger: true  },
+                'vfs.move':               { what: 'move files',                         danger: false },
+                'vfs.mkdir':              { what: 'create folders',                     danger: false }
             };
-            const what = map[verb] || ('use ' + verb);
-            return 'This app wants to ' + what + (path ? ' in “' + path + '”' : '') + '.';
+            const e = map[verb] || { what: 'use ' + verb, danger: /delete|destroy|unlink/i.test(verb) };
+            // Only show the location for real folder paths — a ref id (e.g. "lk-abc…") is noise.
+            const showPath = path && path.indexOf('/') > -1;
+            return {
+                message: (e.danger ? '⚠ ' : '') + 'This app wants to ' + e.what
+                       + (showPath ? ' in “' + path + '”' : '') + '.',
+                danger: e.danger
+            };
         }
 
-        // Clicking the privileges chip opens the (minimal) permissions panel: the manifest grants
-        // are a fixed ceiling, but the user can reset this app's cached create/delete consents.
-        _onPrivsClick() {
+        // The manifest grants are a fixed ceiling; the user can still reset this app's cached
+        // create/delete consents so the prompts are asked again. Triggered from the privs popover.
+        _resetConsents() {
+            this._togglePrivsPop(false);
             const ok = window.confirm('Reset this app’s granted consents (e.g. create/delete prompts will be asked again)?');
             if (ok) this.dispatchEvent(new CustomEvent('app-hud:reset-consents', { bubbles: true, composed: true }));
         }
@@ -463,8 +985,18 @@
             var escape = sr.querySelector('.hud-escape');
 
             if (cfg.mode === 'hidden') {
+                // Chrome row hidden, but the corner escape pill stays — a visible clue
+                // that this is a vault app + a one-click way back.
                 if (wrap)   wrap.style.display = 'none';
                 if (escape) escape.style.display = '';
+                return;
+            }
+            if (cfg.mode === 'none') {
+                // No chrome AND no escape pill — the app is visually indistinguishable from a
+                // standalone page; the only way back is to edit the URL. Author-only, opt-in.
+                // (Consent prompts still render — the consent bar is a sibling of .hud-wrap.)
+                if (wrap)   wrap.style.display = 'none';
+                if (escape) escape.style.display = 'none';
                 return;
             }
             if (wrap)   wrap.style.display = '';
@@ -485,6 +1017,20 @@
                     el.style.display = 'none';
                 }
             });
+
+            // The ⋯ menu only holds Copy / Print / Debug — collapse the whole control when
+            // all three are hidden (e.g. minimal mode) so there's no empty dangling button.
+            var moreWrap = sr.querySelector('.hud-more-wrap');
+            if (moreWrap) {
+                var anyMore = cfg.show.copyLink || cfg.show.print || cfg.show.debug;
+                moreWrap.style.display = anyMore ? '' : 'none';
+            }
+
+            // Activity meter has no data-gating (it's always meaningful, starts at R0/W0), so
+            // drive its visibility explicitly — both hide AND restore — off the show flag. The
+            // per-element loop above only hides, which wouldn't re-show it on a force-show.
+            var actWrap = sr.querySelector('.hud-activity-wrap');
+            if (actWrap) actWrap.style.display = cfg.show.activity ? '' : 'none';
 
             var navbar = sr.querySelector('.navrow');
             if (navbar) navbar.style.display = cfg.show.navBar ? '' : 'none';
@@ -511,8 +1057,8 @@
             background: #12122a; border-bottom: 1px solid #2a2a4a;
         }
         .hud-left  { display: flex; align-items: center; gap: 0.625rem; min-width: 0; }
-        .hud-center { flex: 1; display: flex; align-items: center; justify-content: center; }
-        .hud-right { display: flex; align-items: center; gap: 0.5rem; }
+        .hud-center { flex: 1; display: flex; align-items: center; justify-content: center; min-width: 0; overflow: hidden; }
+        .hud-right { display: flex; align-items: center; gap: 0.5rem; flex: 0 0 auto; }
         .hud-brand { font-weight: 700; font-size: 1rem; color: #e2e8f0; white-space: nowrap; }
         .hud-slash { color: #4ECDC4; }
         .hud-vault-badge {
@@ -524,13 +1070,11 @@
         .hud-app-title {
             font-size: 0.875rem; font-weight: 600; color: #e2e8f0;
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-            min-width: 0;
-            /* No max-width — title grows to its natural width and only ellipsizes
-               when the row genuinely runs out of space (hud-left shrinks via flex,
-               hud-center is flex:1 so it absorbs the squeeze first). The previous
-               200px cap was a leftover from when the HUD was a packed 48px row;
-               with app.json hud.show.* it's common to have only brand+title in
-               hud-left and they should use whatever room is available. */
+            min-width: 0; max-width: 40vw;
+            /* Cap at 40vw so a long title ellipsizes inside hud-left instead of growing
+               until it butts against centre content. (The consent prompt now lives in
+               its own full-width bar, so it no longer collides — but the cap keeps the
+               top row tidy when brand+badge+title are all long.) */
         }
         .hud-msg {
             font-size: 0.8rem; padding: 0.2rem 0.6rem; border-radius: 4px;
@@ -545,46 +1089,228 @@
             border: 1px solid #2a2a4a; white-space: nowrap;
         }
         .hud-vault-link:hover { color: #4ECDC4; border-color: #4ECDC4; }
-        .hud-copy-btn {
-            font-size: 0.75rem; padding: 0.2rem 0.6rem; border-radius: 4px;
-            border: 1px solid #2a2a4a; background: transparent;
-            color: #8892a4; cursor: pointer; white-space: nowrap;
+        .hud-llm-btn {
+            font-size: 0.75rem; color: #8892a4; background: transparent; cursor: pointer;
+            padding: 0.2rem 0.5rem; border-radius: 4px; font-family: inherit;
+            border: 1px solid #2a2a4a; white-space: nowrap;
         }
-        .hud-copy-btn:hover { color: #4ECDC4; border-color: #4ECDC4; }
-        .hud-print-btn {
-            font-size: 0.75rem; padding: 0.2rem 0.6rem; border-radius: 4px;
-            border: 1px solid #2a2a4a; background: transparent;
-            color: #8892a4; cursor: pointer; white-space: nowrap;
+        .hud-llm-btn:hover { color: #4ECDC4; border-color: #4ECDC4; }
+        /* Session AI spend — money, so it reads as a fact chip, not an action. The ~
+           prefix marks an estimate (same rule as every cost surface); … marks in-flight. */
+        .hud-llm-cost {
+            font-size: 0.72rem; color: #b8a3e8; background: transparent; cursor: pointer;
+            padding: 0.2rem 0.5rem; border-radius: 4px; font-family: var(--font-mono, monospace);
+            border: 1px solid #2a2a4a; white-space: nowrap;
         }
-        .hud-print-btn:hover { color: #4ECDC4; border-color: #4ECDC4; }
+        .hud-llm-cost:hover { border-color: #b8a3e8; }
+        .hud-llm-cost--busy { border-color: #b8a3e8; opacity: 0.85; }
+        .hud-act-a { color: #b8a3e8; }
+        /* Amber: this is an offer that costs something to accept, not an error and not a
+           neutral chip. It has to be seen without reading as "something broke". */
+        .hud-update-btn {
+            font-size: 0.75rem; color: #E9C445; background: rgba(233,196,69,0.10); cursor: pointer;
+            padding: 0.2rem 0.5rem; border-radius: 4px; font-family: inherit;
+            border: 1px solid rgba(233,196,69,0.45); white-space: nowrap;
+        }
+        .hud-update-btn:hover { background: rgba(233,196,69,0.2); border-color: #E9C445; }
         .hud-ro-badge {
             font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 9999px;
             background: rgba(100,160,220,0.12); color: #64a0dc;
             border: 1px solid rgba(100,160,220,0.25); white-space: nowrap;
         }
-        .hud-privs-chip {
+        /* Voice capture bar. Red IS right here — unlike a published release, a live
+           microphone is a state the user must never overlook. Full-width sibling row so
+           it survives every hud mode, matching the consent bar. */
+        /* Teal, not red. The HUD spends red on failure (.hud-msg--error, .hud-act-e,
+           .hud-consent-deny), so a red bar for a working microphone reads as an alarm.
+           Visibility comes from the full-width bar, the pulsing dot and the words — none
+           of which need an error colour to be impossible to miss. */
+        .hud-rec-bar {
+            display: none; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+            padding: 0.5rem 0.9rem; font-size: 0.8rem;
+            background: rgba(78,205,196,0.12); border-bottom: 1px solid rgba(78,205,196,0.4);
+            color: #cdf3f0;
+        }
+        .hud-rec-dot {
+            width: 0.6rem; height: 0.6rem; border-radius: 50%; background: #4ecdc4;
+            animation: hud-rec-pulse 1.6s ease-in-out infinite; flex-shrink: 0;
+        }
+        .hud-rec-dot--busy { background: #E9C445; }
+        @keyframes hud-rec-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+        .hud-rec-label { flex: 1; min-width: 10rem; }
+        .hud-rec-time { font-family: var(--font-mono, monospace); opacity: 0.85; }
+        .hud-rec-stop, .hud-rec-cancel {
+            font-size: 0.75rem; padding: 0.25rem 0.6rem; border-radius: 4px; cursor: pointer;
+            font-family: inherit; white-space: nowrap;
+        }
+        .hud-rec-stop   { background: #4ecdc4; border: 1px solid #4ecdc4; color: #0d1120; font-weight: 700; }
+        .hud-rec-cancel { background: transparent; border: 1px solid rgba(255,255,255,0.25); color: inherit; }
+        .hud-rec-cancel:hover { border-color: #fff; }
+
+        /* Release picker + "not the latest version" pill. Amber, not red: viewing a
+           published release is a deliberate, safe state — informational, not an error.
+           Red stays reserved for the consent prompt and live failures. */
+        .hud-rel-wrap { display: inline-flex; }
+        .hud-rel-sel {
+            font-size: 0.72rem; padding: 0.12rem 0.3rem; border-radius: 4px; max-width: 12rem;
+            background: #12121f; color: #c8c8d8; border: 1px solid #2a2a4a;
+            font-family: inherit; cursor: pointer;
+        }
+        .hud-rel-sel:hover { border-color: #4ECDC4; color: #fff; }
+        .hud-rel-badge {
             font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 9999px;
             background: rgba(233,196,69,0.12); color: #E9C445;
-            border: 1px solid rgba(233,196,69,0.3); white-space: nowrap; font-family: monospace; cursor: pointer;
+            border: 1px solid rgba(233,196,69,0.3); white-space: nowrap;
+            max-width: 14rem; overflow: hidden; text-overflow: ellipsis;
         }
-        .hud-privs-chip:hover { border-color: #E9C445; }
-        .hud-consent { display: inline-flex; align-items: center; gap: 0.5rem; }
-        .hud-consent-text { font-size: 0.8rem; color: #e2e8f0; }
+        /* ── Privileges chip (compact 🔒 N) + expandable popover ─────────────────────── */
+        .hud-privs-wrap { position: relative; display: inline-flex; }
+        /* Privileges chip — standing grants, NOT an error. Default state is a calm slate
+           (informational); presence of any destructive grant lifts it to amber. We deliberately
+           do NOT use red here — red is reserved for active errors and the active consent prompt.
+           Red on a permanent status chip read as "something is wrong" in user testing. */
+        .hud-privs-chip {
+            font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 9999px;
+            background: rgba(136,146,164,0.10); color: #aeb6c6;
+            border: 1px solid rgba(136,146,164,0.30); white-space: nowrap;
+            font-family: inherit; cursor: pointer; line-height: 1.4;
+        }
+        .hud-privs-chip:hover { color: #e2e8f0; border-color: rgba(174,182,198,0.55); }
+        .hud-privs-count { font-weight: 700; }
+        .hud-privs-chip--danger {
+            background: rgba(245,164,67,0.10); color: #f5a443;
+            border-color: rgba(245,164,67,0.45);
+        }
+        .hud-privs-chip--danger:hover { color: #ffba5c; border-color: #f5a443; }
+        .hud-privs-pop {
+            position: absolute; top: calc(100% + 6px); right: 0;
+            min-width: 200px; background: #14142a; border: 1px solid #2a2a4a;
+            border-radius: 6px; padding: 0.35rem; box-shadow: 0 12px 30px rgba(0,0,0,0.55);
+            z-index: 200; display: flex; flex-direction: column; gap: 0.1rem;
+        }
+        .hud-priv-head {
+            color: rgba(255,255,255,0.38); font-size: 0.66rem;
+            text-transform: uppercase; letter-spacing: 0.08em; padding: 0.2rem 0.45rem 0.3rem;
+        }
+        .hud-priv-row { padding: 0.22rem 0.45rem; font-size: 0.78rem; color: #cbd3e1; white-space: nowrap; }
+        .hud-priv-row--danger { color: #f5a443; font-weight: 600; }
+        .hud-privs-reset {
+            margin-top: 0.3rem; font-size: 0.72rem; padding: 0.3rem 0.45rem; border-radius: 4px;
+            border: 1px solid #2a2a4a; background: transparent; color: #8892a4;
+            cursor: pointer; text-align: left; font-family: inherit;
+        }
+        .hud-privs-reset:hover { color: #ff8a8a; border-color: rgba(255,107,107,0.4); }
+
+        /* ── File-activity meter (⇅ R N  W N) + expandable popover ────────────────────── */
+        .hud-activity-wrap { position: relative; display: inline-flex; }
+        .hud-activity-chip {
+            font-size: 0.72rem; padding: 0.15rem 0.5rem; border-radius: 9999px;
+            background: rgba(255,255,255,0.04); color: #8892a4;
+            border: 1px solid #2a2a4a; white-space: nowrap; cursor: pointer;
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            transition: border-color 0.45s ease, color 0.45s ease, background 0.45s ease;
+        }
+        .hud-activity-chip:hover { border-color: #4ECDC4; }
+        .hud-act-r { color: #64a0dc; }     /* reads — blue */
+        .hud-act-w { color: #4ECDC4; }     /* writes — teal */
+        .hud-act-e { color: #ff6b6b; font-weight: 700; }   /* errors — red */
+        .hud-activity-chip.pulse-ok  { border-color: #4ECDC4; background: rgba(78,205,196,0.16); }
+        .hud-activity-chip.pulse-err { border-color: #ff6b6b; background: rgba(255,107,107,0.16); }
+        .hud-activity-pop {
+            position: absolute; top: calc(100% + 6px); right: 0;
+            min-width: 240px; max-width: 360px; background: #14142a; border: 1px solid #2a2a4a;
+            border-radius: 6px; padding: 0.35rem; box-shadow: 0 12px 30px rgba(0,0,0,0.55);
+            z-index: 200; display: flex; flex-direction: column; gap: 0.05rem;
+        }
+        .hud-act-summary {
+            font-size: 0.74rem; color: #cbd3e1; padding: 0.15rem 0.45rem 0.35rem;
+            border-bottom: 1px solid #23233f; margin-bottom: 0.2rem;
+        }
+        .hud-act-row {
+            display: flex; align-items: center; gap: 0.4rem;
+            padding: 0.2rem 0.45rem; font-size: 0.74rem; color: #cbd3e1;
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        }
+        .hud-act-row--err { color: #ff8a8a; }
+        .hud-act-tag {
+            flex: 0 0 auto; width: 1.1rem; text-align: center; border-radius: 3px;
+            font-size: 0.66rem; font-weight: 700; padding: 0.02rem 0;
+        }
+        .hud-act-tag--r { background: rgba(100,160,220,0.18); color: #64a0dc; }
+        .hud-act-tag--w { background: rgba(78,205,196,0.18); color: #4ECDC4; }
+        .hud-act-path { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .hud-act-meta { flex: 0 0 auto; color: rgba(255,255,255,0.4); font-size: 0.68rem; }
+        .hud-act-empty { padding: 0.4rem 0.45rem 0.55rem; color: rgba(255,255,255,0.32); font-style: italic; font-size: 0.74rem; }
+
+        /* ── ⋯ overflow menu (Copy link / Print / Debug) ─────────────────────────────── */
+        .hud-more-wrap { position: relative; display: inline-flex; }
+        .hud-more-btn {
+            font-size: 0.95rem; line-height: 1; padding: 0.15rem 0.5rem; border-radius: 4px;
+            border: 1px solid #2a2a4a; background: transparent; color: #8892a4;
+            cursor: pointer; font-family: inherit;
+        }
+        .hud-more-btn:hover { color: #4ECDC4; border-color: #4ECDC4; }
+        .hud-more-panel {
+            position: absolute; top: calc(100% + 6px); right: 0;
+            min-width: 170px; background: #14142a; border: 1px solid #2a2a4a;
+            border-radius: 6px; padding: 0.3rem; box-shadow: 0 12px 30px rgba(0,0,0,0.55);
+            z-index: 200; display: flex; flex-direction: column; gap: 0.1rem;
+        }
+        .hud-mi {
+            font-size: 0.78rem; padding: 0.35rem 0.5rem; border-radius: 4px;
+            border: 1px solid transparent; background: transparent; color: #cbd3e1;
+            cursor: pointer; text-align: left; white-space: nowrap; font-family: inherit;
+        }
+        .hud-mi:hover { background: rgba(255,255,255,0.06); color: #e2e8f0; }
+        .hud-debug-btn.active { color: #4ECDC4; }
+
+        /* ── External-link confirm bar (Option D) ──────────────────────────────────────── */
+        .hud-extlink-bar {
+            display: flex; align-items: center; gap: 0.75rem;
+            padding: 0.5rem 1rem; min-height: 44px; box-sizing: border-box;
+            background: #1a2a3a; border-bottom: 1px solid #2a4a5a; color: #e2e8f0;
+        }
+        .hud-extlink-icon { flex: 0 0 auto; font-size: 1rem; color: #64a0dc; }
+        .hud-extlink-body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 0.1rem; }
+        .hud-extlink-label { font-size: 0.72rem; color: #aeb6c6; }
+        .hud-extlink-url { font-size: 0.82rem; color: #fff; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .hud-extlink-actions { flex: 0 0 auto; display: flex; gap: 0.5rem; }
+        .hud-extlink-open, .hud-extlink-dismiss {
+            font-size: 0.78rem; padding: 0.3rem 0.9rem; border-radius: 4px; cursor: pointer;
+            border: 1px solid #2a2a4a; background: transparent; white-space: nowrap; font-family: inherit;
+        }
+        .hud-extlink-open { background: #64a0dc; color: #0a0a18; border-color: #64a0dc; font-weight: 700; }
+        .hud-extlink-open:hover { background: #5590cc; }
+        .hud-extlink-dismiss { color: #8892a4; }
+        .hud-extlink-dismiss:hover { color: #e2e8f0; border-color: #4a5568; }
+
+        /* ── Consent bar (full-width sibling of .hud-wrap — sovereignty: always rendered) ── */
+        .hud-consent-bar {
+            display: flex; align-items: center; gap: 0.75rem;
+            padding: 0.5rem 1rem; min-height: 44px; box-sizing: border-box;
+            background: #15264a; border-bottom: 1px solid #2a3a6a; color: #e2e8f0;
+        }
+        .hud-consent-bar--danger { background: #3a1a22; border-bottom-color: #7a2a3a; }
+        .hud-consent-icon { flex: 0 0 auto; font-size: 1.05rem; }
+        .hud-consent-body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+        .hud-consent-text { font-size: 0.85rem; color: #fff; line-height: 1.3; }   /* wraps — never truncates */
+        .hud-consent-grants {
+            font-size: 0.72rem; color: #aeb6c6;
+            display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.5rem;
+        }
+        .hud-grants-label { color: rgba(255,255,255,0.4); }
+        .hud-grant { white-space: nowrap; }
+        .hud-grant--danger { color: #ff8a8a; font-weight: 600; }
+        .hud-consent-actions { flex: 0 0 auto; display: flex; gap: 0.5rem; }
         .hud-consent-allow, .hud-consent-deny {
-            font-size: 0.75rem; padding: 0.2rem 0.7rem; border-radius: 4px; cursor: pointer;
-            border: 1px solid #2a2a4a; background: transparent; white-space: nowrap;
+            font-size: 0.78rem; padding: 0.3rem 0.9rem; border-radius: 4px; cursor: pointer;
+            border: 1px solid #2a2a4a; background: transparent; white-space: nowrap; font-family: inherit;
         }
         .hud-consent-allow { background: #4ECDC4; color: #0a0a18; border-color: #4ECDC4; font-weight: 700; }
         .hud-consent-allow:hover { background: #3dbdb5; }
         .hud-consent-deny { color: #ff6b6b; border-color: rgba(255,107,107,0.4); }
-        .hud-consent-deny:hover { border-color: #ff6b6b; }
-        .hud-debug-btn {
-            font-size: 0.75rem; padding: 0.2rem 0.6rem; border-radius: 4px;
-            border: 1px solid #2a2a4a; background: transparent;
-            color: #4a5568; cursor: pointer; white-space: nowrap;
-        }
-        .hud-debug-btn:hover  { color: #4ECDC4; border-color: #4ECDC4; }
-        .hud-debug-btn.active { color: #4ECDC4; border-color: #4ECDC4; background: rgba(78,205,196,0.08); }
+        .hud-consent-deny:hover  { border-color: #ff6b6b; }
+        .hud-consent-deny:focus, .hud-consent-allow:focus { outline: 2px solid #4ECDC4; outline-offset: 1px; }
 
         /* ── Nav row (HUD V1: back/forward/refresh + path display + copy + recent menu) ── */
         .hud-wrap { display: block; }

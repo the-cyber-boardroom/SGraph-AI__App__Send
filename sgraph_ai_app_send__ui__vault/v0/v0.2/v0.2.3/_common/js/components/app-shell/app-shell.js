@@ -25,6 +25,9 @@
             this._vault           = null;
             this._dataSource      = null;
             this._appJson         = null;
+            this._effectiveAppJson = null;    // the manifest actually mounted (folder app.json or deep-link override)
+            this._mountStrategy    = null;    // 'app' | 'file' | 'redirect' — replayed by _remountCurrent on auto-pull
+            this._mountedFilePath  = null;    // the file path when _mountStrategy === 'file'
             this._vaultKey        = null;
             this._writable        = false;
             this._htmlDir         = '';
@@ -61,6 +64,18 @@
                 if (action === 'exit')    this._exitApp();
             };
             document.addEventListener('app-hud:nav', this._navHudHandler);
+            // Release picker → re-mount at the chosen version.
+            this._relHudHandler = (ev) => { this.switchRelease((ev.detail && ev.detail.name) || 'live'); };
+            document.addEventListener('app-hud:release-change', this._relHudHandler);
+            // Auto-sync parity with /vault: re-check the published head when the tab regains
+            // focus, so an app left open picks up code/data another session pushed. Debounced
+            // in _scheduleBehindCheck. Gated by the shared 'sg-vault-autosync' flag.
+            this._visibilityHandler = () => {
+                if (document.hidden) return;
+                this._scheduleBehindCheck(500);
+                this._scheduleAppendCheck(500);          // append check rides the same focus trigger (no-op unless an app opted in)
+            };
+            document.addEventListener('visibilitychange', this._visibilityHandler);
             this._init();
         }
 
@@ -75,6 +90,13 @@
             if (this._resetConsentsHandler) { document.removeEventListener('app-hud:reset-consents', this._resetConsentsHandler); this._resetConsentsHandler = null; }
             if (this._printHandler) { document.removeEventListener('app-hud:print', this._printHandler); this._printHandler = null; }
             if (this._navHudHandler) { document.removeEventListener('app-hud:nav', this._navHudHandler); this._navHudHandler = null; }
+            if (this._relHudHandler) { document.removeEventListener('app-hud:release-change', this._relHudHandler); this._relHudHandler = null; }
+            if (this._visibilityHandler) { document.removeEventListener('visibilitychange', this._visibilityHandler); this._visibilityHandler = null; }
+            clearTimeout(this._autoPushTimer);
+            clearTimeout(this._behindCheckTimer);
+            clearTimeout(this._appendCheckTimer);
+            if (this._embedReceiver)     { this._embedReceiver.stop(); this._embedReceiver = null; }
+            if (this._embedReadyHandler) { this.removeEventListener('app-shell:ready', this._embedReadyHandler); this._embedReadyHandler = null; }
             if (this._vfsBridgeHandler) {
                 window.removeEventListener('message', this._vfsBridgeHandler);
                 this._vfsBridgeHandler = null;
@@ -86,7 +108,9 @@
         getDebugState() {
             return {
                 appJson:         this._appJson,
-                writable:        this._writable,
+                writable:        !!(this._writable && this._dataSource && this._dataSource.writable),
+                writableCrypto:  this._writable,
+                writableAuth:    !!(this._dataSource && this._dataSource.writable),
                 entry:           this._appJson && this._appJson.entry ? this._appJson.entry : null,
                 iframeStatus:    this._iframeStatus,
                 resourcesLoaded: this._resourcesLoaded,
@@ -97,6 +121,23 @@
         // ── Init flow ─────────────────────────────────────────────────────────────────
 
         _init() {
+            // ── Embed mode: ?embed=1 → bypass URL hash + localStorage, wait for
+            // parent to postMessage the key. See embed-protocol.js for the protocol
+            // and the rationale (storage partitioning + key-in-URL avoidance).
+            // Has to run BEFORE the localStorage read so a stray saved key from a
+            // previous non-embed session doesn't auto-open the wrong vault here.
+            // ?embed=1 must NEVER fall through to the storage auto-open below (a
+            // stray saved key would open the wrong vault inside the parent's frame).
+            // The gate is therefore DEP-FREE — it must hold even when
+            // embed-protocol.js itself failed to load (deploy skew / cached HTML);
+            // missing embed modules fail CLOSED inside _initEmbed.
+            var isEmbedPage = false;
+            try { isEmbedPage = new URLSearchParams(window.location.search).get('embed') === '1'; } catch (_) {}
+            if (isEmbedPage) {
+                this._initEmbed();
+                return;
+            }
+
             // The hash on /en-gb/app is a FILE PATH for App Mode — NOT a vault key.
             // Vault key always comes from localStorage (set by /#vault-key → root inbox).
             // /en-gb/app#vault-key is no longer supported; use /#vault-key instead.
@@ -105,8 +146,10 @@
                 // Save as App Mode deep-link so vault can open this file in App Mode
                 // if app-shell redirects to /en-gb/vault/ (no app.json case).
                 try { sessionStorage.setItem('sg-vault-deep-link', 'app:' + rawHash); } catch (_) {}
-                // Remove the hash — file path is now captured in sessionStorage
-                window.history.replaceState(null, '', window.location.pathname + window.location.search);
+                // Remove the hash — file path is now captured in sessionStorage.
+                // try/catch: replaceState throws in an opaque-origin frame (see the
+                // null-origin note on the address-bar scrub in _initWithKey). Best-effort.
+                try { window.history.replaceState(null, '', window.location.pathname + window.location.search); } catch (_) {}
             }
             // Key always from localStorage (set by root inbox /#vault-key handler)
             var saved = '';
@@ -137,6 +180,86 @@
                 return;
             }
             this._showEntryForm();
+        }
+
+        // ── Embed mode init ────────────────────────────────────────────────────────────
+        //
+        // The vault is loaded inside an iframe (typically inside another origin's app
+        // or inside a null-origin App Iframe). The parent passes the vault key via
+        // postMessage rather than via URL hash, so the key stays out of the URL and
+        // out of partitioned localStorage. See embed-protocol.js for the wire format.
+        //
+        // Sequence:
+        //   1. We post {sg:'vault-embed-ready', v:1} to the parent.
+        //   2. Parent responds with {sg:'vault-open', key, mode?, deepLink?}.
+        //   3. We open the vault with the supplied key (one-shot — listener removed
+        //      after the first valid message so a misbehaving parent can't re-key
+        //      mid-session).
+        //   4. Once mounted (app-shell:ready fires), we post {sg:'vault-ready', ...}
+        //      back so the parent knows the vault is interactive.
+        _initEmbed() {
+            var self = this;
+
+            // Sentinel for downstream code (_initWithKey) to skip the storage-
+            // persist step. The key stays in memory only for the embed session.
+            this._embedMode = true;
+
+            // Fail CLOSED if the embed modules didn't load (deploy skew): show an
+            // error, answer nothing — never fall back to the storage auto-open path.
+            if (typeof EmbedProtocol === 'undefined' || typeof EmbedReceiver === 'undefined') {
+                console.error('[app-shell] embed mode requested but embed-protocol.js / embed-receiver.js is not loaded');
+                this._showError('Embed mode unavailable: embed scripts failed to load. Reload the page.');
+                return;
+            }
+
+            this._setStatus('Waiting for vault key…');
+
+            // Handshake receiver is SHARED with the /en-gb/vault surface
+            // (embed-receiver.js) — one implementation, no drifting copies. It posts
+            // the ready ping and arms a one-shot, source/origin-validated listener
+            // (a misbehaving parent can't re-key the vault mid-session).
+            this._embedReceiver = EmbedReceiver.start({
+                onOpen: function (parsed) {
+                    // Deep-link goes to INSTANCE MEMORY, not sessionStorage. In a null-
+                    // origin parent (App Iframe srcdoc), storage access throws — the
+                    // catch would swallow the SET silently, then _continue's GET would
+                    // also throw silently, and the deep-link would be lost without any
+                    // signal. _continue prefers self._embedDeepLink when it's set, so
+                    // the embed deep-link is null-origin-safe.
+                    if (parsed.deepLink) {
+                        self._embedDeepLink = parsed.deepLink;
+                    }
+
+                    self._showLoading('Opening vault…');
+                    self._initWithKey(parsed.key, null).catch(function (err) {
+                        console.error('[app-shell] embed init failed:', err);
+                        self._showError('Vault open failed: ' + (err && err.message || err));
+                        // Tell the parent — its mount() handles vault-error; without
+                        // this the only signal is its generic 14s handshake timeout.
+                        // Null-guard: disconnectedCallback may have torn the receiver
+                        // down while the open was in flight.
+                        if (self._embedReceiver) self._embedReceiver.notifyError((err && err.message) || err);
+                    });
+                }
+            });
+
+            // Forward 'app-shell:ready' to the parent. This fires AFTER _initWithKey
+            // resolves and the app is mounted, so the parent knows the vault is live.
+            this._embedReadyHandler = function (event) {
+                var detail = (event && event.detail) || {};
+                var fileCount = 0;
+                try {
+                    if (self._dataSource && self._dataSource.getFileList) {
+                        fileCount = self._dataSource.getFileList().length;
+                    }
+                } catch (_) {}
+                self._embedReceiver.notifyReady({
+                    vaultName: detail.vaultName,
+                    fileCount: fileCount,
+                    hasApp:    !!self._appJson
+                });
+            };
+            this.addEventListener('app-shell:ready', this._embedReadyHandler);
         }
 
         // ── Public Vault Preview (Mode A: preview + ask for the key) ───────────────────
@@ -219,6 +342,12 @@
 
         async _initWithKey(key, presetAccessKey, expectedVaultId) {
             this._t.start = performance.now();
+            // Strip the sgit CLI's self-identifying key prefixes (sgit_private_vault_,
+            // sgit_private_read_, sgit_public_read_, legacy sgit_vk1_/sgit_rk1_ — the
+            // authoritative list lives in SGVaultCrypto.KEY_PREFIXES). The value after
+            // the prefix is byte-identical to the bare key; deriving from the prefixed
+            // string produces garbage keys and a vault that cannot be found.
+            key = SGVaultCrypto.stripKeyPrefix(key);
             this._vaultKey = key;
 
             var endpoint = (window.SG_ENDPOINT
@@ -226,7 +355,13 @@
                 || 'https://dev.send.sgraph.ai').replace(/\/$/, '');
             var sgSend   = new SGSend({ endpoint: endpoint });
 
-            this._emitVaultEvent('open-start', { label: 'Opening vault', key: this._maskKey(key), isRO: key.startsWith('ro-') });
+            // Read-key credential (formats 6 and 4): SHARED matcher in SGVaultCrypto
+            // — same acceptance as the vault surface's loader. Checked BEFORE the
+            // generic SGVault.open branch — a 64-hex head parsed as a passphrase
+            // would PBKDF2 into garbage. Same routing rule as the sgit CLI.
+            var readKeyCred = SGVaultCrypto.parseReadOnlyCredential(key);
+
+            this._emitVaultEvent('open-start', { label: 'Opening vault', key: this._maskKey(key), isRO: key.startsWith('ro-') || !!readKeyCred });
             var vault, isRO = false;
             this._setStatus('Opening vault…');
 
@@ -234,6 +369,12 @@
                 var creds = await this._resolveROToken(sgSend, key);
                 vault     = await SGVault.openReadOnly(sgSend, creds.vaultId, creds.readKeyB64, creds.refFileId);
                 isRO      = true;
+            } else if (readKeyCred) {
+                // Same capability triple as the ro-token path, derived locally from the
+                // read key (one HMAC — no transfer download, no passphrase involved).
+                var rkCreds = await SGVaultCrypto.deriveReadOnlyCreds(readKeyCred.vaultId, readKeyCred.readKeyHex);
+                vault       = await SGVault.openReadOnly(sgSend, rkCreds.vaultId, rkCreds.readKeyB64, rkCreds.refFileId);
+                isRO        = true;
             } else {
                 vault = await SGVault.open(sgSend, key);
                 // App Mode is a viewer. SGVault.open() loads the tree from this browser's
@@ -259,26 +400,54 @@
 
             // Persist vault key for reload recovery. Per-tab: sessionStorage is this tab's
             // truth; localStorage holds the last-opened key as a fresh-tab fallback.
-            if (!isRO) {
+            // EMBED MODE: do NOT persist — the parent has the key and re-sends it via
+            // postMessage on reload. Writing here would leak the key into the iframe's
+            // (potentially partitioned) storage past the embed session — defeating the
+            // whole point of the embed flow. The protocol assumes ephemeral, parent-driven
+            // re-handshake on reload.
+            if (!isRO && !this._embedMode) {
                 try { sessionStorage.setItem('sg-vault-key', key); localStorage.setItem('sg-vault-key', key); } catch (_) {}
             }
 
-            // Key never stays in address bar
-            if (window.history && window.history.replaceState) {
-                window.history.replaceState(null, '', window.location.pathname + window.location.search);
+            // Key never stays in address bar.
+            // EMBED / null-origin guard: in embed mode the key never was in the URL (it
+            // arrives by postMessage), so there's nothing to scrub. And critically, when
+            // the embedding parent is itself a null-origin sandbox (vault-in-vault), THIS
+            // frame is forced to an opaque origin too — and replaceState() with the resolved
+            // absolute URL throws "Domains, protocols and ports must match", which would
+            // abort _initWithKey BEFORE app-shell:ready fires and the parent never gets
+            // vault-ready. Skip in embed mode; try/catch the rest for any other opaque case.
+            if (!this._embedMode && window.history && window.history.replaceState) {
+                try { window.history.replaceState(null, '', window.location.pathname + window.location.search); } catch (_) {}
             }
 
             // Build data source. Resolve the server access token (write gate): the entry-form
             // preset, else a saved per-vault / backend key. Thread it onto the write transport so
             // write PUTs carry x-sgraph-access-token (reads are tokenless).
             this._setStatus('Reading vault…');
-            var accessKey = !isRO
-                ? (presetAccessKey || this._resolveAccessToken(vault._vaultId || this._vaultKey))
-                : null;
+            // Token resolution priority (writes only): explicit entry-form input → EMBEDDED token
+            // in .vault/access-token.json (Q2: embedded wins over the localStorage cache, since it
+            // is the current vault-bound intent) → legacy app.json.accessToken (below) → cache.
+            // This is what makes a key-only link open WRITABLE: the patient holds the vault key
+            // (reads decrypt), the embedded token authorises backend writes — never in the URL.
+            var accessKey = null;
+            if (!isRO) {
+                if (presetAccessKey) {
+                    accessKey = presetAccessKey;
+                } else {
+                    accessKey = await this._readEmbeddedAccessToken(vault);     // .vault/access-token.json
+                    if (!accessKey) accessKey = this._resolveAccessToken(vault._vaultId || this._vaultKey);
+                }
+            }
             this._applyAccessToken(accessKey);
             this._dataSource = new VaultDataSource(vault, accessKey);
             if (accessKey) this._writable = true;
             await this._dataSource.loadAllSubTrees();
+
+            // ── Release channels ──────────────────────────────────────────────────
+            // Resolve BEFORE app.json is read, so a pinned open reads THAT version's
+            // manifest (entry, resources, permissions, hud config) and not HEAD's.
+            await this._applyRelease();
             this._t.treeLoaded = performance.now();
             this._emitVaultEvent('tree-loaded', { label: 'File tree loaded', fileCount: this._dataSource.getFileList().filter(function(f){return !f.dir;}).length, ms: Math.round(this._t.treeLoaded - this._t.vaultOpened) });
 
@@ -311,18 +480,39 @@
             // Update page title
             var appTitle  = appJson && appJson.title  ? appJson.title  : '';
             var vaultName = vault.name || '';
+            // Never-named vault (settings defaulted to the 'Untitled Vault' placeholder)
+            // running an app with a title: the app title IS the identity — suppress the
+            // placeholder chip rather than showing 'Untitled Vault' next to the real name.
+            // Explicit === false: older/stub vault objects without the getter keep the name.
+            if (appTitle && vault.hasCustomName === false) vaultName = '';
             if (appTitle) document.title = appTitle + ' — SG/App';
             else if (vaultName) document.title = vaultName + ' — SG/App';
 
             // Notify HUD
+            // isRO covers BOTH the crypto tier (ro-token open, no read_key) AND the auth tier
+            // (full key but no access token → server rejects writes). The HUD should show
+            // "read-only" in either case — surfacing only the crypto state left a key-only
+            // open with no token mis-labelled as writable and the chip absent.
+            var effectiveRO = isRO || !(this._dataSource && this._dataSource.writable);
             this.dispatchEvent(new CustomEvent('app-shell:ready', {
                 bubbles: true, composed: true,
                 detail: {
                     vaultName: vaultName, appTitle: appTitle, vaultKey: this._vaultKey,
-                    isRO: isRO, perm: this._perm,
+                    isRO: effectiveRO, perm: this._perm,
+                    // The open vault, for host chrome at the REAL origin that needs it —
+                    // the AI Chat panel on /app resolves its key from .vault/llm through
+                    // this. Safe on this event: the embed forwarder below copies named
+                    // fields into its postMessage, so nothing here crosses an origin.
+                    vault: this._vault,
                     hudCfg: (appJson && appJson.hud) || null   // see AppHud._resolveHudCfg
                 }
             }));
+
+            // Auto-sync parity with /vault: after the app is up, check whether another session
+            // published newer commits and fast-forward the view if so (clean-behind only). The
+            // 1.5s delay lets the iframe settle first; the check is debounced + a no-op when in sync.
+            this._lastBehindCheckTime = 0;
+            setTimeout(() => { this._scheduleBehindCheck(0); }, 1500);
 
             // Auth intercept (auth.required with no cached key and no preset key)
             if (!isRO && !accessKey && appJson && appJson.auth && appJson.auth.required) {
@@ -338,6 +528,236 @@
             }
 
             await this._continue(appJson);
+        }
+
+        // ── Auto-sync (parity with /vault) ──────────────────────────────────────────────
+        // /vault has an auto-sync engine (vault-shell.js _checkAndAutoSync) that auto-PUSHES
+        // local commits and auto-PULLS upstream changes, gated by localStorage 'sg-vault-autosync'.
+        // /app historically had NEITHER, so app writes (sg.fs.write) committed to the working
+        // clone but never pushed → the clone DIVERGED from the named ref → going to /vault showed
+        // "↑N to push" and /app refresh showed stale code (a diverged clone can't fast-forward to
+        // the published head). Porting the same behaviour, reading the SAME flag, fixes both.
+        _isAutoSyncEnabled() {
+            try { var v = localStorage.getItem('sg-vault-autosync'); return v === null ? true : v === 'true'; }
+            catch (_) { return true; }
+        }
+
+        // Debounced auto-push (Commit Queue style): coalesce a burst of app writes into one push
+        // ~2.5s after the last write. Skips when read-only, auto-sync off, nothing to push, or
+        // diverged (a diverged push would clobber published commits — surface it instead).
+        _scheduleAutoPush() {
+            if (!this._vault || !this._vault.writable) return;
+            if (!this._isAutoSyncEnabled()) { this._surfaceUnpushed('autosync-off'); return; }
+            clearTimeout(this._autoPushTimer);
+            this._autoPushTimer = setTimeout(() => { this._autoPushNow(); }, 2500);
+        }
+
+        async _autoPushNow() {
+            if (!this._vault || !this._vault.writable || !this._isAutoSyncEnabled()) return;
+            try {
+                var ahead = await this._vault.getAheadCount();
+                if (!ahead) return;
+                // Diverged guard: named advanced under us (another session pushed) AND we have
+                // local commits → don't push (would lose their work). Surface + let the behind
+                // check fast-forward when it can.
+                var liveNamed = await this._vault._refManager.readRef(this._vault._refFileId);
+                var diverged  = liveNamed && liveNamed !== this._vault._namedHeadId;
+                if (diverged) { this._surfaceUnpushed('diverged'); return; }
+                await this._vault.push();
+                this._emitVaultEvent('auto-push', { label: 'Auto-pushed ' + ahead + ' commit(s)', count: ahead });
+                this._pushHostEvent('vfs.published', { commit_id: this._vault._headCommitId || null, count: ahead });
+                this._clearUnpushedNotice();
+            } catch (e) {
+                console.warn('[app-shell] auto-push failed:', e && e.message);
+                this._surfaceUnpushed('error');
+            }
+        }
+
+        // Debounced behind-check: read the live named ref; if the clone is cleanly behind, fast-
+        // forward the view (reuse _syncViewToPublishedHead) and remount the app so new code shows.
+        _scheduleBehindCheck(delayMs) {
+            var DEBOUNCE_MS = 30 * 1000;
+            if (Date.now() - (this._lastBehindCheckTime || 0) < DEBOUNCE_MS) return;
+            clearTimeout(this._behindCheckTimer);
+            this._behindCheckTimer = setTimeout(() => { this._checkBehind(); }, delayMs || 0);
+        }
+
+        async _checkBehind() {
+            if (!this._vault) return;
+            // Children first: a mounted child kernel is headless, so this tab-focus check is
+            // its only unprompted chance to fast-forward / merge with what others published.
+            if (this._kernelParent && typeof this._kernelParent.syncAll === 'function') {
+                try { await this._kernelParent.syncAll(); } catch (_) {}
+            }
+            // Pinned to a published release: auto-sync must NOT drag the viewer forward.
+            // Silently remounting someone mid-demo onto HEAD is the exact failure release
+            // channels exist to prevent. Keep checking, but surface it passively instead.
+            if (this._release && !this._release.live) {
+                try {
+                    var named = await this._vault._refManager.readRef(this._vault._refFileId);
+                    if (named && named !== this._vault._namedHeadId) {
+                        this._vault._namedHeadId = named;
+                        var hudN = document.getElementById('app-hud') || document.querySelector('app-hud');
+                        if (hudN && typeof hudN.showMessage === 'function') {
+                            hudN.showMessage('release-newer', 'A newer version has been published. You are viewing "' +
+                                (this._release.label || this._release.name) + '".', 'info', 6000);
+                        }
+                    }
+                } catch (_) {}
+                return;
+            }
+            this._lastBehindCheckTime = Date.now();
+            try {
+                var liveNamed = await this._vault._refManager.readRef(this._vault._refFileId);
+                if (!liveNamed || liveNamed === this._vault._namedHeadId) return;   // up to date
+                this._vault._namedHeadId = liveNamed;
+                // If we have unpushed local commits, this is divergence — surface, don't clobber.
+                var ahead = await this._vault.getAheadCount();
+                if (ahead > 0) { this._surfaceUnpushed('diverged'); return; }
+                // Clean behind → OFFER the update; do not apply it.
+                //
+                // This used to fast-forward and remount immediately. Remounting replaces the
+                // app frame, so anything the running app held that was not written to the
+                // vault — a half-filled form, an unsaved editor buffer — went with it. A
+                // background check must not be able to discard the user's work; the pinned
+                // -release branch above already had this right, and now the live path does too.
+                this._pendingUpdateHead = liveNamed;
+                var hudU = document.getElementById('app-hud') || document.querySelector('app-hud');
+                if (hudU && typeof hudU.showUpdate === 'function') {
+                    var selfU = this;
+                    hudU.showUpdate('New version available', function () { selfU.applyPendingUpdate(); });
+                } else if (hudU && typeof hudU.showMessage === 'function') {
+                    // No update chip in this HUD build — say it rather than apply it silently.
+                    hudU.showMessage('update-available',
+                        'New version available — reload the page to load it.', 'info', null);
+                }
+                this._emitVaultEvent('update-available', { label: 'New version available', head: liveNamed });
+            } catch (_) { /* network errors are silent — retried on next focus */ }
+        }
+
+        // What the auto-pull used to do without asking. _remountCurrent replays the SAME
+        // mount the user is looking at (the opened "as an app" file / folder manifest),
+        // expanding lazy sub-trees first — the older path re-ran _continue with a stale root
+        // app.json and a consumed deep-link, so it remounted the DEFAULT app (or 404'd the
+        // entry on the now-lazy sub-tree).
+        async applyPendingUpdate() {
+            if (!this._vault) return false;
+            var hud = document.getElementById('app-hud') || document.querySelector('app-hud');
+            try {
+                await this._syncViewToPublishedHead(this._vault);
+                try { await this._remountCurrent(); } catch (_) {}
+                this._pendingUpdateHead = null;
+                if (hud && hud.hideUpdate) hud.hideUpdate();
+                this._emitVaultEvent('auto-pull', { label: 'View synced to published head',
+                                                    head: this._vault._namedHeadId });
+                return true;
+            } catch (err) {
+                if (hud && hud.showMessage) {
+                    hud.showMessage('update-failed', 'Could not load the new version: ' +
+                                    ((err && err.message) || 'failed'), 'error', 6000);
+                }
+                return false;
+            }
+        }
+
+        // ── Append check-on-events → host_events-gated push to the app ────────────────────
+        // Built only when the mounted app declared an append host_event (default-deny). Runs
+        // on the same quasi-events as the behind-check (focus, app open). Each emit is filtered
+        // through app.json.host_events before it reaches the iframe — an app cannot receive an
+        // event it didn't declare. auto_fetch is off here: apps pull ciphertext on demand via
+        // sg.append.fetch when they get the notification.
+        async _initAppendChecker(appJson) {
+            this._hostEvents = AppHostEvents.parse(appJson);
+            if (typeof SGAppend === 'undefined' || typeof SGAppendChecker === 'undefined' || typeof AppHostEvents === 'undefined') return;
+            var wantsAppend = AppHostEvents.allows(this._hostEvents, 'append.new-messages')
+                          || AppHostEvents.allows(this._hostEvents, 'append.error');
+            if (!wantsAppend || !this._vault) { this._appendChecker = null; return; }
+            // Reuse the checker across re-mounts of the same vault (seen-set persists).
+            if (this._appendChecker && this._appendCheckerVaultId === this._vault._vaultId) {
+                this._scheduleAppendCheck(0, 'app-remount');
+                return;
+            }
+            var self = this;
+            // Lanes of DECLARED mounts (the monitoring pattern: data vaults that RECEIVE appends,
+            // watched from the parent). One checker per mount, its own seen-set, events tagged
+            // with the mount so the app knows which vault spoke. A mount whose credential
+            // yields no read key is skipped (event only) — never fatal to the root checker.
+            await this._initLaneCheckers();
+            var inbox = await this._getAppendClient();
+            if (!inbox) { this._appendChecker = null; return; }
+            var bus = { emit: function (name, payload) { self._pushHostEvent(name, payload); } };
+            this._appendChecker = new SGAppendChecker(inbox, bus, function () {
+                return { enabled: AppHostEvents.allows(self._hostEvents, 'append.new-messages'), auto_fetch: false };
+            });
+            this._appendCheckerVaultId = this._vault._vaultId;
+            this._scheduleAppendCheck(0, 'app-open');
+        }
+
+        async _initLaneCheckers() {
+            this._laneCheckers = this._laneCheckers || {};
+            var mounts = (this._mounts && typeof this._mounts.list === 'function') ? this._mounts.list() : [];
+            var self = this;
+            for (var i = 0; i < mounts.length; i++) {
+                var m = mounts[i];
+                if (!m || !m.meta || !m.meta.declared) continue;
+                if (this._laneCheckers[m.mountId]) continue;                      // keep its seen-set across remounts
+                try {
+                    var client = await this._laneClientFor(m.mountId);
+                    this._laneCheckers[m.mountId] = new SGAppendChecker(client, {
+                        emit: (function (mount) {
+                            return function (name, payload) {
+                                self._pushHostEvent(name, Object.assign({ mount: mount.prefix, mountId: mount.mountId }, payload || {}));
+                            };
+                        })(m)
+                    }, function () {
+                        return { enabled: AppHostEvents.allows(self._hostEvents, 'append.new-messages'), auto_fetch: false };
+                    });
+                } catch (err) {
+                    this._emitVaultEvent('append-lane-skipped', { label: 'Append lane skipped: ' + (m.prefix || m.mountId), mountId: m.mountId, err: (err && (err.code || err.message)) || 'error' });
+                }
+            }
+        }
+
+        _scheduleAppendCheck(delayMs, trigger) {
+            var hasLanes = !!(this._laneCheckers && Object.keys(this._laneCheckers).length);
+            if (!this._appendChecker && !hasLanes) return;
+            var DEBOUNCE_MS = 1000;
+            var since = Date.now() - (this._lastAppendCheckTime || 0);
+            var wait  = Math.max(delayMs || 0, DEBOUNCE_MS - since);
+            var label = trigger || 'visibility';
+            clearTimeout(this._appendCheckTimer);
+            this._appendCheckTimer = setTimeout(() => {
+                this._lastAppendCheckTime = Date.now();
+                if (this._appendChecker) this._appendChecker.check(label);
+                var lanes = this._laneCheckers || {};
+                Object.keys(lanes).forEach(function (id) { try { lanes[id].check(label); } catch (_) {} });
+            }, Math.max(0, wait));
+        }
+
+        // Push a kernel event to the app iframe, gated by app.json.host_events.
+        _pushHostEvent(name, payload) {
+            try {
+                if (!AppHostEvents.allows(this._hostEvents, name)) { this._emitBridgeCall('event.' + name, { ok: false, err: 'not in host_events' }); return; }
+                var win = this._iframeEl && this._iframeEl.contentWindow;
+                if (win) { win.postMessage({ type: 'sg-event', name: name, payload: payload }, '*'); this._emitBridgeCall('event.' + name, { ok: true, pushed: true }); }
+            } catch (_) { /* iframe gone / cross-origin — drop */ }
+        }
+
+        // Make the "unpushed commits" state VISIBLE — a persistent HUD warning (ttl=null), since
+        // the small status pill is easy to miss. Cleared on a successful push.
+        _surfaceUnpushed(reason) {
+            var hud = document.getElementById('app-hud') || document.querySelector('app-hud');
+            if (!hud || typeof hud.showMessage !== 'function') return;
+            var text = reason === 'diverged'
+                ? 'Unsynced changes — the vault changed elsewhere. Open in the vault view to merge.'
+                : (reason === 'autosync-off'
+                    ? 'Auto-sync is off — your changes are saved locally but not pushed.'
+                    : 'Could not push your changes — they are saved locally. Will retry.');
+            hud.showMessage('unpushed', text, 'warn', null);   // null ttl = persistent
+        }
+        _clearUnpushedNotice() {
+            var hud = document.getElementById('app-hud') || document.querySelector('app-hud');
+            if (hud && typeof hud.clearMessage === 'function') { try { hud.clearMessage('unpushed'); } catch (_) {} }
         }
 
         // ── Sync view to published head ────────────────────────────────────────────────
@@ -367,10 +787,21 @@
 
         async _continue(appJson) {
             // A specific file was requested ("Open as App" on a file, via /#key|app:path or the
-            // direct /en-gb/app/#path link form) — read it now and clear so a reload starts fresh.
+            // direct /en-gb/app/#path link form, OR via vault-open's deepLink field in embed
+            // mode) — read it now and clear so a reload starts fresh.
+            //
+            // Embed flow prefers instance memory because sessionStorage throws in null-origin
+            // iframes (App Iframe srcdoc parents). The non-embed flow still reads from
+            // sessionStorage where the hash handlers put it. The embed deep-link is a raw
+            // path (no 'app:' prefix); the legacy session-storage form has the prefix.
             var deepLink = '';
-            try { deepLink = sessionStorage.getItem('sg-vault-deep-link') || ''; } catch (_) {}
-            try { sessionStorage.removeItem('sg-vault-deep-link'); } catch (_) {}
+            if (typeof this._embedDeepLink === 'string') {
+                deepLink = 'app:' + this._embedDeepLink;
+                this._embedDeepLink = null;
+            } else {
+                try { deepLink = sessionStorage.getItem('sg-vault-deep-link') || ''; } catch (_) {}
+                try { sessionStorage.removeItem('sg-vault-deep-link'); } catch (_) {}
+            }
             var deepPath = deepLink.indexOf('app:') === 0 ? deepLink.slice(4) : '';
 
             // The decision (deep-link × app.json present × deep-link is HTML) is delegated to
@@ -380,27 +811,125 @@
             // /en-gb/app/#patient/index.html rendered unstyled. Now an HTML deep-link in an
             // app vault routes through _mountApp with the deep-link overriding appJson.entry,
             // so the app's CSS/JS still load.
+            var deepIsHtml = deepPath && (deepPath.lastIndexOf('.html') === deepPath.length - 5 ||
+                                          deepPath.lastIndexOf('.htm')  === deepPath.length - 4);
+
+            // Per-folder app.json (Bug 2): if the deep-linked HTML lives in a sub-folder that has
+            // its OWN app.json, that folder is its own app — use THAT manifest (its resources/
+            // auth/hud/permissions/host_events, paths resolved relative to the folder), not the
+            // root manifest. "Open as App" on tools/release-tester/index.html now loads
+            // tools/release-tester/app.json, not the vault-root app.json.
+            if (deepIsHtml && deepPath.indexOf('/') > -1) {
+                var folderJson = await this._resolveFolderAppJson(deepPath);
+                if (folderJson) {
+                    await this._setActiveManifest(folderJson);   // its OWN permissions / host_events / appId
+                    await this._mountAppFlow(folderJson);
+                    return;
+                }
+            }
+
             var decision = AppNavHelpers.decideMountStrategy({ deepPath: deepPath, appJson: appJson });
 
             if (decision.strategy === 'redirect') {
                 // No default app and no file path — App Mode lives on /en-gb/app, not the
                 // vault page; bounce there so the user can browse files instead.
+                this._mountStrategy = 'redirect';
                 var base = window.location.pathname.split('/en-gb/')[0];
                 window.location.replace(base + '/en-gb/vault/');
                 return;
             }
             if (decision.strategy === 'file') {
+                this._mountStrategy   = 'file';
+                this._mountedFilePath = decision.filePath;
                 await this._mountVaultFile(decision.filePath);
                 return;
             }
             // decision.strategy === 'app' — appJson may be the original or a deep-link-
             // overridden clone with .entry set to the requested HTML file.
-            var effectiveAppJson = decision.appJson;
+            await this._mountAppFlow(decision.appJson);
+        }
+
+        // Fetch resources for `appJson` and mount it. Records the effective manifest + strategy so
+        // an auto-refresh remount (_remountCurrent) replays the SAME app/entry, not the root default.
+        async _mountAppFlow(appJson) {
+            this._mountStrategy    = 'app';
+            this._effectiveAppJson = appJson;
             this._setStatus('Loading resources…');
-            var resourcesData = await this._fetchResources(effectiveAppJson);
+            var resourcesData = await this._fetchResources(appJson);
             this._t.resourcesLoaded = performance.now();
             this._emitVaultEvent('resources-loaded', { label: 'Resources pre-fetched', cssCount: resourcesData.css.length, jsCount: resourcesData.js.length, ms: Math.round(this._t.resourcesLoaded - (this._t.appJsonFetched || this._t.treeLoaded)) });
-            await this._mountApp(effectiveAppJson, resourcesData);
+            await this._mountApp(appJson, resourcesData);
+        }
+
+        // Read a sub-folder's app.json (next to the opened HTML) and resolve it into the manifest
+        // to mount. Returns null when the folder has no app.json. Path resolution is the pure
+        // AppNavHelpers.resolveFolderManifest (folder-relative resources, entry = the opened file).
+        async _resolveFolderAppJson(deepPath) {
+            var slash = deepPath.lastIndexOf('/');
+            if (slash < 0) return null;
+            var folder    = deepPath.slice(0, slash);
+            var candidate = folder + '/app.json';
+            var fileList  = this._dataSource.getFileList();
+            var fileEntry = fileList.find(function (f) { return f.path === candidate; });
+            if (!fileEntry) return null;
+            try {
+                var buf        = await this._dataSource.getFileBytes(fileEntry.path);
+                var folderJson = JSON.parse(new TextDecoder().decode(buf));
+                return AppNavHelpers.resolveFolderManifest(folderJson, folder, deepPath);
+            } catch (e) {
+                console.warn('[app-shell] folder app.json parse error at ' + candidate + ':', e.message);
+                return null;
+            }
+        }
+
+        // Make `appJson` the active app manifest — its permissions, host_events, consent identity
+        // and title govern the running app. Used when a folder app.json takes over from the root.
+        async _setActiveManifest(appJson) {
+            // A folder app.json REPLACES the root manifest wholesale — AppNavHelpers
+            // .resolveFolderManifest does Object.assign({}, folderJson), so nothing is
+            // inherited. Grants declared at the vault root then stop applying, silently, and
+            // the app fails with a bare "Permission denied" that points nowhere near the
+            // cause. Say so once, loudly, naming the groups that were dropped.
+            try {
+                var rootPerms   = (this._appJson && this._appJson.permissions) || null;
+                var folderPerms = (appJson       && appJson.permissions)       || null;
+                if (rootPerms && appJson !== this._appJson) {
+                    var dropped = Object.keys(rootPerms).filter(function (k) {
+                        return !folderPerms || !(k in folderPerms);
+                    });
+                    if (dropped.length) {
+                        var msg = 'This folder\'s app.json replaces the vault-root manifest, so these root '
+                                + 'permission groups no longer apply: ' + dropped.join(', ')
+                                + '. Re-declare them in the folder app.json if the app needs them.';
+                        console.warn('[app-shell] ' + msg);
+                        this._emitVaultEvent('app-json-permissions-dropped', { label: 'Root permissions dropped by folder app.json', dropped: dropped });
+                        var hudEl = document.getElementById('app-hud') || document.querySelector('app-hud');
+                        if (hudEl && typeof hudEl.showMessage === 'function') {
+                            try { hudEl.showMessage('permissions', msg, 'warn', 10000); } catch (_) {}
+                        }
+                    }
+                }
+            } catch (_) {}
+            this._appJson = appJson;
+            this._perm    = AppPermissions.parsePermissions(appJson);
+            this._appId   = '';
+            try { this._appId = await AppPermissions.appId(JSON.stringify(appJson)); } catch (_) {}
+            try { if (typeof AppHostEvents !== 'undefined') this._hostEvents = AppHostEvents.parse(appJson); } catch (_) {}
+        }
+
+        // Re-mount the CURRENT view after an auto-pull fast-forward — replays the same strategy
+        // (app/file) and the same entry/manifest the user is looking at, NOT the root default.
+        // Crucially expands lazy sub-trees first: _syncViewToPublishedHead reloads the tree with
+        // sub-folders unloaded, so without this the entry-file lookup (and folder app.json) 404.
+        async _remountCurrent() {
+            try { await this._dataSource.loadAllSubTrees(); } catch (_) {}
+            if (this._mountStrategy === 'file' && this._mountedFilePath) {
+                await this._mountVaultFile(this._mountedFilePath);
+            } else if (this._effectiveAppJson) {
+                await this._mountAppFlow(this._effectiveAppJson);
+            } else if (this._appJson) {
+                await this._mountAppFlow(this._appJson);
+            }
         }
 
 
@@ -543,8 +1072,12 @@
             keyInput.addEventListener('input', function () {
                 var v = keyInput.value.trim();
                 if (!v || !modeEl) { if (modeEl) modeEl.innerHTML = ''; return; }
+                var isReadKey = (typeof SGVaultCrypto !== 'undefined' && SGVaultCrypto.parseReadOnlyCredential)
+                    ? !!SGVaultCrypto.parseReadOnlyCredential(v) : false;
                 if (v.startsWith('ro-')) {
                     modeEl.innerHTML = '<span class="ef-mode-badge ef-mode-ro">&#128065; Read-only token</span>';
+                } else if (isReadKey) {
+                    modeEl.innerHTML = '<span class="ef-mode-badge ef-mode-ro">&#128065; Read-only key</span>';
                 } else if (v.indexOf('-') > 0 || (v.indexOf(':') > 0 && !/\s/.test(v))) {
                     modeEl.innerHTML = '<span class="ef-mode-badge ef-mode-full">&#128273; Full vault key</span>';
                 } else {
@@ -677,6 +1210,56 @@
             try { return localStorage.getItem('sg-backend-access-key') || null; } catch (_) { return null; }
         }
 
+        // ── Embedded access token (.vault/access-token.json) ────────────────────────────
+        // A backend access token can live INSIDE the vault, encrypted under read_key and under
+        // the .vault/** floor (so a sandboxed app can't read it via the bridge — only the kernel
+        // does, to authorise writes). This lets a KEY-ONLY link/QR open writable: the holder has
+        // the vault key (reads), the embedded token upgrades to writes. The token is NEVER in the
+        // URL. A vault without this file opens read-only from a key-only link (today's behaviour).
+        async _readEmbeddedAccessToken(vault) {
+            // ONE implementation (SGVault.readEmbeddedAccessToken) shared with /vault and the
+            // child kernel; the inline copy below only serves vault-likes that lack it.
+            if (vault && typeof vault.readEmbeddedAccessToken === 'function') return vault.readEmbeddedAccessToken();
+            try {
+                if (!vault) return null;
+                if (vault.needsLoading && vault.needsLoading('/.vault')) {
+                    await vault.loadSubTreeOnDemand('/.vault');
+                }
+                var listed = vault.listFolder('/.vault') || [];
+                if (!listed.some(function (e) { return e.name === 'access-token.json'; })) return null;
+                var bytes = await vault.getFile('/.vault', 'access-token.json');   // read_key decrypt
+                var obj   = JSON.parse(new TextDecoder().decode(bytes));
+                return (obj && obj.token) ? String(obj.token) : null;
+            } catch (_) { return null; }
+        }
+
+        async _writeEmbeddedAccessToken(vault, token, source) {
+            if (!vault || !vault.writable) throw Object.assign(new Error('Read-only vault'), { code: 'EREADONLY' });
+            if (!vault.listFolder('/.vault')) { try { await vault.createFolder('/.vault'); } catch (_) {} }
+            var rec   = { token: String(token), created: Date.now(), source: source || 'explicit' };
+            var bytes = new TextEncoder().encode(JSON.stringify(rec));
+            var exists = (vault.listFolder('/.vault') || []).some(function (e) { return e.name === 'access-token.json'; });
+            if (exists) await vault.updateFile('/.vault', 'access-token.json', bytes);
+            else        await vault.addFile('/.vault', 'access-token.json', bytes);
+        }
+
+        // Resolve a create/setAccessToken `accessToken` option to a concrete token string.
+        //   'inherit'    → this (parent/doctor) vault's current access token
+        //   '<explicit>' → use the supplied token string as-is
+        //   'new'        → ENOTIMPL (mint endpoint exists but uses a separate API-key workflow,
+        //                  not wired here — use 'inherit' or an explicit token for now)
+        _resolveEmbedToken(spec) {
+            if (spec === 'inherit') {
+                var t = (this._dataSource && this._dataSource._accessKey)
+                        || this._resolveAccessToken(this._vault && this._vault._vaultId);
+                if (!t) throw Object.assign(new Error('nothing to inherit — this vault has no access token'), { code: 'ENOTOKEN' });
+                return t;
+            }
+            if (spec === 'new') throw Object.assign(new Error("accessToken:'new' not wired yet — use 'inherit' or an explicit token"), { code: 'ENOTIMPL' });
+            if (typeof spec === 'string' && spec) return spec;
+            return null;
+        }
+
         // Thread the access token onto the vault's transport so write PUTs carry
         // x-sgraph-access-token. The VaultDataSource accessKey only flips the `writable`
         // flag; the actual write requests authorise via vault._sgSend.token (read at request
@@ -698,6 +1281,373 @@
             } catch (_) { return false; }
         }
 
+        // Lazily build (and cache per vault) the SGAppend transport client for the open vault.
+        // enum_key is derived from the read_key's raw bytes (owner sessions; RO sessions
+        // get a null enum_key and the read verbs fail closed). Re-derives if the vault changed.
+        async _getAppendClient() {
+            var vault = this._vault;
+            if (!vault || typeof SGAppend === 'undefined') return null;
+            if (this._append && this._appendVaultId === vault._vaultId) return this._append;
+            var sgSend   = vault._sgSend || null;
+            var endpoint = (sgSend && sgSend.endpoint)
+                || (window.SG_ENDPOINT
+                    || (function () { try { return sessionStorage.getItem('sg-vault-endpoint'); } catch (_) { return null; } })()
+                    || 'https://dev.send.sgraph.ai');
+            var rawBytes = await vault.readKeyRawBytes();
+            var enumKey  = rawBytes ? await SGAppend.deriveEnumKey(rawBytes) : null;
+            this._append = new SGAppend({
+                endpoint:    endpoint,
+                vaultId:     vault._vaultId,
+                enumKey:     enumKey,
+                writeKeyHex: vault.writeKeyHex,
+                accessToken: (sgSend && sgSend.token) || null
+            });
+            this._appendVaultId = vault._vaultId;
+            return this._append;
+        }
+
+        // Lane client for a DECLARED mount: an SGAppend bound to the CHILD's vault id and enum
+        // key, derived from the credential the parent already resolved for that mount. Lazy
+        // and cached per mountId. The child vault is never opened (MountLanes derives keys
+        // from the credential string alone), and no write key is carried — purge/configure
+        // are parent-only by construction, not just by gate. Runtime (sg.vault.mount) mounts
+        // are refused: an app-chosen mount is not an owner declaration, and the declared
+        // path is the trust anchor here (07 Sep analysis §6, "declared mounts are top-kernel-only").
+        async _laneClientFor(mountId) {
+            if (!this._laneClients) this._laneClients = {};
+            if (this._laneClients[mountId]) return this._laneClients[mountId];
+            var m = this._mounts && this._mounts.get(mountId);
+            if (!m)                                     throw Object.assign(new Error('no such mount: ' + mountId), { code: 'ENOENT' });
+            if (!m.meta || !m.meta.declared)            throw Object.assign(new Error('append lanes cross only DECLARED mounts (owner *.link.json), not runtime mounts'), { code: 'ENOLANE' });
+            if (typeof MountLanes === 'undefined' || typeof SGAppend === 'undefined' || typeof SGVaultCrypto === 'undefined') {
+                throw Object.assign(new Error('append transport unavailable'), { code: 'ENOTRANSPORT' });
+            }
+            var spec  = (this._declaredSpecs || []).find(function (d) { return d.ref === m.ref; }) || null;
+            var creds = await this._resolveChildCredentials(m.ref);
+            var bind  = await MountLanes.laneBinding(creds, spec && spec.vaultId, SGVaultCrypto);
+            if (!bind) throw Object.assign(new Error('no read credential for mount ' + (m.prefix || mountId) + ' — the lane cannot be derived'), { code: 'ENOLANE' });
+            var vault    = this._vault;
+            var sgSend   = (vault && vault._sgSend) || null;
+            var endpoint = (sgSend && sgSend.endpoint)
+                || (window.SG_ENDPOINT
+                    || (function () { try { return sessionStorage.getItem('sg-vault-endpoint'); } catch (_) { return null; } })()
+                    || 'https://dev.send.sgraph.ai');
+            var enumKey = await SGAppend.deriveEnumKey(bind.readKeyBytes);
+            var client  = new SGAppend({ endpoint: endpoint, vaultId: bind.vaultId, enumKey: enumKey, writeKeyHex: null, accessToken: null });
+            client._laneMount = { mountId: mountId, prefix: m.prefix, tier: bind.tier };
+            this._laneClients[mountId] = client;
+            return client;
+        }
+
+        // ── Release channels ("pin a version") ─────────────────────────────────────────
+        //
+        // A vault already holds every version of itself; this is the selection layer.
+        // Config: `.vault/releases.json` (inside the permission floor → an app can neither
+        // read nor tamper with it, which is exactly the requirement: which version you are
+        // running is the host's decision, not the versioned code's).
+
+        // The release MAP is read at HEAD, always. Only the CONTENT gets pinned — reading
+        // the map at the pinned commit would freeze the release list to whatever that old
+        // version knew about, with no way back to anything newer.
+        async _readReleases() {
+            var vault = this._vault;
+            if (!vault || typeof SGReleases === 'undefined') return null;
+            try {
+                // `.vault` is lazy and loadSubTreeOnDemand expands ONE level per call —
+                // the same trap that made a configured LLM key read as ENOKEY.
+                if (vault.needsLoading && vault.needsLoading('/.vault')) {
+                    await vault.loadSubTreeOnDemand('/.vault');
+                }
+                var listed = vault.listFolder('/.vault') || [];
+                if (!listed.some(function (e) { return e.name === SGReleases.FILE; })) return null;
+                var bytes = await vault.getFile('/.vault', SGReleases.FILE);
+                var cfg   = SGReleases.parse(JSON.parse(new TextDecoder().decode(bytes)));
+                return SGReleases.hasReleases(cfg) ? cfg : null;
+            } catch (_) { return null; }        // absent or corrupt → the vault opens normally
+        }
+
+        _releaseStoreKey() {
+            return 'sg-vault-release:' + ((this._vault && this._vault._vaultId) || this._vaultKey || '');
+        }
+
+        // Only ever written by an EXPLICIT selection. A vault nobody pinned therefore opens
+        // on the latest version after a reload, which is what "no news is good news" should
+        // mean here. Same kernel-localStorage tier as sg.state.* (device-local, not vault state).
+        _readStoredRelease() {
+            try { return localStorage.getItem(this._releaseStoreKey()) || null; } catch (_) { return null; }
+        }
+        _writeStoredRelease(name) {
+            try {
+                if (name) localStorage.setItem(this._releaseStoreKey(), name);
+                else      localStorage.removeItem(this._releaseStoreKey());
+            } catch (_) {}
+        }
+
+        // Consumed once, like the deep link: a pinned URL decides THIS open.
+        _consumeReleasePin() {
+            if (this._releasePinFromUrl !== undefined && this._releasePinFromUrl !== null) {
+                var v = this._releasePinFromUrl;
+                this._releasePinFromUrl = null;
+                return v;
+            }
+            try {
+                var raw = sessionStorage.getItem('sg-vault-release-pin') || '';
+                sessionStorage.removeItem('sg-vault-release-pin');
+                return raw || null;
+            } catch (_) { return null; }
+        }
+
+        // Resolve → (maybe) swap the data source for a read-only view of that commit.
+        async _applyRelease() {
+            this._releases = await this._readReleases();
+            this._release  = null;
+            if (!this._releases) return;
+
+            var isOwner = !!this._writable;          // has the access token → can push
+            var res = SGReleases.resolve({
+                config   : this._releases,
+                urlPin   : this._consumeReleasePin(),
+                storedPin: this._readStoredRelease(),
+                isOwner  : isOwner
+            });
+            this._release = res;
+
+            if (res.error) {
+                // A link asked for something that no longer exists. Say so — silently
+                // serving different content than the link requested is precisely the
+                // failure this feature exists to prevent.
+                var hud0 = document.getElementById('app-hud') || document.querySelector('app-hud');
+                if (hud0 && typeof hud0.showMessage === 'function') {
+                    try { hud0.showMessage('release', res.error, 'warn', 8000); } catch (_) {}
+                }
+            }
+            if (res.live) return;                    // nothing to swap
+
+            try {
+                var pinned = new PinnedVaultDataSource(this._vault, res.commit, { name: res.name, label: res.label });
+                await pinned.warm();                 // sync getFileList() afterwards
+                this._dataSource = pinned;
+                this._writable   = false;            // pinned is read-only for EVERYONE, owner included
+            } catch (err) {
+                this._release = { live: true, name: null, commit: null, label: null, source: 'live',
+                                  error: 'Could not load release "' + res.name + '" — showing the latest version.' };
+                this._emitVaultEvent('release-failed', { label: 'Release load failed', name: res.name, err: (err && err.message) || '' });
+            }
+        }
+
+        // Switch release at runtime (from the HUD picker). Re-opens the vault view rather
+        // than patching state in place, so every downstream consumer sees one consistent
+        // world. An explicit choice — including choosing Live — is remembered.
+        async switchRelease(name) {
+            if (!this._releases) return;
+            var live = !name || String(name).toLowerCase() === 'live';
+            this._writeStoredRelease(live ? 'live' : name);
+            this._releasePinFromUrl = live ? 'live' : name;
+            this._updateReleaseInUrl(live ? null : name);
+            try {
+                // Re-derive the data source from the live vault, then re-resolve.
+                this._writable   = !!(this._vault && this._vault._sgSend && this._vault._sgSend.token);
+                this._dataSource = new VaultDataSource(this._vault, this._accessKeyForDataSource());
+                await this._dataSource.loadAllSubTrees();
+                await this._applyRelease();
+                var appJson = await this._readAppJson();
+                this._appJson = appJson;
+                this._perm    = AppPermissions.parsePermissions(appJson);
+                await this._continue(appJson);
+                this._announceRelease();
+            } catch (err) {
+                this._showError('Could not switch release', (err && err.message) || String(err));
+            }
+        }
+
+        _accessKeyForDataSource() {
+            try { return (this._vault && this._vault._sgSend && this._vault._sgSend.token) || null; } catch (_) { return null; }
+        }
+
+        // Keep the pin in the address bar so the link a user copies carries the version.
+        // A pinned link is the whole point: a pin held only in this browser dies on a new
+        // laptop or cleared storage — mid-demo, which is the failure being designed against.
+        _updateReleaseInUrl(name) {
+            try {
+                var key = this._vaultKey || '';
+                if (!key || this._embedMode) return;
+                var base = window.location.origin + '/#' + key;
+                var url  = name ? (base + '|@' + SGReleases.slug(name)) : base;
+                history.replaceState(null, '', url);
+            } catch (_) { /* null-origin / opaque — the picker still works */ }
+        }
+
+        // Tell the HUD what to show. Also the "gentle visual clue" for a non-latest view.
+        _announceRelease() {
+            var hud = document.getElementById('app-hud') || document.querySelector('app-hud');
+            if (!hud || typeof hud.setReleases !== 'function') return;
+            try {
+                hud.setReleases(this._releases, this._release);
+            } catch (_) {}
+        }
+
+        // ── sg.llm.* host helpers ──────────────────────────────────────────────────────
+        // The app frame never sees any of this: the key, the policy and the running bill
+        // all live on this side of the postMessage boundary.
+
+        // Resolve (and cache per vault) the vault's LLM session. Cached because
+        // SGLlmVault.open unseals the owner secret — repeating that per call would be
+        // both slow and pointless. Re-resolves when the vault changes.
+        async _llmSession() {
+            var vault = this._vault;
+            if (!vault) return { ok: false, reason: 'ENOKEY' };
+            // Cache first: an already-resolved session is valid regardless of whether the
+            // resolver script is still reachable, and re-unsealing per call would be waste.
+            if (this._llmSess && this._llmSessVaultId === vault._vaultId) return this._llmSess;
+            if (typeof SGLlmVault === 'undefined') return { ok: false, reason: 'ENOKEY' };
+            try { this._llmSess = await SGLlmVault.open(vault); }
+            catch (_) { this._llmSess = { ok: false, reason: 'EPROTO' }; }
+            this._llmSessVaultId = vault._vaultId;
+            return this._llmSess;
+        }
+
+        // Session accounting comes from the SHARED ledger, so an app's spend and the vault
+        // UI's own chat spend are one number — the budget means nothing if each surface
+        // counts only itself.
+        // Session tally. Pass an appId to scope it to one spender — budget enforcement must,
+        // because per-app caps compared against a session-global counter are not caps: the
+        // owner's own chat spend would trip an app's EBUDGET and two apps would eat each
+        // other's allowance. Call with no argument for the display figure (one bill/session).
+        _llmTotals(app) {
+            if (globalThis.VaultLlmLog) {
+                return (arguments.length === 0) ? VaultLlmLog.totals() : VaultLlmLog.totals(app);
+            }
+            return { calls: 0, totalCost: 0, billedCost: 0, estimatedCost: 0, promptTokens: 0, completionTokens: 0 };
+        }
+
+        // ── sg.llm.listen — host-owned microphone → text ───────────────────────────
+        // Capture happens HERE, at the real origin, because a null-origin app frame has no
+        // `navigator.mediaDevices` at all (the SG/Tools guide documents the same constraint
+        // and assigns capture to the embedder). Recording on host chrome is also what makes
+        // the red bar unavoidable — an app cannot open a microphone invisibly.
+        //
+        // The audio is transcribed through the SAME SGLlm client, model policy, budget and
+        // ledger as every other call, so voice spend is not a separate untracked bill.
+        async _recordAndTranscribe(session, opts) {
+            var hud = document.getElementById('app-hud') || document.querySelector('app-hud');
+            var self = this;
+            var maxMs = Math.min(Math.max(opts.maxMs || 120000, 5000), 300000);
+
+            // One microphone, one take. Without this a second listen() would open a second
+            // recorder over the first — two live mics, two bars, and the first take's Stop
+            // pointing at a session nobody can reach.
+            if (this._listenFinish) throw Object.assign(new Error('Already recording'), { code: 'EBUSY' });
+
+            var rec = await SGVoice.start();                 // throws {code} if unavailable
+            var settled = false;
+
+            return await new Promise(function (resolve, reject) {
+                var timer = setTimeout(function () { finish(false); }, maxMs);
+
+                // Published so the APP can drive the take too (sg.llm.listenStop /
+                // listenCancel). The host's own bar keeps its buttons either way — an app
+                // gaining a stop button must not cost the user theirs.
+                self._listenFinish = finish;
+
+                function finish(cancelled) {
+                    if (settled) return;
+                    settled = true;
+                    if (self._listenFinish === finish) self._listenFinish = null;
+                    clearTimeout(timer);
+                    if (cancelled) {
+                        // Still stop the recorder — cancelling must release the mic, not
+                        // just hide the bar. A tab quietly holding the mic open is worse
+                        // than the original problem.
+                        SGVoice.cancel(rec).catch(function () {});
+                        if (hud && hud.hideRecording) hud.hideRecording();
+                        reject(Object.assign(new Error('Cancelled'), { code: 'EABORT' }));
+                        return;
+                    }
+                    if (hud && hud.setRecordingBusy) hud.setRecordingBusy('Transcribing…');
+                    SGVoice.stop(rec)
+                        .then(function (audio) { return self._transcribe(audio, opts); })
+                        .then(function (out) { if (hud && hud.hideRecording) hud.hideRecording(); resolve(out); })
+                        .catch(function (err) { if (hud && hud.hideRecording) hud.hideRecording(); reject(err); });
+                }
+
+                if (hud && hud.showRecording) {
+                    hud.showRecording({ onStop: function () { finish(false); },
+                                        onCancel: function () { finish(true); } });
+                } else {
+                    // No HUD (embed / minimal host): never record without a visible stop —
+                    // fall back to a short fixed take rather than an open microphone.
+                    setTimeout(function () { finish(false); }, Math.min(maxMs, 15000));
+                }
+            });
+        }
+
+        // Delegates to SGVoice.transcribeWith so the app bridge and the vault's own chat
+        // panel share ONE implementation of model policy, spend caps and the ledger entry.
+        async _transcribe(audio, opts) {
+            var s = await this._llmSession();
+            return SGVoice.transcribeWith(s, audio, {
+                model : opts.model,
+                prompt: opts.prompt,
+                appId : this._appId || null
+            });
+        }
+
+        // Size + shape of any image parts in an outgoing message set. Kept host-side so the
+        // ceiling is not something a frame can talk its way past.
+        _llmCountImages(messages) {
+            var pc = (typeof SGVision !== 'undefined')
+                ? SGVision.promptChars(messages)
+                : { chars: 0, images: 0 };
+            var bytes = 0;
+            var arr = Array.isArray(messages) ? messages : [];
+            for (var i = 0; i < arr.length; i++) {
+                var c = arr[i] && arr[i].content;
+                if (!Array.isArray(c)) continue;
+                for (var j = 0; j < c.length; j++) {
+                    var p = c[j];
+                    if (p && p.type === 'image_url') {
+                        var u = (p.image_url && p.image_url.url) || '';
+                        // base64 is 4 chars per 3 bytes; close enough for a ceiling check and
+                        // it never needs to decode a payload just to measure it.
+                        bytes += Math.floor(String(u).length * 0.75);
+                    }
+                }
+            }
+            return { chars: pc.chars, images: pc.images, bytes: bytes };
+        }
+
+        _llmMaxImageBytes() {
+            return (typeof SGVision !== 'undefined') ? (SGVision.MAX_BYTES * SGVision.MAX_IMAGES)
+                                                     : (16 * 1024 * 1024);
+        }
+
+        _llmLedgerPatch(res, fallbackModel) {
+            var eff = SGLlm.effectiveCost(res);
+            return {
+                id        : res.id || null,
+                model     : res.model || fallbackModel,
+                status    : res.aborted ? 'aborted' : 'ok',
+                usage     : res.usage || {},
+                cost      : (eff.value != null) ? eff.value : null,
+                costSource: eff.source,
+                estimated : eff.estimated,
+                latencyMs : res.latencyMs || null
+            };
+        }
+
+        // "This app is calling an LLM" — shown once per app session. An app spending the
+        // user's money in the background with no visible sign is precisely what the HUD
+        // exists to prevent; repeating it on every token would be noise, so it is one
+        // notice plus the permanent activity/ledger surfaces.
+        _llmNotify(model) {
+            if (this._llmNotified) return;
+            this._llmNotified = true;
+            var hud = document.getElementById('app-hud') || document.querySelector('app-hud');
+            if (hud && typeof hud.showMessage === 'function') {
+                try { hud.showMessage('llm', 'This app is calling an AI model (' + model + ') with your vault\'s key.', 'info', 6000); } catch (_) {}
+            }
+        }
+
         // Consent cache key — scoped by (vault, app identity, verb) so a different app in the same
         // vault never inherits a prior app's consent (A4). Single source of truth for _can-layered
         // consent and the HUD chip/panel.
@@ -711,11 +1661,26 @@
         // the HUD (host chrome, §3.5) — the sandboxed app cannot satisfy it. Serialised so two
         // concurrent requests don't collide on the single HUD slot (A10).
         async _consent(verb, path) {
-            var alwaysConfirm = (verb === 'vault.delete');
+            // Effective policy: app.json permissions.consent[verb] adjusts the per-verb default.
+            //   default 'always' for key-return / destroy; 'once' for the rest.
+            //   'auto' → no prompt (the app.json author opted into trusting the grant alone).
+            //
+            // BUT app.json is authored by the APP (untrusted — it declares intent, it does not
+            // grant capability). For verbs with a consent FLOOR the manifest may therefore only
+            // make consent STRICTER, never weaker: without this, an app could ship
+            // `"consent": {"llm.chat": "auto"}` and switch off the gate on a capability that
+            // spends the vault owner's money, and `llm.listen` (a MICROPHONE) could be granted
+            // once and cached forever.
+            var floor = AppShell.CONSENT_FLOOR[verb] || null;
+            var policy = (this._perm && this._perm.consent && this._perm.consent[verb]) || null;
+            var defaultAlways = (verb === 'vault.delete' || verb === 'vault.createKey' || floor === 'always');
+            var mode = policy || (defaultAlways ? 'always' : 'once');
+            if (floor) mode = AppShell.strictestConsent(mode, floor);
+            if (mode === 'auto') return true;                              // pre-granted in app.json — no prompt
             var ckey = this._consentCacheKey(verb);
-            if (!alwaysConfirm) { try { if (localStorage.getItem(ckey) === '1') return true; } catch (_) {} }
+            if (mode === 'once') { try { if (localStorage.getItem(ckey) === '1') return true; } catch (_) {} }
             var granted = await this._hudConsent(verb, path);
-            if (granted && !alwaysConfirm) { try { localStorage.setItem(ckey, '1'); } catch (_) {} }
+            if (granted && mode === 'once') { try { localStorage.setItem(ckey, '1'); } catch (_) {} }
             return granted;
         }
 
@@ -750,29 +1715,260 @@
             return s || ('link-' + Math.random().toString(36).slice(2, 8));
         }
 
-        // Create a new child vault and wire it into folder `path` as a read-through sub-vault:
-        // keyless <slug>.link.json in the tree + a portable read-only owner record (read_key tier).
-        // Mirrors the host "Add link" flow (vault-browse-edit _showAddLink). v1 = read-through only.
-        async _createChildVault(path, label) {
-            var parentVault = this._vault;
-            var sgSend = parentVault && parentVault._sgSend;
-            if (!sgSend || typeof SGVault === 'undefined' || typeof VaultLinks === 'undefined') throw new Error('Cannot create vaults here');
-            var child   = await SGVault.create(sgSend, this._genVaultPassphrase(), { name: label });   // proper-vault-key derivation
-            var vaultId = child._vaultId;
-            var refId   = this._genRefId();
+        // ── Owner-secret store (owner-tier custody for child write-keys) ─────────────
+        // Secrets live at .vault/owner/secrets/<ref>.json, sealed with a key derived from
+        // THIS vault's write_key (SGVaultOwnerSecrets). RO sessions (write_key=null) cannot
+        // derive the key → cannot open them. The outer vault-file read_key encryption is
+        // incidental; the inner seal provides the owner tier. Distinct from ro-links.json
+        // (read-tier, readable by any parent reader).
+        _secretsFolder() { return '/.vault/owner/secrets'; }
 
-            var dir = path ? ('/' + path) : '/';
-            if (dir !== '/' && !parentVault.listFolder(dir)) { try { await this._dataSource.createFolder(dir); } catch (_) {} }
-            var fileName = this._slugify(label) + '.link.json';
-            var linkObj  = { vault_id: vaultId, ref_id: refId, label: label };
-            await this._dataSource.saveFile(dir, fileName, new TextEncoder().encode(JSON.stringify(linkObj, null, 2)).buffer);
+        async _ownerSecretKey() {
+            if (this._ownerSecretCryptoKey) return this._ownerSecretCryptoKey;
+            var wk = this._vault && this._vault.writeKeyHex;
+            if (!wk) throw Object.assign(new Error('Read-only: owner secrets unavailable'), { code: 'EREADONLY' });
+            this._ownerSecretCryptoKey = await SGVaultOwnerSecrets.deriveKey(wk);
+            return this._ownerSecretCryptoKey;
+        }
 
-            var rawRk  = new Uint8Array(await crypto.subtle.exportKey('raw', child._readKey));
-            var record = { type: 'vault', label: label, pin: { mode: 'latest' }, vault_id: vaultId,
-                           read_key: btoa(String.fromCharCode.apply(null, rawRk)), ref_file_id: child._refFileId };
-            await VaultLinks.saveRoRecord(parentVault, refId, record);   // read-tier owner record; commits + pushes
-            if (this._dataSource.scan) { try { await this._dataSource.scan(); } catch (_) {} }
-            return { vault_id: vaultId, ref_id: refId, ref_file_id: child._refFileId };
+        async _ensureSecretsFolder() {
+            var v = this._vault, parts = ['.vault', 'owner', 'secrets'], cur = '';
+            for (var i = 0; i < parts.length; i++) {
+                var next = cur ? cur + '/' + parts[i] : parts[i];
+                if (!v.listFolder('/' + next)) { try { await v.createFolder('/' + next); } catch (_) {} }
+                cur = next;
+            }
+        }
+
+        async _ownerSecretPut(refId, secret) {
+            var v = this._vault;
+            if (!v || !v.writable) throw Object.assign(new Error('Read-only vault'), { code: 'EREADONLY' });
+            var key = await this._ownerSecretKey();
+            var rec = await SGVaultOwnerSecrets.seal(key, secret);
+            await this._ensureSecretsFolder();
+            var folder = this._secretsFolder(), name = refId + '.json';
+            var bytes  = new TextEncoder().encode(JSON.stringify(rec));
+            var exists = (v.listFolder(folder) || []).some(function (e) { return e.name === name; });
+            if (exists) await v.updateFile(folder, name, bytes); else await v.addFile(folder, name, bytes);
+            if (typeof v.push === 'function') { try { await v.push(); } catch (_) {} }
+        }
+
+        async _ownerSecretGet(refId) {
+            var v = this._vault, folder = this._secretsFolder(), name = refId + '.json';
+            if (!(v.listFolder(folder) || []).some(function (e) { return e.name === name; })) return null;
+            var bytes = await v.getFile(folder, name);               // read_key (outer) decrypt
+            var rec   = JSON.parse(new TextDecoder().decode(bytes));
+            var key   = await this._ownerSecretKey();
+            return await SGVaultOwnerSecrets.open(key, rec);         // owner-tier (inner) decrypt
+        }
+
+        async _ownerSecretList() {
+            var v = this._vault, folder = this._secretsFolder(), out = [], key;
+            try { key = await this._ownerSecretKey(); } catch (_) { return out; }
+            var listed = v.listFolder(folder) || [];
+            for (var i = 0; i < listed.length; i++) {
+                var e = listed[i];
+                if (e.type !== 'file' || !/\.json$/.test(e.name)) continue;
+                try {
+                    var bytes = await v.getFile(folder, e.name);
+                    var sec   = await SGVaultOwnerSecrets.open(key, JSON.parse(new TextDecoder().decode(bytes)));
+                    out.push({ ref_id: e.name.replace(/\.json$/, ''), vault_id: sec.vault_id, label: sec.label });
+                } catch (_) {}
+            }
+            return out;
+        }
+
+        async _ownerSecretRemove(refId) {
+            var v = this._vault, folder = this._secretsFolder(), name = refId + '.json';
+            if ((v.listFolder(folder) || []).some(function (e) { return e.name === name; })) {
+                await v.removeFile(folder, name);
+                if (typeof v.push === 'function') { try { await v.push(); } catch (_) {} }
+            }
+        }
+
+        // ── Create a child vault (read-through link / standalone / return-key / seedFrom) ──
+        // opts = { label, link:{path}|false, returnKey:bool, custody:bool(default true),
+        //          seedFrom, accessToken:'inherit'|'<explicit>'|undefined }
+        // The returned `key` (when requested) is the OPENABLE composed form `passphrase:vault_id`
+        // — the bare passphrase has no colon and would fail SGVaultCrypto.parseVaultKey.
+        // accessToken embeds a backend token in the new vault (.vault/access-token.json) so a
+        // key-only link opens it WRITABLE — the token is never put in the link.
+        async _createChildVault(opts) {
+            opts = opts || {};
+            var parentVault = this._vault, sgSend = parentVault && parentVault._sgSend;
+            if (!sgSend || typeof SGVault === 'undefined') throw new Error('Cannot create vaults here');
+            var label     = String(opts.label || 'vault');
+            var wantsLink = !!(opts.link && opts.link.path != null);
+            var wantsKey  = !!opts.returnKey;
+            var custody   = opts.custody !== false;                 // default: kernel custodies the key
+            if (!wantsLink && !wantsKey && !custody) throw Object.assign(new Error('unreachable vault: needs link, returnKey, or custody'), { code: 'EINVAL' });
+
+            // Resolve the embed token BEFORE creating (fail fast on a bad 'inherit'/'new').
+            var embedToken = opts.accessToken ? this._resolveEmbedToken(opts.accessToken) : null;
+
+            var passphrase = this._genVaultPassphrase();            // strong shape; never simple-token
+            var child      = await SGVault.create(sgSend, passphrase, { name: label });
+            var vaultId    = child._vaultId;
+            var key        = child._passphrase + ':' + child._vaultId;   // composed openable key
+            var refId      = this._genRefId();
+
+            if (embedToken) {
+                await this._writeEmbeddedAccessToken(child, embedToken, opts.accessToken === 'inherit' ? 'inherit' : 'explicit');
+            }
+
+            if (opts.seedFrom) {
+                try { await this._seedVaultTree(child, opts.seedFrom); }
+                catch (e) { console.warn('[app-shell] seedFrom failed:', e && e.message); }
+            }
+
+            // Publish the child (embedded token + any seed) to its named ref so a fresh open elsewhere
+            // sees them. _seedVaultTree also pushes; a re-push of the same head is harmless.
+            if (embedToken && typeof child.push === 'function') { try { await child.push(); } catch (_) {} }
+
+            var result = { vault_id: vaultId, ref_id: refId };
+
+            if (custody) {
+                try { await this._ownerSecretPut(refId, { vault_id: vaultId, key: key, label: label, created: Date.now() }); }
+                catch (e) { if (!wantsKey) throw e; }               // if returning the key, custody failure is non-fatal
+            }
+
+            if (wantsLink) {
+                var dir = opts.link.path ? ('/' + AppPermissions.normalizePath(opts.link.path)) : '/';
+                if (dir !== '/' && !parentVault.listFolder(dir)) { try { await this._dataSource.createFolder(dir); } catch (_) {} }
+                var fileName = this._slugify(label) + '.link.json';
+                var linkObj  = { vault_id: vaultId, ref_id: refId, label: label };
+                await this._dataSource.saveFile(dir, fileName, new TextEncoder().encode(JSON.stringify(linkObj, null, 2)).buffer);
+                var rawRk  = new Uint8Array(await crypto.subtle.exportKey('raw', child._readKey));
+                var record = { type: 'vault', label: label, pin: { mode: 'latest' }, vault_id: vaultId,
+                               read_key: btoa(String.fromCharCode.apply(null, rawRk)), ref_file_id: child._refFileId };
+                await VaultLinks.saveRoRecord(parentVault, refId, record);   // read-tier owner record; commits + pushes
+                if (this._dataSource.scan) { try { await this._dataSource.scan(); } catch (_) {} }
+                result.ref_file_id = child._refFileId;
+            }
+
+            if (wantsKey) result.key = key;                         // raw key returned only on demand
+            result.writable_link = !!embedToken;                    // key-only link opens writable
+            return result;
+        }
+
+        // Retrieve a custodied key to re-share. As powerful as createKey → consent always re-confirms.
+        async _getVaultKey(refId) {
+            var sec = await this._ownerSecretGet(String(refId));
+            if (!sec || !sec.key) throw Object.assign(new Error('no key on file for ' + refId), { code: 'ENOKEY' });
+            return { key: sec.key };
+        }
+
+        // Set / rotate the embedded access token of a vault (Q4). ref = a custodied ref_id
+        // (resolved kernel-side via the owner-secret store) or a raw key. value = 'inherit' or an
+        // explicit token. Opens the target writable, writes .vault/access-token.json, pushes.
+        async _setVaultAccessToken(ref, value) {
+            var token = this._resolveEmbedToken(value);
+            if (!token) throw Object.assign(new Error('no token to set'), { code: 'EINVAL' });
+            var key = (ref && String(ref).indexOf(':') > -1) ? String(ref) : null;
+            if (!key) { var sec = await this._ownerSecretGet(String(ref)); key = sec && sec.key; }
+            if (!key) throw Object.assign(new Error('cannot resolve vault for ' + ref), { code: 'ENOKEY' });
+            var target = await SGVault.open(this._vault._sgSend, key);
+            await this._writeEmbeddedAccessToken(target, token, value === 'inherit' ? 'inherit' : 'explicit');
+            if (typeof target.push === 'function') { try { await target.push(); } catch (_) {} }
+            return { set: true, vault_id: target._vaultId };
+        }
+
+        // Launch a vault as an app. A raw key (contains ':') is used directly; a ref is resolved
+        // from the owner-secret store kernel-side (the key never crosses the iframe boundary).
+        async _openAppVault(ref, opts) {
+            opts = opts || {};
+            var key = (ref && String(ref).indexOf(':') > -1) ? String(ref) : null;
+            if (!key) { var sec = await this._ownerSecretGet(String(ref)); key = sec && sec.key; }
+            if (!key) throw Object.assign(new Error('cannot resolve key for ' + ref), { code: 'ENOKEY' });
+            var url = location.origin + '/en-gb/app/#' + encodeURIComponent(key) +
+                      (opts.deepLink ? ('/' + String(opts.deepLink).replace(/^\//, '')) : '');
+            if (opts.target === 'replace') { location.href = url; return { opened: 'replace' }; }
+            if (opts.target === 'embed')   { throw Object.assign(new Error('embed target deferred'), { code: 'ENOTIMPL' }); }
+            window.open(url, '_blank');
+            return { opened: 'tab' };
+        }
+
+        // Roster: custodied secrets (owner-tier, rw) ∪ read-through links (read-tier, ro).
+        async _listChildVaults() {
+            var self = this;
+            var rows = await this._ownerSecretList();
+            var seen = {}, out = rows.map(function (r) { seen[r.ref_id] = true; return { ref_id: r.ref_id, vault_id: r.vault_id, label: r.label, tier: 'rw' }; });
+            try {
+                var links = await VaultLinks.loadRoLinks(self._vault).catch(function () { return {}; });
+                Object.keys(links || {}).forEach(function (refId) {
+                    if (seen[refId]) return;
+                    var rec = links[refId] || {};
+                    out.push({ ref_id: refId, vault_id: rec.vault_id || null, label: rec.label || refId, tier: 'ro' });
+                });
+            } catch (_) {}
+            return out;
+        }
+
+        // Destroy a child vault. Key custody is solved (owner-secret store); the server-side
+        // teardown requires SGVault.destroy() — if absent, the custody record + link are removed
+        // and { server_teardown:false } is reported (the server vault is retained until the
+        // teardown endpoint ships — see the dev plan §16 server dependency).
+        async _deleteChildVault(refId) {
+            var sec = await this._ownerSecretGet(String(refId));
+            var serverTeardown = false;
+            if (sec && sec.key) {
+                try {
+                    var child = await SGVault.open(this._vault._sgSend, sec.key);
+                    if (typeof child.destroy === 'function') { await child.destroy(); serverTeardown = true; }
+                } catch (e) { console.warn('[app-shell] vault.delete server teardown failed:', e && e.message); }
+            }
+            await this._ownerSecretRemove(String(refId));
+            return { deleted: true, vault_id: sec && sec.vault_id, server_teardown: serverTeardown };
+        }
+
+        // ── seedFrom: copy a template tree into the freshly-created (writable) child ──────
+        // source 'self:<path>' → a folder in THIS vault; '<ref_id>' → a custodied/linked
+        // source; '<raw key>' (contains ':') → open read-only by possession (Q4). The walk
+        // SKIPS any .vault/** segment so a template copy can never exfiltrate owner secrets.
+        async _seedVaultTree(childVault, source) {
+            var src = String(source || ''), entries;
+            if (src.indexOf('self:') === 0) {
+                entries = await this._collectTree(this._vault, AppPermissions.normalizePath(src.slice(5)));
+            } else {
+                entries = await this._collectTree(await this._resolveReadableVault(src), '');
+            }
+            for (var i = 0; i < entries.length; i++) {
+                var rel = entries[i].relPath, slash = rel.lastIndexOf('/');
+                var dir = slash > 0 ? '/' + rel.slice(0, slash) : '/', name = slash > 0 ? rel.slice(slash + 1) : rel;
+                if (dir !== '/' && !childVault.listFolder(dir)) { try { await childVault.createFolder(dir); } catch (_) {} }
+                try { await childVault.addFile(dir, name, entries[i].bytes); }
+                catch (_) { try { await childVault.updateFile(dir, name, entries[i].bytes); } catch (__) {} }
+            }
+            // addFile commits to the child's CLONE ref only — push so the seeded content is on
+            // the child's published (named) ref, i.e. visible to anyone who opens the new vault.
+            if (entries.length && typeof childVault.push === 'function') { try { await childVault.push(); } catch (_) {} }
+        }
+
+        // Walk a vault's tree under basePath → [{ relPath, bytes }]; skips .vault/** (floor).
+        async _collectTree(vault, basePath) {
+            var out = [], stack = [{ abs: basePath ? ('/' + basePath) : '/', rel: '' }];
+            while (stack.length) {
+                var node = stack.pop(), listed = vault.listFolder(node.abs) || [];
+                for (var i = 0; i < listed.length; i++) {
+                    var e = listed[i], rel = node.rel ? node.rel + '/' + e.name : e.name;
+                    if (AppPermissions.hasVaultSegment(rel)) continue;          // floor
+                    var abs = node.abs === '/' ? '/' + e.name : node.abs + '/' + e.name;
+                    if (e.type === 'folder') { stack.push({ abs: abs, rel: rel }); }
+                    else { try { out.push({ relPath: rel, bytes: await vault.getFile(node.abs, e.name) }); } catch (_) {} }
+                }
+            }
+            return out;
+        }
+
+        // Resolve a ref_id or raw key to a readable SGVault (raw key = possession authority, Q4).
+        async _resolveReadableVault(refOrKey) {
+            var s = String(refOrKey);
+            if (s.indexOf(':') > -1) return await SGVault.open(this._vault._sgSend, s);
+            var sec = await this._ownerSecretGet(s);
+            if (sec && sec.key) return await SGVault.open(this._vault._sgSend, sec.key);
+            var link = await VaultLinks.effectiveLink(this._vault, s).catch(function () { return null; });
+            if (link && link.read_key) return await SGVault.openReadOnly(this._vault._sgSend, link.vault_id, link.read_key, link.ref_file_id);
+            throw Object.assign(new Error('cannot resolve source vault: ' + s), { code: 'ENOKEY' });
         }
 
         // Remove a sub-vault pointer (the <name>.link.json). The child vault stays on the server
@@ -861,8 +2057,14 @@
             // (no allow-same-origin), so VivCustody classifies App-A as 'null-origin' and
             // the gate no longer refuses parent-held mounts (null-origin App-A cannot read
             // the parent's secrets — that was the whole point of the coupling rule).
-            var sandboxSpec = (this._iframeEl && this._iframeEl.getAttribute && this._iframeEl.getAttribute('sandbox')) || null;
-            var appOrigin   = VivCustody.classifyAppFrameOrigin(sandboxSpec);
+            // Evaluated at each gate (a function): declared mounts register just BEFORE the
+            // app iframe exists, so classify the sandbox the frame is ABOUT to get
+            // (_appSandbox()) when there is no element yet, and the live element after.
+            var appOrigin = function () {
+                var spec = (self._iframeEl && self._iframeEl.getAttribute && self._iframeEl.getAttribute('sandbox'))
+                        || (typeof self._appSandbox === 'function' ? self._appSandbox() : null);
+                return VivCustody.classifyAppFrameOrigin(spec);
+            };
             // Synthetic-only escape hatch. NEVER set this for real-data trials. The
             // pack §05 invariant is fail-closed by design; this is the one named opt-in.
             var unsafeOk = (window.SG_VIV_ALLOW_UNSAFE_SYNTHETIC === true);
@@ -941,22 +2143,44 @@
             var iframe = document.createElement('iframe');
             iframe.sandbox = 'allow-scripts';            // null origin
             iframe.style.cssText = 'display:none;';      // headless mount; visible UI mounts are Phase 5
+            // srcdoc navigation is asynchronous: the moment the element is in the DOM its
+            // contentWindow is the initial about:blank document, so a port posted before
+            // `load` reaches a window with no listener and the boot hangs forever (the
+            // broker entry stayed 'pending' — found by the declared-mounts browser e2e).
+            // Arm the load promise BEFORE setting srcdoc, wait for it, then bootstrap.
+            var loaded = new Promise(function (resolve) { iframe.addEventListener('load', resolve, { once: true }); });
             iframe.srcdoc = KERNEL_SHELL_HTML;
             document.body.appendChild(iframe);
 
             var channel;
             try {
-                channel = await SecureChannel.create(iframe, { sensitiveKey: true, cid: 'ch-' + ref });
+                await Promise.race([loaded, new Promise(function (_, reject) {
+                    setTimeout(function () { reject(Object.assign(new Error('child kernel load timeout'), { code: 'EUNREACH' })); }, 10000);
+                })]);
+                channel = await SecureChannel.create(iframe, { sensitiveKey: true, cid: 'ch-' + ref, timeoutMs: 10000 });
                 // M5: tell the child WHICH server to hit — its own Edge 1. Without this the
                 // child falls back to the hardcoded dev endpoint regardless of where we are.
                 await channel.send('secrets', {
                     vaultKey:    creds.vaultKey,
                     accessToken: creds.accessToken || null,
-                    endpoint:    this._sendEndpoint()
+                    endpoint:    this._sendEndpoint(),
+                    // Per-parent clone branch in the child (07 Sep §6.3): two parents mounting the
+                    // same child must not share one clone ref. HMAC-derived — the parent id never
+                    // appears on the server. Label/kind feed the child's Via-Mount commit trailer.
+                    cloneBranch: 'viv:' + ((this._vault && this._vault._vaultId) || 'top'),
+                    parentVaultId: (this._vault && this._vault._vaultId) || null,
+                    mountLabel:  creds.label || ref,
+                    mountKind:   creds.kind  || 'runtime'
                 }, { sensitive: true });
                 await new Promise(function (resolve, reject) {
                     var t = setTimeout(function () { reject(Object.assign(new Error('child kernel boot timeout'), { code: 'EUNREACH' })); }, 10000);
                     channel.on('ready', function (p) { clearTimeout(t); resolve(p); });
+                    // The child reports a failed boot (vault open, policy read…) instead of
+                    // leaving the parent to time out: fail fast with the real cause.
+                    channel.on('boot-error', function (p) {
+                        clearTimeout(t);
+                        reject(Object.assign(new Error('child kernel boot failed: ' + ((p && p.message) || 'unknown')), { code: (p && p.code) || 'EUNREACH' }));
+                    });
                 });
             } catch (err) {
                 if (channel) { try { channel.close(); } catch (_) {} }
@@ -970,12 +2194,69 @@
 
         async _mountChildVault(opts) {
             var kp = this._ensureKernelParent();
-            return kp.mount({ prefix: opts.prefix, ref: opts.ref, label: opts.label });
+            return kp.mount({ prefix: opts.prefix, ref: opts.ref, label: opts.label, meta: opts.meta || {} });
         }
 
-        async _unmountChildVault(mountId) {
+        // Declared mounts (07 Sep analysis §5): every `<name>.link.json` the OWNER put in the
+        // vault becomes an ordinary KernelParent mount before the app runs, so the app reads
+        // and writes `/<name>/…` without ever calling sg.vault.mount — it has no idea the path
+        // is another vault. Register eager (the path resolves from the first bridge call),
+        // spawn lazy (no child kernel until first use). Idempotent per vault. Never fatal: a
+        // link with no resolvable credentials stays a read-only composite link exactly as
+        // before. Top-kernel only by construction — child kernels run kernel-bootstrap, not
+        // this shell, so a child never auto-mounts (no cycles, non-transitive reach holds).
+        async _mountDeclaredVaults() {
+            if (this._declaredMountsDone) return this._declaredMountsResult || [];
+            this._declaredMountsDone = true;
+            var out = [];
+            if (typeof DeclaredMounts === 'undefined' || typeof VaultLinks === 'undefined') return out;
+            if (!this._dataSource || !this._vault) return out;
+            var self = this, specs = [], fileList = [];
+            try {
+                fileList = this._dataSource.getFileList() || [];
+                specs = await DeclaredMounts.scan(fileList, function (p) { return self._dataSource.getFileBytes(p); });
+            } catch (_) { specs = []; }
+            if (!specs.length) return out;
+            this._declaredSpecs = specs;
+            var kp = null;
+            try { kp = this._ensureKernelParent(); } catch (_) { return out; }
+            for (var i = 0; i < specs.length; i++) {
+                var spec = specs[i];
+                // S6 pre-flight: a REAL folder at the mount path becomes unreachable (the mount wins
+                // the path; nothing is corrupted). Say so — the owner may have left content there.
+                var shadowed = fileList.some(function (f) { return f && f.dir && f.path === spec.prefix + '/'; });
+                if (shadowed) {
+                    this._emitVaultEvent('declared-mount-shadows-folder', { label: 'Declared mount ' + spec.prefix + '/ shadows a real folder in this vault', prefix: spec.prefix, ref: spec.ref });
+                }
+                if (spec.duplicateOf) {
+                    // Same child already declared at another path in THIS vault — one mount per child.
+                    this._emitVaultEvent('declared-mount-skipped', { label: 'Declared mount skipped (duplicate child): ' + spec.prefix, prefix: spec.prefix, ref: spec.ref, err: 'EEXIST', duplicateOf: spec.duplicateOf });
+                    continue;
+                }
+                try {
+                    var res = await kp.mount({ prefix: spec.prefix, ref: spec.ref, label: spec.label, lazy: true,
+                                               meta: { declared: true, linkPath: spec.linkPath } });
+                    // The broker's per-mount 'ask' is for RUNTIME mounts an app requested itself.
+                    // A declared mount is the owner's decision, the app's grant on that prefix is
+                    // still checked by _can, the app-level consent flow (fs.write 'once'…) still
+                    // runs, and the child's own policy still gates every op. A second prompt naming
+                    // a mount id would only reveal the mount the design hides. → auto.
+                    ['fs.read', 'fs.write', 'fs.delete', 'fs.mkdir', 'fs.move'].forEach(function (cap) {
+                        try { kp.broker.setPolicy(res.mountId, cap, 'auto'); } catch (_) {}
+                    });
+                    out.push({ prefix: spec.prefix, ref: spec.ref, mountId: res.mountId, access: res.access });
+                    this._emitVaultEvent('declared-mount', { label: 'Declared mount ' + spec.prefix + ' (' + res.access + ')', prefix: spec.prefix, ref: spec.ref, access: res.access });
+                } catch (err) {
+                    this._emitVaultEvent('declared-mount-skipped', { label: 'Declared mount skipped: ' + spec.prefix, prefix: spec.prefix, ref: spec.ref, err: (err && (err.code || err.message)) || String(err) });
+                }
+            }
+            this._declaredMountsResult = out;
+            return out;
+        }
+
+        async _unmountChildVault(mountId, opts) {
             if (!this._kernelParent) return { unmounted: false };
-            var res = await this._kernelParent.unmount(mountId);
+            var res = await this._kernelParent.unmount(mountId, opts || {});
             // Tear down the iframe stashed on the channel (DOM cleanup KernelParent can't do).
             try {
                 var iframe = res && res.channel && res.channel._mountIframe;
@@ -989,13 +2270,40 @@
             return this._kernelParent.list();
         }
 
-        // Trial-only stub. The clinic vault's app.json + an owner record (clinic.json)
-        // can provide child credentials. Real production: Kernel-A holds them
-        // (port-transfer model — architect pack §3 "Cleaner future variant").
-        // Resolved creds are tagged custody:'parent-held' so the B10 gate can refuse
-        // the unsafe combination (this resolver + a same-origin App-A) by default.
+        // What sg.vault.mounts() hands an app (S4): the projection, never the raw kernel row.
+        _listMountsForApps() {
+            if (!this._kernelParent) return [];
+            return this._kernelParent.listForApps();
+        }
+
+        // Production credential resolver for a mount ref (07 Sep analysis §5.2). Order:
+        //   1. owner-secret store (.vault/owner/secrets/<ref>, parent WRITE-key tier) → full key → rw
+        //   2. ro-links record   (.vault/owner/ro-links.json, parent READ-key tier)  → read cred → ro
+        //   3. a key saved on this device (VaultLinks localStorage)                    → full key → rw
+        //   4. the clinic.json trial stub (kept for the synthetic trial)
+        // In a read-only parent session step 1 cannot decrypt and falls through to 2 —
+        // never throws, never opens rw. The pure ordering lives in DeclaredMounts so it is
+        // unit-tested; this method only wires the sources.
         async _resolveChildCredentials(ref) {
             if (this._resolveChildCredentialsImpl) return this._resolveChildCredentialsImpl(ref);
+            var self = this;
+            if (typeof DeclaredMounts !== 'undefined') {
+                var spec    = (this._declaredSpecs || []).find(function (d) { return d.ref === ref; }) || null;
+                var vaultId = spec ? spec.vaultId : null;
+                return DeclaredMounts.resolveCredentials(ref, vaultId, {
+                    ownerSecret: function (r)   { return self._ownerSecretGet(String(r)); },
+                    roRecord:    function (r)   { return (typeof VaultLinks !== 'undefined') ? VaultLinks.resolveRef(self._vault, r) : null; },
+                    storedKey:   function (vid) { return (typeof VaultLinks !== 'undefined') ? VaultLinks.getStoredChildKey(vid) : null; },
+                    legacy:      function (r)   { return self._resolveChildCredentialsLegacy(r); }
+                });
+            }
+            return this._resolveChildCredentialsLegacy(ref);
+        }
+
+        // Trial-only stub (pre-07-Sep behaviour): clinic.json in the vault tree, PLAINTEXT
+        // credentials. Now the LAST fallback, kept only so the synthetic clinic trial keeps
+        // working. Tagged custody:'parent-held' so the B10 gate applies.
+        async _resolveChildCredentialsLegacy(ref) {
             try {
                 var bytes = await this._dataSource.getFileBytes('clinic.json');
                 var clinic = JSON.parse(new TextDecoder().decode(bytes));
@@ -1040,6 +2348,11 @@
         }
 
         _setCachedAccessKey(vaultId, key, persist) {
+            // Embed mode: never persist. The parent owns credentials lifecycle
+            // (same reasoning as the vault-key skip in _initWithKey). Null-origin
+            // embed parents would throw here too — the existing catch keeps things
+            // quiet, but skipping the call entirely is cleaner and signals intent.
+            if (this._embedMode) return;
             try {
                 if (persist) localStorage.setItem('sg-access-key:' + vaultId, key);
                 else         sessionStorage.setItem('sg-access-key:' + vaultId, key);
@@ -1186,6 +2499,15 @@
             var htmlBytes = await this._dataSource.getFileBytes(entry.path);
             var htmlText  = new TextDecoder().decode(htmlBytes);
 
+            // Empty-entry guard. A 0-byte or whitespace-only entry file (e.g. a broken
+            // reassembled app, a failed write, or a placeholder that never got content)
+            // would otherwise mount a blank iframe with NO clue for the user — the worst
+            // case. Catch it here with a clear host-drawn error instead.
+            if (!htmlText || !htmlText.trim()) {
+                this._showError('Entry file "' + entryFile + '" is empty — the app has no content to display.');
+                return;
+            }
+
             // Track html dir for relative path resolution
             this._htmlDir = entry.path.includes('/')
                 ? entry.path.substring(0, entry.path.lastIndexOf('/') + 1) : '';
@@ -1211,8 +2533,9 @@
             // Dropping `allow-same-origin` means app code can no longer read
             // localStorage / window.parent / ambient-fetch vault paths; every vault
             // access goes through the postMessage bridge (sg.*), which never needed it.
+            await this._mountDeclaredVaults();         // owner-declared sub-vaults, before the app frame can send a message
             var iframe         = document.createElement('iframe');
-            iframe.sandbox     = 'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox';
+            iframe.sandbox     = this._appSandbox();
             iframe.style.cssText = 'border:none;width:100%;height:100%;display:block;flex:1;';
             iframe.srcdoc      = injected;
             iframe.addEventListener('load', () => {
@@ -1236,6 +2559,9 @@
             this._navHistory   = [entry.path];
             this._navIndex     = 0;
             this._emitNavChange();
+
+            // Start the append checker if this app opted into append host_events (no-op otherwise).
+            this._initAppendChecker(appJson);
         }
 
         // _page.json: render via PageLayoutRenderer.
@@ -1286,8 +2612,9 @@
             });
 
             // Phase 3: null-origin frame — srcdoc, no allow-same-origin (see _mountApp).
+            await this._mountDeclaredVaults();         // owner-declared sub-vaults, before the app frame can send a message
             var iframe         = document.createElement('iframe');
-            iframe.sandbox     = 'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox';
+            iframe.sandbox     = this._appSandbox();
             iframe.style.cssText = 'border:none;width:100%;height:100%;display:block;flex:1;';
             iframe.srcdoc      = html;
             iframe.addEventListener('load', () => {
@@ -1340,8 +2667,9 @@
                 var htmlText  = new TextDecoder().decode(htmlBytes);
                 var injected  = AppFrameBootstrap.build({ kind: 'html', htmlText: htmlText, bridgeScript: bridgeScript });
                 // Phase 3: null-origin frame — srcdoc, no allow-same-origin (see _mountApp).
+                await this._mountDeclaredVaults();
                 var iframe         = document.createElement('iframe');
-                iframe.sandbox     = 'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox';
+                iframe.sandbox     = this._appSandbox();
                 iframe.style.cssText = 'border:none;width:100%;height:100%;display:block;flex:1;';
                 iframe.srcdoc      = injected;
                 iframe.addEventListener('load', () => {
@@ -1381,8 +2709,9 @@
                 });
 
                 // Phase 3: null-origin frame — srcdoc, no allow-same-origin (see _mountApp).
+                await this._mountDeclaredVaults();
                 var iframe         = document.createElement('iframe');
-                iframe.sandbox     = 'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox';
+                iframe.sandbox     = this._appSandbox();
                 iframe.style.cssText = 'border:none;width:100%;height:100%;display:block;flex:1;';
                 iframe.srcdoc      = html;
                 iframe.addEventListener('load', () => {
@@ -1588,8 +2917,199 @@
 
         // ── VFS bridge (injected into iframe) ─────────────────────────────────────────
 
+        // The sandbox for an app iframe. Least-privilege base: allow-scripts allow-forms.
+        // allow-popups + allow-popups-to-escape-sandbox are added ONLY when the app.json
+        // grants `permissions.externalLinks` (Option C) — so the escape-sandbox token is
+        // opt-in, not default. Without it, external <a href> links are routed to the host,
+        // which opens them after a one-click user confirm (Option D, see _promptExternalOpen).
+        _appSandbox() {
+            var s = 'allow-scripts allow-forms';
+            if (this._perm && this._perm.externalLinks) s += ' allow-popups allow-popups-to-escape-sandbox';
+            return s;
+        }
+
+        // Option D: an app without the externalLinks grant posted a URL to open. Validate it
+        // (http/https only — never javascript:/data:) and surface a one-click host confirm.
+        // The actual window.open runs in the HOST's click gesture (inside the HUD button
+        // handler), so the popup is allowed without granting the iframe escape-sandbox — and
+        // the user gets to see where a vault file is sending them before it opens.
+        _promptExternalOpen(url) {
+            var safe = '';
+            try {
+                var u      = (url.indexOf('//') === 0) ? (window.location.protocol + url) : url;
+                var parsed = new URL(u, window.location.href);
+                if (parsed.protocol === 'http:' || parsed.protocol === 'https:') safe = parsed.href;
+            } catch (_) {}
+            if (!safe) return;
+            var open = function () { try { window.open(safe, '_blank', 'noopener,noreferrer'); } catch (_) {} };
+            var hud  = document.getElementById('app-hud') || document.querySelector('app-hud');
+            if (hud && typeof hud.promptExternalLink === 'function') {
+                hud.promptExternalLink(safe, open);   // open() fires inside the HUD's click gesture
+            } else {
+                open();   // no HUD (e.g. hud.mode "none") — degraded: no host gesture, popup may be blocked
+            }
+        }
+
+        // Download confirm for apps without the `downloads` grant. onDecision(true|false)
+        // ALWAYS fires so the app's sg.vfs.download promise settles either way. With no HUD
+        // (hud.mode "none") we proceed — same degraded posture as _promptExternalOpen: the
+        // save still happens host-side with the file named in the browser's own download UI.
+        _promptDownload(filename, sizeLabel, onDecision) {
+            var hud = document.getElementById('app-hud') || document.querySelector('app-hud');
+            if (hud && typeof hud.promptDownload === 'function') {
+                hud.promptDownload(filename, sizeLabel, onDecision);
+            } else {
+                try { onDecision(true); } catch (_) {}
+            }
+        }
+
+        // sg.ui.preview overlay — HOST document quick-look. Lives in host DOM (sibling of the
+        // app iframe), so the app can neither draw nor dismiss it; the user always can (✕,
+        // Escape, backdrop click). One overlay at a time: a new call replaces the current one.
+        // Rendering happens at the REAL origin, which is the whole point for PDFs — Chromium
+        // refuses its PDF viewer inside the sandboxed app frame but runs it happily here.
+        // Returns the detected kind ('pdf'|'image'|'video'|'audio'|'text'|'binary').
+        _openHostPreview(fileName, buf) {
+            this._closeHostPreview();
+            var ext  = (fileName.lastIndexOf('.') > -1 ? fileName.slice(fileName.lastIndexOf('.') + 1) : '').toLowerCase();
+            var MIME = { pdf: 'application/pdf',
+                         jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif',
+                         webp: 'image/webp', svg: 'image/svg+xml', avif: 'image/avif', bmp: 'image/bmp', ico: 'image/x-icon',
+                         mp4: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime',
+                         mp3: 'audio/mpeg', wav: 'audio/wav', ogg: 'audio/ogg', m4a: 'audio/mp4' };
+            var kind = ext === 'pdf' ? 'pdf'
+                     : /^(jpg|jpeg|png|gif|webp|svg|avif|bmp|ico)$/.test(ext) ? 'image'
+                     : /^(mp4|webm|mov)$/.test(ext) ? 'video'
+                     : /^(mp3|wav|ogg|m4a)$/.test(ext) ? 'audio'
+                     : 'text';
+            var self = this;
+            var wrap = document.createElement('div');
+            wrap.id = 'sg-host-preview';
+            wrap.setAttribute('role', 'dialog');
+            wrap.setAttribute('aria-label', 'File preview: ' + fileName);
+            wrap.style.cssText = 'position:fixed;inset:0;z-index:9000;background:rgba(8,10,20,.82);display:flex;flex-direction:column;';
+            var head = document.createElement('div');
+            head.style.cssText = 'display:flex;align-items:center;gap:.75rem;padding:.5rem .9rem;background:#141a2a;color:#dfe6f3;font:600 13px/1.4 system-ui,sans-serif;';
+            var title = document.createElement('span');
+            title.textContent = fileName; title.style.cssText = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;';
+            var close = document.createElement('button');
+            close.textContent = '✕'; close.setAttribute('aria-label', 'Close preview');
+            close.style.cssText = 'background:none;border:1px solid #3a4460;border-radius:6px;color:#dfe6f3;cursor:pointer;font-size:13px;padding:.2rem .6rem;';
+            close.addEventListener('click', function () { self._closeHostPreview(); });
+            head.appendChild(title); head.appendChild(close);
+            var body = document.createElement('div');
+            body.style.cssText = 'flex:1;display:flex;align-items:center;justify-content:center;overflow:auto;padding:0;min-height:0;';
+            wrap.appendChild(head); wrap.appendChild(body);
+
+            var url = null;
+            try {
+                if (kind === 'text') {
+                    // Decode defensively; if it's not really text, fall through to binary notice.
+                    var txt = new TextDecoder('utf-8', { fatal: false }).decode(buf);
+                    if (/�[\s\S]*�[\s\S]*�/.test(txt.slice(0, 2000))) { kind = 'binary'; }
+                    else {
+                        var pre = document.createElement('pre');
+                        pre.textContent = txt;
+                        pre.style.cssText = 'margin:0;padding:1rem 1.2rem;width:100%;height:100%;overflow:auto;box-sizing:border-box;background:#0d1120;color:#e2e8f0;font:12px/1.55 ui-monospace,monospace;white-space:pre-wrap;word-break:break-word;';
+                        body.appendChild(pre);
+                    }
+                }
+                if (kind === 'pdf' || kind === 'image' || kind === 'video' || kind === 'audio') {
+                    url = URL.createObjectURL(new Blob([buf], { type: MIME[ext] || 'application/octet-stream' }));
+                    var el;
+                    if (kind === 'pdf')        { el = document.createElement('iframe'); el.style.cssText = 'width:100%;height:100%;border:0;background:#fff;'; }
+                    else if (kind === 'image') { el = document.createElement('img');    el.alt = fileName; el.style.cssText = 'max-width:96%;max-height:96%;object-fit:contain;'; }
+                    else if (kind === 'video') { el = document.createElement('video');  el.controls = true; el.style.cssText = 'max-width:96%;max-height:96%;'; }
+                    else                       { el = document.createElement('audio');  el.controls = true; }
+                    el.src = url;
+                    body.appendChild(el);
+                }
+                if (kind === 'binary') {
+                    var note = document.createElement('div');
+                    note.style.cssText = 'color:#aeb6c6;font:13px/1.6 system-ui,sans-serif;text-align:center;padding:2rem;';
+                    note.textContent = 'No inline preview for this file type — use sg.vfs.download to save it.';
+                    body.appendChild(note);
+                }
+            } catch (_) { kind = 'binary'; }
+
+            var onKey = function (ev) { if (ev.key === 'Escape') self._closeHostPreview(); };
+            wrap.addEventListener('click', function (ev) { if (ev.target === wrap || ev.target === body) self._closeHostPreview(); });
+            document.addEventListener('keydown', onKey);
+            this._hostPreview = { el: wrap, url: url, onKey: onKey };
+            document.body.appendChild(wrap);
+            return kind;
+        }
+
+        _closeHostPreview() {
+            var p = this._hostPreview;
+            if (!p) return;
+            this._hostPreview = null;
+            try { document.removeEventListener('keydown', p.onKey); } catch (_) {}
+            try { p.el.remove(); } catch (_) {}
+            if (p.url) { try { URL.revokeObjectURL(p.url); } catch (_) {} }
+        }
+
+        // Source for sg.vault.embed(), injected into the app bridge. The pure src-building
+        // and sandbox-sanitisation come from the unit-tested SgEmbed module, and the
+        // handshake glue comes from the VENDORABLE SgVaultEmbed._mountImpl
+        // (lib/sg-embed/sg-vault-embed.js) — all injected verbatim via Function.toString,
+        // so the code vault apps run is byte-identical to the code a third-party website
+        // vendors with one script tag. One implementation, no drifting copies.
+        // SECURITY: sandbox defaults to allow-scripts only; SgEmbed refuses
+        // allow-same-origin and allow-popups-to-escape-sandbox even if asked.
+        _embedHelperSrc() {
+            if (typeof SgEmbed === 'undefined' || !SgEmbed.sanitizeSandbox || !SgEmbed.buildEmbedSrc
+                || typeof SgVaultEmbed === 'undefined' || !SgVaultEmbed._mountImpl) {
+                return 'function _embedVault(){return Promise.reject(new Error("sg.vault.embed unavailable (sg-embed-helpers.js / sg-vault-embed.js not loaded)"));}';
+            }
+            return ''
+                + 'var _sanitizeSandbox=' + SgEmbed.sanitizeSandbox.toString()   + ';'
+                + 'var _buildEmbedSrc='   + SgEmbed.buildEmbedSrc.toString()     + ';'
+                + 'var _mountImpl='       + SgVaultEmbed._mountImpl.toString()   + ';'
+                + 'function _embedVault(mount,key,opts){return _mountImpl(_sanitizeSandbox,_buildEmbedSrc,mount,key,opts);}';
+        }
+
         _buildVfsBridgeScript(currentPath) {
-            var writable  = this._writable;
+            // Every runtime value spliced into the bridge lands inside a <script> in a srcdoc
+            // document. JSON.stringify is a valid JS literal but NOT HTML-safe: a value holding
+            // '</script>' closes the bridge early, kills every sg.* call, and runs whatever
+            // follows. vaultName and release.label are owner-authored free text, so escape
+            // the one sequence the HTML parser cares about (and the two JS line terminators
+            // JSON leaves raw). Confirmed by test: a label of '</script>' used to yield three
+            // raw closers in the built bridge instead of one.
+            var _jsLit = function (v) {
+                return JSON.stringify(v === undefined ? null : v)
+                    .replace(/<\//g, '<\\/')
+                    .replace(/\u2028/g, '\\u2028')
+                    .replace(/\u2029/g, '\\u2029');
+            };
+            // EFFECTIVE writability — match what the bridge ACTUALLY enforces (and what the
+            // SG/Vault editor preview reports via send-browse). Two distinct gates:
+            //   • this._writable      = read_key tier: do we have a full key (not an ro-token)?
+            //   • dataSource.writable = access-token tier: is the server-side write gate open?
+            // Both must be true for a write to land. Reporting only the crypto tier (the old
+            // behaviour) meant a key-only open with no access token surfaced sg.app.writable
+            // as TRUE; the app then tried to write, the host rejected, and the user saw a
+            // red "Read-only vault" error — exactly the parity bug vs the Vault UI preview.
+            var writable  = !!(this._writable && this._dataSource && this._dataSource.writable);
+            // Release pin, surfaced read-only to the app (see sg.app.pinned / sg.app.release).
+            // this._release is SGReleases.resolve()'s result: {live, name, commit, label, ...},
+            // or null when the vault publishes no releases at all — both mean "not pinned".
+            var releaseInfo = { pinned: false, release: null };
+            try {
+                if (this._release && this._release.live === false) {
+                    releaseInfo.pinned  = true;
+                    releaseInfo.release = { name  : this._release.name  || null,
+                                            label : this._release.label || null,
+                                            commit: this._release.commit || null };
+                }
+            } catch (_) {}
+            // External-link handling (Options C/D). When the app has the externalLinks grant,
+            // its sandbox carries allow-popups-to-escape-sandbox, so links open in-frame via
+            // window.open (frictionless). Without it, links are posted to the host for a
+            // one-click confirm-open (no escape-sandbox). Decided at build time — the grant
+            // doesn't change during a session.
+            var extLinks  = !!(this._perm && this._perm.externalLinks);
             var vaultName = (this._vault && this._vault.name)     || '';
             var vaultId   = (this._vault && this._vault._vaultId) || '';
             var fileList  = this._dataSource ? this._dataSource.getFileList() : [];
@@ -1598,26 +3118,81 @@
             // "" for root-level "index.html"). Injected into the bridge so the img.src patch can
             // resolve relative image paths to absolute vault paths before sending to the parent.
             var htmlDir   = currentPath.includes('/') ? currentPath.substring(0, currentPath.lastIndexOf('/') + 1) : '';
+            // Which vault file is running. Held so an uncaught error can be attributed to the
+            // APP rather than reading as a fault in the vault itself — see _onAppError.
+            this._appPath = currentPath;
 
-            return '<script>(function(){' +
+            // ── Frame egress containment ────────────────────────────────────────────────
+            // The bridge script is injected as the FIRST child of <head> by
+            // AppFrameBootstrap._injectHead, on all four srcdoc paths (app / page-layout /
+            // html / markdown), so prefixing the CSP meta here governs the whole document
+            // and needs no change at the four call sites.
+            //
+            // WHY: moving the LLM key into the kernel is pointless if the frame can still
+            // fetch() anywhere — the app legitimately holds decrypted vault content, and
+            // an unrestricted frame can post it to any host. With `connect-src` locked
+            // down the postMessage bridge is the only way out, and everything that leaves
+            // is permission-checked.
+            //
+            // WHY blob:/data: AND NOT 'none': the print RPC fetches blob: URLs to inline
+            // images and stylesheets into the print document (see the __sgPrintReq handler);
+            // 'none' would break printing silently. Neither scheme can reach the network.
+            // img.src and dynamic import() are governed by img-src / script-src, so vault
+            // images and CDN component imports are unaffected by this directive.
+            var csp = (this._perm && this._perm.network)
+                ? ''                                   // explicit escape hatch — see permissions.network
+                : '<meta http-equiv="Content-Security-Policy" content="connect-src blob: data:">';
+
+            return csp + '<script>(function(){' +
 
                 // App-error surfacing (ViV Phase 4 re-spec). Under null-origin app frames
                 // the parent can no longer reach in to inject window.onerror; instead the
                 // frame self-reports uncaught errors OUT over postMessage (null-origin safe).
                 // The parent handler routes {type:"sg-app-error"} to the HUD. See probe P5.
-                'window.onerror=function(m,s,l,c){try{window.parent.postMessage({type:"sg-app-error",message:String(m)+(l?" (line "+l+(c?":"+c:"")+")":"")},"*");}catch(_){}return false;};' +
-                'window.addEventListener("unhandledrejection",function(e){try{var r=e&&e.reason;window.parent.postMessage({type:"sg-app-error",message:"Unhandled rejection: "+String((r&&r.message)||r)},"*");}catch(_){}});' +
-                // Body-hidden self-check: if the app never makes its body visible, surface a
+                // The frame also logs it itself, prefixed, because the browser's own uncaught
+                // error line says nothing about WHOSE code threw — and a syntax error in an
+                // app's script reads exactly like a fault in the vault to anyone debugging.
+                'function _sgAppErr(msg){try{console.error("[vault-app] " + ' + _jsLit(currentPath) +
+                  ' + " — this error is from the APP\'s own JavaScript, not the vault platform:\\n" + msg);}catch(_){}' +
+                  'try{window.parent.postMessage({type:"sg-app-error",message:msg,appPath:' + _jsLit(currentPath) + '},"*");}catch(_){}}' +
+                'window.onerror=function(m,s,l,c){_sgAppErr(String(m)+(l?" (line "+l+(c?":"+c:"")+")":""));return false;};' +
+                'window.addEventListener("unhandledrejection",function(e){var r=e&&e.reason;_sgAppErr("Unhandled rejection: "+String((r&&r.message)||r));});' +
+
+                // Kernel→app event channel (sg.on / sg.off). The kernel postMessages
+                // {type:"sg-event",name,payload} ONLY for events this app declared in
+                // app.json.host_events (gate is enforced parent-side). We fan them out to
+                // subscribers here. Registering for a name the kernel never sends is a
+                // harmless no-op (no enumeration leak). "*" is a wildcard over received events.
+                'var _sgEvtH={};' +
+                'function _sgOn(name,cb){if(typeof cb!=="function"||!name)return function(){};(_sgEvtH[name]=_sgEvtH[name]||[]).push(cb);return function(){_sgOff(name,cb);};}' +
+                'function _sgOff(name,cb){var a=_sgEvtH[name];if(!a)return;var i=a.indexOf(cb);if(i>=0)a.splice(i,1);if(a.length===0)delete _sgEvtH[name];}' +
+                'function _sgDispatch(name,payload){if(!name)return;var a=(_sgEvtH[name]||[]).slice(),i;for(i=0;i<a.length;i++){try{a[i](payload);}catch(_){}}' +
+                  'var s=(_sgEvtH["*"]||[]).slice();for(i=0;i<s.length;i++){try{s[i](name,payload);}catch(_){}}}' +
+                'window.addEventListener("message",function(e){if(e&&e.data&&e.data.type==="sg-event")_sgDispatch(e.data.name,e.data.payload);});' +
+                // Blank-app self-check: if the app never paints anything visible, surface a
                 // hint (mirrors the old same-origin display:none probe, now from inside).
                 //
-                // Delay raised from 0 → 2500 ms (2026-05-31): apps with a typical "hidden
-                // until init JS runs" reveal pattern (Private Health Score is one) hit the
-                // 0-ms check before their reveal had a chance to fire, so the banner showed
-                // a false-positive even when the page later rendered fine. 2.5 s is well past
+                // Detects MORE than display:none — an app can be blank without it: an empty
+                // body (no children), a visibility:hidden / opacity:0 reveal that never fired,
+                // or nothing rendered at all (scrollHeight 0). The previous check only caught
+                // display:none, so an empty/hidden body left the user staring at a blank screen
+                // with no console error and no host clue (the worst case).
+                //
+                // Delay 2500 ms (2026-05-31): apps with a "hidden until init JS runs" reveal
+                // pattern (Private Health Score is one) need time to paint; 2.5 s is well past
                 // every reasonable init time but short enough to still be useful when the app
-                // GENUINELY never reveals. Apps that take >2.5s to first paint should signal
-                // sg-app-ready (see AUTHORING.md) — the banner reflects a real problem then.
-                'window.addEventListener("DOMContentLoaded",function(){setTimeout(function(){try{var b=document.body;if(b&&getComputedStyle(b).display==="none"){window.parent.postMessage({type:"sg-app-error",message:"App body is hidden (display:none) — initialisation may have failed."},"*");}}catch(_){}},2500);});' +
+                // GENUINELY never renders. A working app that has painted by then has body
+                // children + non-zero height, so it never trips this — no false positives.
+                'window.addEventListener("DOMContentLoaded",function(){setTimeout(function(){try{' +
+                  'var b=document.body;if(!b)return;' +
+                  'var cs=getComputedStyle(b);' +
+                  'var reason=cs.display==="none"?"hidden (display:none)":' +
+                    '(cs.visibility==="hidden"?"hidden (visibility:hidden)":' +
+                    '(parseFloat(cs.opacity)===0?"hidden (opacity:0)":' +
+                    '(b.children.length===0?"empty (rendered no content)":' +
+                    '((b.scrollHeight||0)<2&&!(b.textContent||"").trim()?"blank (no visible content)":null))));' +
+                  'if(reason){window.parent.postMessage({type:"sg-app-error",message:"App loaded but is showing nothing — "+reason+". Its initialisation may have failed."},"*");}' +
+                '}catch(_){}},2500);});' +
 
                 // Nav intercept: relative .html/.htm links → postMessage to parent.
                 // The extension check runs on the path portion only (strip ?query / #frag) so
@@ -1626,19 +3201,38 @@
                 // The ORIGINAL href (with the fragment) is forwarded so the parent can scroll
                 // to the anchor inside the new srcdoc after navigation.
                 //
-                // External links (http://, https://, //) are opened in a NEW TAB via window.open.
-                // The iframe's sandbox now includes allow-popups + allow-popups-to-escape-sandbox,
-                // so the new window is unrestricted. Doing it from inside the iframe (synchronous
-                // within the click gesture) avoids the popup-blocker hit that a postMessage round-
-                // trip to the parent would incur — postMessage is async, the gesture is lost, and
-                // window.open() in the parent would be blocked.
+                // External links (http://, https://, //). TWO paths, decided by the
+                // externalLinks grant (injected as `extLinks`):
+                //   • GRANTED (Option C): the sandbox carries allow-popups-to-escape-sandbox,
+                //     so open in-frame via window.open — synchronous within the click gesture,
+                //     so no popup-blocker hit. Frictionless.
+                //   • DEFAULT (Option D): no escape-sandbox. Post the URL to the host, which
+                //     shows a one-click "Open <url>" confirm and opens it in the HOST's gesture
+                //     (real origin) — popup allowed, and the user sees where they're going.
                 'document.addEventListener("click",function(e){' +
                   'var a=e.target.closest("a");if(!a)return;' +
+                  // Sanctioned opt-out: an app that already handled the click (preventDefault
+                  // from a window-capture listener) or marks the anchor app-internal
+                  // (data-sg-native) keeps it — the host must not claim it.
+                  'if(e.defaultPrevented||a.hasAttribute("data-sg-native"))return;' +
                   'var h=a.getAttribute("href");if(!h)return;' +
-                  'if(h.startsWith("#")||h.startsWith("mailto:"))return;' +
+                  // Bare-# anchors: the browser default is BROKEN in a null-origin srcdoc frame
+                  // (the fragment resolves against the inherited parent base URL → real
+                  // cross-document navigation → the host vault-key page). Claim the click and
+                  // scroll in-frame; a miss is a no-op (preventDefault still — never navigate).
+                  // No stopPropagation: app listeners still see the event if they want it.
+                  'if(h.startsWith("#")){' +
+                    'e.preventDefault();' +
+                    'var fid=h.slice(1);' +
+                    'if(fid){try{var fel=document.getElementById(fid);if(fel)fel.scrollIntoView();}catch(_){}}' +
+                    'return;' +
+                  '}' +
+                  'if(h.startsWith("mailto:"))return;' +
                   'if(h.startsWith("http")||h.startsWith("//")){' +
                     'e.preventDefault();e.stopPropagation();' +
-                    'try{window.open(h,"_blank","noopener,noreferrer");}catch(_){}' +
+                    (extLinks
+                      ? 'try{window.open(h,"_blank","noopener,noreferrer");}catch(_){}'
+                      : 'try{window.parent.postMessage({__sgOpenExternal:h},"*");}catch(_){}') +
                     'return;' +
                   '}' +
                   'var hp=h.split("?")[0].split("#")[0];' +
@@ -1655,7 +3249,11 @@
                 'window.addEventListener("message",function(e){' +
                   'if(!e.data||typeof e.data.__sgVfsScrollToHash!=="string")return;' +
                   'var frag=e.data.__sgVfsScrollToHash;if(!frag)return;' +
-                  'var apply=function(){try{var el=document.getElementById(frag);if(el){el.scrollIntoView();return;}location.hash="#"+frag;}catch(_){}};' +
+                  // A miss is a NO-OP. The old fallback (location.hash="#"+frag) was a live
+                  // bug: in a null-origin srcdoc frame a hash assignment is a cross-document
+                  // navigation that re-navigates the frame to the host entry page. Apps whose
+                  // anchor targets render async should carry the target in sg.state instead.
+                  'var apply=function(){try{var el=document.getElementById(frag);if(el)el.scrollIntoView();}catch(_){}};' +
                   'if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",apply);else apply();' +
                 '});' +
 
@@ -1695,7 +3293,10 @@
                       'payload[type]=id;' +
                       'var rk=type==="__sgVfsWriteReq"?"__sgVfsWriteReply":"__sgVfsListReply";' +
                       'function h(e){if(!e.data||e.data[rk]!==id)return;window.removeEventListener("message",h);' +
-                        'if(e.data.ok)res(e.data);else rej(new Error(e.data.err||"VFS error"));}' +
+                        'if(e.data.ok){res(e.data);return;}' +
+                        'var er=new Error(e.data.err||"VFS error");' +
+                        'var c=e.data.code||(/^E[A-Z0-9]+$/.test(e.data.err||"")?e.data.err:null);' +   // ENOENT arrives in `err`
+                        'if(c)er.code=c;rej(er);}' +
                       'window.addEventListener("message",h);window.parent.postMessage(payload,"*");' +
                     '});' +
                   '}' +
@@ -1704,9 +3305,14 @@
                     'var bytes;' +
                     'if(typeof content==="string"){bytes=new TextEncoder().encode(content);}' +
                     'else{bytes=content instanceof Uint8Array?content:new Uint8Array(content);}' +
-                    'var b64="",chunk=8192;' +
+                    // chunk MUST be a multiple of 3 — otherwise each chunk\'s btoa() output ends
+                    // in \'=\' padding and the concatenated string has \'=\'s mid-stream, which the
+                    // host\'s atob() rejects as invalid (surfacing as "Bad encoding"). 8192 was 2
+                    // mod 3, so any payload over 8 KB failed. 8190 = 3*2730 — well under the
+                    // String.fromCharCode.apply argument limit on every browser we care about.
+                    'var b64="",chunk=8190;' +
                     'for(var i=0;i<bytes.length;i+=chunk)b64+=btoa(String.fromCharCode.apply(null,bytes.subarray(i,i+chunk)));' +
-                    'return _vfsMsg("__sgVfsWriteReq",{path:path,data:b64,encoding:"base64"}).then(function(d){return{path:path,size:d.size};});' +
+                    'return _vfsMsg("__sgVfsWriteReq",{path:path,data:b64,encoding:"base64"}).then(function(d){return{path:path,size:d.size,commit_id:d.commit_id||null,published:!!d.published};});' +
                   '}' +
                   // sg.vfs.read (strict)
                   'function _read(path){' +
@@ -1714,12 +3320,19 @@
                       'var id=(Math.random()*1e9|0).toString(36)+Date.now().toString(36);' +
                       'function h(e){if(!e.data||e.data.__sgVfsReadReply!==id)return;window.removeEventListener("message",h);' +
                         'if(e.data.ok)res(e.data.buf);' +
-                        'else rej(new Error(e.data.err==="ENOENT"?"No such file: "+e.data.path:(e.data.err||"Read failed")));' +
+                        'else{var er=new Error(e.data.err==="ENOENT"?"No such file: "+e.data.path:(e.data.err||"Read failed"));' +
+                        'var c=e.data.code||(e.data.err==="ENOENT"?"ENOENT":null);if(c)er.code=c;rej(er);}' +
                       '}' +
                       'window.addEventListener("message",h);window.parent.postMessage({__sgVfsReadReq:id,path:path},"*");' +
                     '});' +
                   '}' +
                   'function _readText(path){return _read(path).then(function(buf){return new TextDecoder().decode(buf);});}' +
+                  // sg.vfs.download — save a vault file to the user's device. Fulfilled by the
+                  // HOST (real origin): the parent reads the bytes and clicks an <a download>
+                  // in its own document, so the sandboxed app frame never needs allow-downloads.
+                  // Without the `downloads` grant each call surfaces a one-click HUD confirm;
+                  // dismissing rejects with ECONSENT.
+                  'function _download(path,opts){opts=opts||{};return _sgCmd("download",{action:"file",path:path,filename:opts.filename});}' +
                   // sg.vfs.list
                   'function _list(path){' +
                     'return _vfsMsg("__sgVfsListReq",{path:path||""})' +
@@ -1735,29 +3348,100 @@
                       'var id=(Math.random()*1e9|0).toString(36)+Date.now().toString(36);' +
                       'payload.__sgCmdId=id;payload.__sgCmdType=cmdType;' +
                       'function h(e){if(!e.data||e.data.__sgCmdReply!==id)return;window.removeEventListener("message",h);' +
-                        'if(e.data.ok)res(e.data.result);else rej(new Error(e.data.err||"Command failed"));}' +
+                        // cmdReply has always sent a `code`; it used to be dropped here, so every
+                        // bridge error reached the app as a bare Error with no enumerable keys and
+                        // apps had to string-match `message`. Carry it (and any HTTP status) across.
+                        'if(e.data.ok){res(e.data.result);return;}' +
+                        'var er=new Error(e.data.err||"Command failed");' +
+                        'if(e.data.code)er.code=e.data.code;' +
+                        'if(e.data.status!=null)er.status=e.data.status;' +
+                        'rej(er);}' +
                       'window.addEventListener("message",h);window.parent.postMessage(payload,"*");' +
                     '});' +
                   '}' +
+                  // sg.llm.chat — streaming chat WITHOUT the app ever seeing the key.
+                  // One request → N delta frames → one terminal reply. Three rules from the
+                  // plan (§4.1) are load-bearing here:
+                  //   1. deltas carry only the INCREMENT (O(n) total, not O(n²));
+                  //   2. the terminal reply is authoritative — an app that ignores onToken
+                  //      still gets the full `content`;
+                  //   3. coalescing happens in the kernel, not here.
+                  // The returned promise carries `.requestId` so sg.llm.cancel(id) can abort
+                  // a call that is still streaming.
+                  'function _llmChat(req,onToken){' +
+                    'req=req||{};' +
+                    'var id=(Math.random()*1e9|0).toString(36)+Date.now().toString(36);' +
+                    'var p=new Promise(function(res,rej){' +
+                      'function h(e){' +
+                        'if(!e.data)return;' +
+                        'if(e.data.__sgLlmDelta===id){if(onToken){try{onToken(e.data.delta,e.data.acc);}catch(_){}}return;}' +
+                        'if(e.data.__sgCmdReply!==id)return;' +
+                        'window.removeEventListener("message",h);' +
+                        'if(e.data.ok)res(e.data.result);else{var er=new Error(e.data.err||"LLM call failed");er.code=e.data.code||null;rej(er);}' +
+                      '}' +
+                      'window.addEventListener("message",h);' +
+                      'window.parent.postMessage({__sgCmdType:"llm",action:"chat",__sgCmdId:id,' +
+                        'messages:req.messages||[],model:req.model||null,maxTokens:req.maxTokens||null,' +
+                        'temperature:(req.temperature==null?null:req.temperature),topP:(req.topP==null?null:req.topP),' +
+                        'stream:req.stream!==false},"*");' +
+                    '});' +
+                    'p.requestId=id;' +
+                    'return p;' +
+                  '}' +
+                  // sg.vault.embed() — open ANOTHER vault inside an iframe via the embed
+                  // handshake, with no key in the URL and minimal sandbox privileges. The
+                  // src-building + sandbox-sanitisation come from the unit-tested SgEmbed
+                  // module, injected verbatim here (toString) so the shipped code IS the
+                  // tested code. Default sandbox is allow-scripts only — see sg-embed-helpers.js.
+                  this._embedHelperSrc() +
                   // window.sg.*
                   'window.sg={' +
-                    'vfs:{write:_write,read:_read,readText:_readText,list:_list},' +
+                    'vfs:{write:_write,read:_read,readText:_readText,list:_list,download:_download},' +
                     // sg.fs.* — mutations gated by app.json permissions (move/delete/mkdir)
                     'fs:{' +
                       'move:function(from,to){return _sgCmd("fs",{action:"move",from:from,to:to});},' +
                       'delete:function(path){return _sgCmd("fs",{action:"delete",path:path});},' +
                       'mkdir:function(path){return _sgCmd("fs",{action:"mkdir",path:path});}' +
                     '},' +
-                    // sg.vault.* — create a child vault in a folder (read-through), unlink, delete
+                    // sg.vault.* — create / manage child vaults. create(opts) takes an opts object
+                    // (matches mount(opts)): { label, link:{path}|false, returnKey, custody, seedFrom }.
                     'vault:{' +
-                      'create:function(path,label){return _sgCmd("vault",{action:"create",path:path,label:label});},' +
+                      // embed(mountEl, key, opts?) → Promise<{vaultName,fileCount,hasApp,iframe}>.
+                      // Opens another vault inside an iframe; key travels by postMessage (never
+                      // the URL/storage); sandbox defaults to allow-scripts only. opts: {host,
+                      // surface:"app"|"vault", mode, deepLink, sandbox:[...narrow tokens], timeoutMs}.
+                      'embed:_embedVault,' +
+                      'create:function(opts){opts=opts||{};return _sgCmd("vault",{action:"create",label:opts.label,link:opts.link,returnKey:opts.returnKey,custody:opts.custody,seedFrom:opts.seedFrom,accessToken:opts.accessToken});},' +
+                      // getKey(ref) → {key}: retrieve a custodied key to re-share (always-confirm consent).
+                      'getKey:function(ref){return _sgCmd("vault",{action:"getKey",ref:ref});},' +
+                      // setAccessToken(ref,value): embed/rotate a backend token (value="inherit"|"<token>").
+                      'setAccessToken:function(ref,value){return _sgCmd("vault",{action:"setAccessToken",ref:ref,value:value});},' +
+                      // openApp(ref,opts): launch a vault as an app. ref = raw key or a custodied ref.
+                      'openApp:function(ref,opts){opts=opts||{};return _sgCmd("vault",{action:"openApp",ref:ref,deepLink:opts.deepLink,target:opts.target});},' +
+                      // list() → {vaults:[{ref_id,vault_id,label,tier}]}: roster of managed vaults.
+                      'list:function(){return _sgCmd("vault",{action:"list"});},' +
                       'unlink:function(path){return _sgCmd("vault",{action:"unlink",path:path});},' +
-                      'delete:function(path){return _sgCmd("vault",{action:"delete",path:path});},' +
-                      // ViV Phase 2: mount a child vault for cross-vault reads/writes via this kernel.
+                      'delete:function(ref){return _sgCmd("vault",{action:"delete",ref:ref});},' +
+                      // ViV Phase 2: mount a child vault for cross-vault reads via this kernel (rw mount → separate brief).
                       'mount:function(opts){return _sgCmd("vault",{action:"mount",prefix:opts&&opts.prefix,ref:opts&&opts.ref,label:opts&&opts.label});},' +
                       'unmount:function(mountId){return _sgCmd("vault",{action:"unmount",mountId:mountId});},' +
-                      'mounts:function(){return _sgCmd("vault",{action:"mounts"});}' +
+                      'mounts:function(){return _sgCmd("vault",{action:"mounts"});},' +
+                      // Cross-vault peer wake — ask a mounted child to check its append lane now (C6).
+                      'notify:function(mountId,name,payload){return _sgCmd("vault",{action:"notify",mountId:mountId,name:name,payload:payload});}' +
                     '},' +
+                    // sg.append.* — append-only transport (six verbs, 1:1 with the server).
+                    // The kernel holds the keys and attaches the gate header per verb; app.json
+                    // permissions.append.* decides which verbs are callable.
+                    'append:{' +
+                      'configure:function(o){o=o||{};return _sgCmd("append",{action:"configure",append_anchors:o.append_anchors});},' +
+                      'write:function(o){o=o||{};return _sgCmd("append",{action:"write",vault_id:o.vault_id,append_token:o.append_token,payload:o.payload});},' +
+                      'list:function(o){o=o||{};return _sgCmd("append",{action:"list",inbox:o.inbox,after_file_id:o.after_file_id,limit:o.limit,include_content:o.include_content,path:o.path});},' +
+                      'fetch:function(o){o=o||{};return _sgCmd("append",{action:"fetch",inbox:o.inbox,file_ids:o.file_ids,path:o.path});},' +
+                      'markProcessed:function(o){o=o||{};return _sgCmd("append",{action:"markProcessed",inbox:o.inbox,file_ids:o.file_ids,path:o.path});},' +
+                      'purge:function(o){o=o||{};return _sgCmd("append",{action:"purge",folder:o.folder,inbox:o.inbox,file_ids:o.file_ids});}' +
+                    '},' +
+                    // sg.on / sg.off — kernel→app events (see the _sgEvtH registry above).
+                    'on:_sgOn,off:_sgOff,' +
                     'loadCss:_loadCss,loadJs:_loadJs,' +
                     // sg.history.* — read past commits / trees / blobs (read-only)
                     'history:{' +
@@ -1768,11 +3452,22 @@
                       'readBlob:function(id){return _sgCmd("history",{action:"readBlob",blobId:id});}' +
                     '},' +
                     'app:{' +
-                      'selfPath:'  + JSON.stringify(currentPath) + ',' +
+                      // context: 'app' here ('/en-gb/app/' full surface). The SG/Vault editor's
+                      // inline preview should set 'preview' so apps can feature-detect deliberately
+                      // (cross-repo parity work — see brief v0.33.5__brief__vault-preview-app-parity).
+                      'context:"app",' +
+                      'selfPath:'  + _jsLit(currentPath) + ',' +
                       'writable:'  + (writable  ? 'true' : 'false') + ',' +
-                      'vaultName:' + JSON.stringify(vaultName) + ',' +
-                      'vaultId:'   + JSON.stringify(vaultId)   + ',' +
+                      'vaultName:' + _jsLit(vaultName) + ',' +
+                      'vaultId:'   + _jsLit(vaultId)   + ',' +
                       'fileCount:' + fileCount + ',' +
+                      // Which version the app is running as. `.vault/releases.json` is inside the
+                      // permission floor, so an app cannot read it and previously had no way to tell
+                      // it was mounted from a pinned commit rather than HEAD — the one fact that
+                      // explains "I pushed a new app.json and nothing changed", and a pinned mount is
+                      // read-only for everyone, owner included. Read-only mirror of the host's state.
+                      'pinned:'    + (releaseInfo.pinned ? 'true' : 'false') + ',' +
+                      'release:'   + _jsLit(releaseInfo.release)     + ',' +
                       'totalSize:0' +
                     '},' +
                     'sync:{' +
@@ -1793,7 +3488,13 @@
                       'message:function(text,type,opts){opts=opts||{};var h=(Math.random()*1e9|0).toString(36)+Date.now().toString(36);var ttl=opts.ttl===null?null:(typeof opts.ttl==="number"?opts.ttl:3000);window.parent.postMessage({__sgUiMsg:{handle:h,text:String(text||""),msgType:type||"info",ttl:ttl}},"*");return h;},' +
                       'dismiss:function(h){window.parent.postMessage({__sgUiMsg:{handle:h,dismiss:true}},"*");},' +
                       // ask the user (on the HUD) to grant a declared-but-consent-gated verb; resolves {granted}
-                      'requestPermission:function(verb,path){return _sgCmd("ui",{action:"requestPermission",verb:verb,path:path});}' +
+                      'requestPermission:function(verb,path){return _sgCmd("ui",{action:"requestPermission",verb:verb,path:path});},' +
+                      // sg.ui.preview — host-rendered "quick look" overlay for a vault file.
+                      // Same permission chain as vfs.read, nothing more (consent gates effects
+                      // that outlive the page; ephemeral display of readable content is free).
+                      // PDFs render in the HOST document, where Chromium allows its PDF viewer
+                      // (blocked inside this sandboxed frame — see AUTHORING "Displaying PDFs").
+                      'preview:function(path){return _sgCmd("ui",{action:"preview",path:path});}' +
                     '},' +
                     // sg.state.* — device-local preferences (theme, panel widths, "don't show again"
                     // dismissals). Backed by the TOP-LEVEL kernel's localStorage, namespaced as
@@ -1811,6 +3512,50 @@
                       'remove:function(key){return _sgCmd("state",{action:"remove",key:String(key||"")});},' +
                       'clear:function(){return _sgCmd("state",{action:"clear"});},' +
                       'keys:function(){return _sgCmd("state",{action:"keys"});}' +
+                    '},' +
+                    // sg.llm.* — call an LLM with the vault's key, which stays in the HOST.
+                    // available() is NOT optional: unlike every other namespace, LLM depends on
+                    // runtime state (is a key configured? static host? budget spent?), so an app
+                    // must be able to degrade BEFORE it renders a chat UI. models() is
+                    // policy-filtered, so a picker an app builds is automatically correct.
+                    'llm:{' +
+                      'available:function(){return _sgCmd("llm",{action:"available"});},' +
+                      'models:function(){return _sgCmd("llm",{action:"models"});},' +
+                      'usage:function(){return _sgCmd("llm",{action:"usage"});},' +
+                      'chat:_llmChat,' +
+                      'cancel:function(id){return _sgCmd("llm",{action:"cancel",id:id});},' +
+                      // listen() → {text,...}. The HOST opens the microphone (this frame has
+                      // no `navigator.mediaDevices`), shows a red recording bar with Stop, and
+                      // transcribes with the vault's key. You get text back and nothing else —
+                      // the audio never enters this frame.
+                      'listen:function(opts){opts=opts||{};return _sgCmd("llm",{action:"listen",' +
+                        'maxMs:opts.maxMs||null,model:opts.model||null,prompt:opts.prompt||null});},' +
+                      // Drive the take from your own UI: listen() stays pending and resolves
+                      // with the transcript when you call listenStop(). listenCancel() releases
+                      // the mic and makes listen() reject with EABORT. Both resolve
+                      // {stopped:false} when nothing is recording — stopping twice is not an
+                      // error. The host bar keeps its own Stop/Cancel regardless.
+                      'listenStop:function(){return _sgCmd("llm",{action:"listenStop"});},' +
+                      'listenCancel:function(){return _sgCmd("llm",{action:"listenCancel"});},' +
+                      'listening:function(){return _sgCmd("llm",{action:"listening"});},' +
+                      // imagePart(blobOrBytes, mime?) → the content part to drop into a
+                      // message's `content` array. Runs IN THIS FRAME (no host round trip):
+                      // it is pure encoding, and the bytes are already yours.
+                      //
+                      // The chunk is 8190, not 8192. 8192 % 3 === 2, so every non-final
+                      // slice emits "=" padding mid-string and atob() rejects that — a bug
+                      // this codebase has shipped three times. Use this rather than writing
+                      // it again.
+                      'imagePart:async function(src,mime){' +
+                        'var u,m=mime||"";' +
+                        'if(src&&typeof src.arrayBuffer==="function"){u=new Uint8Array(await src.arrayBuffer());m=m||src.type||"image/png";}' +
+                        'else if(src instanceof Uint8Array){u=src;}' +
+                        'else if(src instanceof ArrayBuffer){u=new Uint8Array(src);}' +
+                        'else if(typeof src==="string"){return{type:"image_url",image_url:{url:src}};}' +
+                        'else{throw new Error("imagePart: pass a Blob/File, bytes, or a data: URL");}' +
+                        'var c=8190,o="";for(var i=0;i<u.length;i+=c){o+=String.fromCharCode.apply(null,u.subarray(i,i+c));}' +
+                        'return{type:"image_url",image_url:{url:"data:"+(m||"image/png")+";base64,"+btoa(o)}};' +
+                      '}' +
                     '}' +
                   '};' +
                   'window.sgVault={writeFile:_write,readFile:_readText,listFiles:function(){return _list("");},writable:window.sg.app.writable,selfPath:window.sg.app.selfPath};' +
@@ -1830,7 +3575,7 @@
                   // The resolved path is sent to the parent via _read() which postMessages
                   // {__sgVfsReadReq, path} — this call will appear in the Bridge debug tab.
                   '(function(){' +
-                    'var _hd=' + JSON.stringify(htmlDir) + ';' +
+                    'var _hd=' + _jsLit(htmlDir) + ';' +
                     'function _rp(b,r){if(!b)return r;var p=(b+r).split("/"),o=[];' +
                       'for(var i=0;i<p.length;i++){if(p[i]==="..")o.pop();' +
                       'else if(p[i]!=="."&&p[i]!=="")o.push(p[i]);}return o.join("/");}' +
@@ -1867,7 +3612,10 @@
                     '}catch(e){console.warn("[sg-vfs] img.src patch failed:",e.message);}' +
                   '})();' +
 
-                  'console.log("[sg-vfs] ready | writable=' + (writable ? 'true' : 'false') + ' | vaultName=' + vaultName.replace(/'/g, "\\'") + ' | page: /en-gb/app");' +
+                  // The name is spliced into a double-quoted literal, so escaping only the single
+                  // quote left `"` and newlines as syntax errors that took the whole bridge down —
+                  // every app in a vault named `Q3 "final"` died on mount. Emit it as a JS literal.
+                  'console.log("[sg-vfs] ready | writable=' + (writable ? 'true' : 'false') + ' | vaultName=" + ' + _jsLit(vaultName) + ' + " | page: /en-gb/app");' +
                 '})();' +
               '})();<\/script>';
         }
@@ -1960,6 +3708,15 @@
                     return;
                 }
 
+                // ── External link (Option D) ──────────────────────────────────
+                // App has no externalLinks grant, so the iframe can't (and shouldn't) open a
+                // popup itself. It posts the URL here; the host shows a one-click confirm and
+                // opens it in the HOST's user gesture (real origin, no escape-sandbox needed).
+                if (e.data.__sgOpenExternal) {
+                    self._promptExternalOpen(String(e.data.__sgOpenExternal));
+                    return;
+                }
+
                 // ── Write ─────────────────────────────────────────────────────
                 if (e.data.__sgVfsWriteReq) {
                     var writeId  = e.data.__sgVfsWriteReq;
@@ -1967,13 +3724,45 @@
                     function wReply(ok, payload) {
                         try { writeSrc.postMessage(Object.assign({ __sgVfsWriteReply: writeId, ok: ok }, payload), '*'); } catch (_) {}
                     }
-                    if (!dataSource.writable) { wReply(false, { err: 'Read-only vault' }); return; }
+                    if (!dataSource.writable) { wReply(false, { err: 'Read-only vault', code: 'EREADONLY' }); return; }   // the code AUTHORING.md/skill already promise
                     var wBytes;
                     try {
                         var bin = atob(e.data.data || '');
                         wBytes  = new Uint8Array(bin.length);
                         for (var i = 0; i < bin.length; i++) wBytes[i] = bin.charCodeAt(i);
-                    } catch (_) { wReply(false, { err: 'Bad encoding' }); return; }
+                    } catch (err) {
+                        // atob() rejects if the base64 string has '=' padding mid-stream — which is
+                        // what happened when the sender chunked at a non-multiple of 3. The sender
+                        // now uses chunk=8190, but surface a precise error if anything else corrupts
+                        // the payload (so the next ticket isn\'t another 8-KB witch-hunt).
+                        var rawLen = (e.data.data || '').length;
+                        wReply(false, { err: 'Bad base64 payload (' + rawLen + ' chars): ' + (err && err.message || err) + '. The sg.vfs.write encoder must chunk in multiples of 3.', code: 'EBADENC' });
+                        return;
+                    }
+                    // Pre-Lambda-413 friendly guard. A single sg.vfs.write becomes one POST
+                    // /api/vault/batch carrying the new blob + new tree + commit + ref + index,
+                    // each base64-encoded inside JSON. AWS Lambda URL Functions cap the request
+                    // payload at 6 MB; base64 inflates ~1.33x and the other batch entries take
+                    // ~10–50 KB. 3 MB plaintext leaves comfortable headroom; above that, the
+                    // app would get an opaque 413 mid-batch (with a partial corrupted state).
+                    // A presigned-PUT large-write path is the proper fix — until then, refuse
+                    // here with a clear EFBIG so the app author knows exactly what to do.
+                    var MAX_WRITE_BYTES = 3 * 1024 * 1024;
+                    if (wBytes.byteLength > MAX_WRITE_BYTES) {
+                        wReply(false, {
+                            err:  'File too large for a single write: ' + wBytes.byteLength
+                                + ' bytes > ' + MAX_WRITE_BYTES + ' (~3 MB). The vault batch '
+                                + 'endpoint carries the blob+tree+commit+ref base64-in-JSON, so '
+                                + 'AWS Lambda\'s 6 MB request cap with ~1.33x base64 inflation '
+                                + 'means a single write tops out around 3 MB. Large-file write '
+                                + '(presigned-PUT) is not yet supported.',
+                            code: 'EFBIG',
+                            limit: MAX_WRITE_BYTES,
+                            actual: wBytes.byteLength
+                        });
+                        self._emitBridgeCall('vfs.write', { path: e.data.path || '', ok: false, err: 'EFBIG', bytes: wBytes.byteLength });
+                        return;
+                    }
                     var wPath     = e.data.path || '';
                     var wResolved = wPath.startsWith('/') ? wPath.slice(1) : self._resolvePath(self._htmlDir, wPath);
                     // Floor is unconditional regardless of mount membership — the .vault floor
@@ -1986,7 +3775,7 @@
                     // which forced the parent app.json to add a path it has no business writing to.)
                     if (self._mounts && self._mounts.resolve(wResolved)) {
                         self._handleVfsViv('write', { path: wResolved, data: wBytes })
-                            .then(function () { wReply(true, { size: wBytes.byteLength, mounted: true }); self._emitBridgeCall('vfs.write', { path: wResolved, ok: true, mounted: true }); })
+                            .then(function (r) { wReply(true, { size: wBytes.byteLength, mounted: true, commit_id: (r && r.commit_id) || null, published: !!(r && r.published) }); self._emitBridgeCall('vfs.write', { path: wResolved, ok: true, mounted: true, commit_id: (r && r.commit_id) || null }); })
                             .catch(function (err) { wReply(false, { err: err.message || 'Write failed', code: err.code || 'EPROTO' }); self._emitBridgeCall('vfs.write', { path: wResolved, ok: false, err: err.code || err.message }); });
                         return;
                     }
@@ -1998,8 +3787,12 @@
                     var _t0w = performance.now();
                     dataSource.saveFile(wDir, wFile, wBytes.buffer)
                         .then(function () {
-                            wReply(true, { size: wSize });
+                            // Local write: committed on the clone branch now, published by the debounced
+                            // auto-push later → published:false here; the 'vfs.published' host event
+                            // (app.json host_events) closes the receipt when the push lands.
+                            wReply(true, { size: wSize, commit_id: (self._vault && self._vault._headCommitId) || null, published: false });
                             self._emitBridgeCall('vfs.write', { path: wResolved, bytes: wSize, ms: Math.round(performance.now() - _t0w), ok: true });
+                            self._scheduleAutoPush();   // sync app writes to the server (debounced)
                         })
                         .catch(function (err) {
                             wReply(false, { err: err.message || 'Write failed' });
@@ -2093,8 +3886,11 @@
                 if (e.data.__sgCmdType) {
                     var cmdId  = e.data.__sgCmdId;
                     var cmdSrc = e.source;
-                    function cmdReply(ok, result, errMsg) {
-                        try { cmdSrc.postMessage({ __sgCmdReply: cmdId, ok: ok, result: result || null, err: errMsg || null }, '*'); } catch (_) {}
+                    // `code` is optional and carries a machine-readable error class
+                    // (EPERM / ECONSENT / ENOKEY / EBUDGET / EMODEL / EABORT / EPROTO) so an
+                    // app can branch on the reason instead of string-matching a message.
+                    function cmdReply(ok, result, errMsg, code, status) {         // status: HTTP status when the transport saw one (else omitted)
+                        try { cmdSrc.postMessage({ __sgCmdReply: cmdId, ok: ok, result: result || null, err: errMsg || null, code: code || null, status: (status == null ? null : status) }, '*'); } catch (_) {}
                     }
                     var vault    = self._vault;
                     var endpoint = (window.SG_ENDPOINT
@@ -2123,12 +3919,403 @@
                         return;
                     }
 
+                    // ── append transport (configure / write / list / fetch / markProcessed / purge) ──
+                    // The kernel holds the keys; SGAppend attaches the gate header per verb.
+                    // app.json permissions.append.* decides which verbs the app may call.
+                    if (e.data.__sgCmdType === 'append') {
+                        var ibAct = e.data.action;
+                        var ibCap = { configure: 'append.configure', write: 'append.write', list: 'append.list',
+                                      fetch: 'append.read', markProcessed: 'append.markProcessed', purge: 'append.purge' }[ibAct];
+                        if (!ibCap) { cmdReply(false, null, 'Unknown append action: ' + ibAct, 'ENOSYS'); return; }
+                        if (!self._can(ibCap, '')) {
+                            // Name the grant that is missing. 'Permission denied' alone sent one
+                            // integrator hunting a read-only gate that does not exist on this branch
+                            // (there is no writable check here — the grant is the only gate).
+                            cmdReply(false, null, 'Permission denied: app.json needs "permissions": { "append": { "'
+                                     + ibCap.slice(7) + '": true } }', 'EPERM');
+                            self._emitBridgeCall('append.' + ibAct, { ok: false, err: 'EPERM' }); return;
+                        }
+                        var ibData = e.data;
+                        // `path` — drain ANOTHER vault's lane: the path must sit under a DECLARED
+                        // mount (an owner-declared *.link.json, never a runtime sg.vault.mount),
+                        // and only the read verbs cross (owner verbs need the child's write key,
+                        // which the lane binding never carries). The parent holds the child's
+                        // credential already; the read key IS the enum key, so this grants the
+                        // app nothing the parent could not compute. See MountLanes.
+                        var ibPath   = (ibData.path != null && ibData.path !== '') ? String(ibData.path) : null;
+                        var clientP;
+                        if (ibPath) {
+                            if (typeof MountLanes === 'undefined' || !MountLanes.allowsVerb(ibAct)) {
+                                cmdReply(false, null, ibAct + ' cannot target a mounted vault — owner verbs (purge/configure) stay on the open vault', 'EPERM');
+                                self._emitBridgeCall('append.' + ibAct, { ok: false, err: 'EPERM', path: ibPath }); return;
+                            }
+                            var hit = self._mounts ? self._mounts.resolve(ibPath) : null;
+                            if (!hit) {
+                                cmdReply(false, null, 'No mounted vault at ' + ibPath, 'ENOENT');
+                                self._emitBridgeCall('append.' + ibAct, { ok: false, err: 'ENOENT', path: ibPath }); return;
+                            }
+                            clientP = self._laneClientFor(hit.mount.mountId);
+                        } else {
+                            clientP = self._getAppendClient();
+                        }
+                        clientP.then(function (inbox) {
+                            if (!inbox) {                                        // SGAppend absent, or no vault open
+                                throw Object.assign(new Error('append transport unavailable'), { code: 'ENOTRANSPORT' });
+                            }
+                            switch (ibAct) {
+                                case 'configure':     return inbox.configure({ append_anchors: ibData.append_anchors });
+                                case 'write':         return inbox.write({ vault_id: ibData.vault_id, append_token: ibData.append_token, payload: ibData.payload });
+                                case 'list':          return inbox.list({ inbox: ibData.inbox, after_file_id: ibData.after_file_id, limit: ibData.limit, include_content: ibData.include_content });
+                                case 'fetch':         return inbox.fetch({ inbox: ibData.inbox, file_ids: ibData.file_ids });
+                                case 'markProcessed': return inbox.markProcessed({ inbox: ibData.inbox, file_ids: ibData.file_ids });
+                                case 'purge':         return inbox.purge({ folder: ibData.folder, inbox: ibData.inbox, file_ids: ibData.file_ids });
+                            }
+                        }).then(function (r) {
+                            cmdReply(true, r); self._emitBridgeCall('append.' + ibAct, { ok: true });
+                        }).catch(function (err) {
+                            cmdReply(false, null, (err && err.message) || String(err), (err && err.code) || 'EAPPEND', err && err.http);
+                            self._emitBridgeCall('append.' + ibAct, { ok: false, err: (err && err.code) || (err && err.message) || 'error' });
+                        });
+                        return;
+                    }
+
+                    // ── sg.llm.* — the key never crosses the boundary ─────────────
+                    // THE chokepoint: permission → consent → budget → call. The app frame
+                    // sends messages and receives text; the credential, the policy and the
+                    // accounting all stay in the host. Deliberately reuses SGLlm/SGLlmVault
+                    // unchanged (they were built DOM-free and bridge-free for exactly this)
+                    // and VaultLlmLog, so an app's spend lands in the SAME ledger the vault
+                    // UI's own chat writes to — one bill per session, not two.
+                    if (e.data.__sgCmdType === 'llm') {
+                        var lAct = e.data.action;
+                        var lCap = { available: null, models: 'llm.models', usage: 'llm.usage',
+                                     chat: 'llm.chat', cancel: 'llm.chat', listen: 'llm.listen',
+                                     // Ending a take you already started needs no NEW authority —
+                                     // it is strictly less than starting one. Same grant, and no
+                                     // consent prompt: nobody should have to approve stopping.
+                                     listenStop: 'llm.listen', listenCancel: 'llm.listen',
+                                     listening: 'llm.listen' }[lAct];
+                        if (lCap === undefined) { cmdReply(false, null, 'Unknown llm action: ' + lAct); return; }
+
+                        // available() is ungated ON PURPOSE: an app must be able to discover it
+                        // cannot use the LLM (no grant, no key) in order to degrade gracefully.
+                        // It leaks nothing a denied call would not already reveal.
+                        if (lCap && !self._can(lCap, '')) {
+                            cmdReply(false, null, 'Permission denied', 'EPERM');
+                            self._emitBridgeCall('llm.' + lAct, { ok: false, err: 'EPERM' });
+                            return;
+                        }
+
+                        // Ending a take the app started. The result travels back through the
+                        // ORIGINAL listen() promise — an app that stops gets its transcript
+                        // where it already asked for it, not through a second channel.
+                        if (lAct === 'listenStop' || lAct === 'listenCancel') {
+                            var fin = self._listenFinish;
+                            if (!fin) { cmdReply(true, { stopped: false, recording: false }); return; }
+                            fin(lAct === 'listenCancel');
+                            cmdReply(true, { stopped: true, recording: false });
+                            self._emitBridgeCall('llm.' + lAct, { ok: true });
+                            return;
+                        }
+                        if (lAct === 'listening') { cmdReply(true, { recording: !!self._listenFinish }); return; }
+
+                        // listen: consent EVERY time by default. A microphone is not a
+                        // capability to grant once and forget — `permissions.consent.llm.listen`
+                        // can relax it for a kiosk, but the default is per-use.
+                        if (lAct === 'listen') {
+                            if (typeof SGVoice === 'undefined') {
+                                cmdReply(false, null, 'Voice capture unavailable in this host', 'ENOMIC');
+                                return;
+                            }
+                            var vAv = SGVoice.available();
+                            if (!vAv.ok) {
+                                cmdReply(false, null, 'Microphone unavailable (' + vAv.reason + ')', vAv.reason);
+                                self._emitBridgeCall('llm.listen', { ok: false, err: vAv.reason });
+                                return;
+                            }
+                            var lOpts = { maxMs: e.data.maxMs, model: e.data.model, prompt: e.data.prompt };
+                            self._consent('llm.listen', '').then(function (granted) {
+                                if (!granted) {
+                                    cmdReply(false, null, 'User declined', 'ECONSENT');
+                                    self._emitBridgeCall('llm.listen', { ok: false, err: 'ECONSENT' });
+                                    return;
+                                }
+                                return self._recordAndTranscribe(null, lOpts).then(function (out) {
+                                    cmdReply(true, out);
+                                    self._emitBridgeCall('llm.listen', { ok: true, ms: out.durationMs, bytes: out.bytes });
+                                });
+                            }).catch(function (err) {
+                                cmdReply(false, null, (err && err.message) || 'Recording failed', (err && err.code) || 'EPROTO');
+                                self._emitBridgeCall('llm.listen', { ok: false, err: (err && err.code) || 'error' });
+                            });
+                            return;
+                        }
+
+                        if (lAct === 'cancel') {
+                            var cRec = self._llmInflight && self._llmInflight[e.data.id];
+                            if (cRec) { try { cRec.abort.abort(); } catch (_) {} }
+                            cmdReply(true, { cancelled: !!cRec });
+                            self._emitBridgeCall('llm.cancel', { ok: true, found: !!cRec });
+                            return;
+                        }
+
+                        self._llmSession().then(function (s) {
+                            if (lAct === 'available') {
+                                var av = { ok: !!(s && s.ok), reason: (s && s.ok) ? null : ((s && s.reason) || 'ENOKEY') };
+                                if (s && s.ok) {
+                                    var lim = SGLlmConfig.limitsFor(s.policy, self._appId || null);
+                                    var t   = self._llmTotals();
+                                    av.model     = s.model || null;
+                                    av.remaining = {
+                                        calls: lim.maxCallsPerSession ? Math.max(0, lim.maxCallsPerSession - t.calls) : null,
+                                        cost : lim.maxCostPerSession  ? Math.max(0, lim.maxCostPerSession  - t.totalCost) : null
+                                    };
+                                }
+                                // A grant-less app gets ok:false/EPERM rather than a lie about the key.
+                                if (av.ok && !self._can('llm.chat', '')) { av.ok = false; av.reason = 'EPERM'; }
+                                cmdReply(true, av);
+                                self._emitBridgeCall('llm.available', { ok: true, available: av.ok, reason: av.reason });
+                                return;
+                            }
+                            if (!s || !s.ok) {
+                                cmdReply(false, null, (s && s.message) || 'LLM not available for this vault', (s && s.reason) || 'ENOKEY');
+                                self._emitBridgeCall('llm.' + lAct, { ok: false, err: (s && s.reason) || 'ENOKEY' });
+                                return;
+                            }
+
+                            if (lAct === 'models') {
+                                return s.client.models().then(function (all) {
+                                    self._llmModelMeta = all || null;     // vision capability lives here
+                                    var ids = (all || []).filter(function (m) {
+                                        return m && m.id && SGLlmConfig.modelAllowed(s.policy, m.id);
+                                    }).map(function (m) {
+                                        return { id: m.id, name: m.name || m.id, pricing: m.pricing || null,
+                                                 context: (m.context_length || (m.top_provider && m.top_provider.context_length)) || null };
+                                    });
+                                    cmdReply(true, ids);
+                                    self._emitBridgeCall('llm.models', { ok: true, n: ids.length });
+                                });
+                            }
+
+                            if (lAct === 'usage') {
+                                var ul = SGLlmConfig.limitsFor(s.policy, self._appId || null);
+                                // Scoped: an app asking "how much have I spent / how much is
+                                // left" must be answered about ITS OWN budget, not the session's.
+                                var ut = self._llmTotals(self._appId || null);
+                                cmdReply(true, {
+                                    calls: ut.calls, promptTokens: ut.promptTokens, completionTokens: ut.completionTokens,
+                                    cost: ut.totalCost, billed: ut.billedCost, estimated: ut.estimatedCost,
+                                    remaining: {
+                                        calls: ul.maxCallsPerSession ? Math.max(0, ul.maxCallsPerSession - ut.calls) : null,
+                                        cost : ul.maxCostPerSession  ? Math.max(0, ul.maxCostPerSession  - ut.totalCost) : null
+                                    }
+                                });
+                                self._emitBridgeCall('llm.usage', { ok: true });
+                                return;
+                            }
+
+                            // ── chat ──────────────────────────────────────────────
+                            // Consent first: an app calling out to a paid third party with the
+                            // user's key is exactly the class of act the consent bar exists for.
+                            return self._consent('llm.chat', '').then(function (granted) {
+                                if (!granted) {
+                                    cmdReply(false, null, 'User declined', 'ECONSENT');
+                                    self._emitBridgeCall('llm.chat', { ok: false, err: 'ECONSENT' });
+                                    return;
+                                }
+                                var limits = SGLlmConfig.limitsFor(s.policy, self._appId || null);
+                                // Scoped to THIS app: a per-app cap must be measured against
+                                // that app's own spend, not the whole session's.
+                                var tot    = self._llmTotals(self._appId || null);
+                                // Budget enforced HERE — the panel enforcing caps on itself does
+                                // nothing for an app calling through the bridge.
+                                if (limits.maxCallsPerSession && tot.calls >= limits.maxCallsPerSession) {
+                                    cmdReply(false, null, 'Session call limit reached (' + limits.maxCallsPerSession + ')', 'EBUDGET');
+                                    self._emitBridgeCall('llm.chat', { ok: false, err: 'EBUDGET' });
+                                    return;
+                                }
+                                if (limits.maxCostPerSession && tot.totalCost >= limits.maxCostPerSession) {
+                                    cmdReply(false, null, 'Session spend cap reached ($' + limits.maxCostPerSession + ')', 'EBUDGET');
+                                    self._emitBridgeCall('llm.chat', { ok: false, err: 'EBUDGET' });
+                                    return;
+                                }
+                                var model = e.data.model || s.model || null;
+                                if (model && !SGLlmConfig.modelAllowed(s.policy, model)) {
+                                    cmdReply(false, null, 'Model not allowed by this vault: ' + model, 'EMODEL');
+                                    self._emitBridgeCall('llm.chat', { ok: false, err: 'EMODEL', model: model });
+                                    return;
+                                }
+                                if (!model) {
+                                    cmdReply(false, null, 'No model selected and no default configured', 'EMODEL');
+                                    self._emitBridgeCall('llm.chat', { ok: false, err: 'EMODEL' });
+                                    return;
+                                }
+                                // maxTokens is CLAMPED, never trusted: the app asks, the policy decides.
+                                var maxTok = e.data.maxTokens || limits.maxTokensPerCall || undefined;
+                                if (maxTok && limits.maxTokensPerCall && maxTok > limits.maxTokensPerCall) {
+                                    maxTok = limits.maxTokensPerCall;
+                                }
+
+                                // Images: validated HERE, before the call. An image sent to a
+                                // text-only model comes back as a provider error naming nothing,
+                                // which is the exact failure that made voice look broken. And an
+                                // unbounded data: URL from a frame is an unbounded bill, so the
+                                // size ceiling is the host's to enforce, not the app's to respect.
+                                var vCount = self._llmCountImages(e.data.messages);
+                                var visionGate = Promise.resolve(true);
+                                if (vCount.images) {
+                                    if (vCount.bytes > self._llmMaxImageBytes()) {
+                                        cmdReply(false, null, 'Image payload too large (' +
+                                                 Math.round(vCount.bytes / 1024) + ' KB)', 'EIMGSIZE');
+                                        self._emitBridgeCall('llm.chat', { ok: false, err: 'EIMGSIZE' });
+                                        return;
+                                    }
+                                    // Fetch the catalogue rather than fall back to a short
+                                    // hard-coded list: refusing a model that CAN see, because
+                                    // our list has not heard of it, is the worse error.
+                                    visionGate = (self._llmModelMeta ? Promise.resolve(self._llmModelMeta)
+                                                                     : s.client.models().then(function (all) {
+                                                                           self._llmModelMeta = all || null;
+                                                                           return self._llmModelMeta;
+                                                                       }).catch(function () { return null; })
+                                    ).then(function (meta) {
+                                        return typeof SGVision === 'undefined' ||
+                                               SGVision.supportsImages(model, meta);
+                                    });
+                                }
+                                return visionGate.then(function (canSee) {
+                                if (!canSee) {
+                                    cmdReply(false, null, 'Model cannot read images: ' + model, 'EMODEL');
+                                    self._emitBridgeCall('llm.chat', { ok: false, err: 'EMODEL', model: model });
+                                    return;
+                                }
+
+                                var rec = (globalThis.VaultLlmLog || null) && VaultLlmLog.add({
+                                    model: model, files: [], status: 'pending',
+                                    // Attribution: who is spending. null here would mean the
+                                    // host's own chat — an app call must never be recorded as
+                                    // the owner's, or per-app caps and the audit trail lie.
+                                    app: self._appId || null,
+                                    images: vCount.images,
+                                    // Counted through SGVision: the old `typeof content ===
+                                    // 'string'` test scored an image-bearing message as ZERO,
+                                    // so the priciest calls looked like the cheapest.
+                                    promptChars: vCount.chars
+                                });
+
+                                self._llmNotify(model);
+                                var abort = new AbortController();
+                                self._llmInflight = self._llmInflight || {};
+                                self._llmInflight[cmdId] = { abort: abort };
+
+                                // Coalesce deltas in the KERNEL (~50ms): a postMessage per token is
+                                // the obvious performance trap. The tail is always flushed before
+                                // the terminal reply so no text is lost.
+                                var pend = '', acc = '', timer = null;
+                                var flush = function () {
+                                    if (timer) { clearTimeout(timer); timer = null; }
+                                    if (!pend) return;
+                                    try { cmdSrc.postMessage({ __sgLlmDelta: cmdId, delta: pend, acc: acc }, '*'); } catch (_) {}
+                                    pend = '';
+                                };
+                                var onTok = function (delta, all) {
+                                    acc = all; pend += delta;
+                                    if (!timer) timer = setTimeout(flush, 50);
+                                };
+
+                                var t0 = Date.now();
+                                return s.client.chat({
+                                    model: model, messages: e.data.messages || [], maxTokens: maxTok,
+                                    temperature: (e.data.temperature == null) ? undefined : e.data.temperature,
+                                    topP       : (e.data.topP        == null) ? undefined : e.data.topP,
+                                    stream     : e.data.stream !== false
+                                }, onTok, abort.signal).then(function (res) {
+                                    flush();
+                                    delete self._llmInflight[cmdId];
+                                    if (rec) VaultLlmLog.update(rec.key, self._llmLedgerPatch(res, model));
+                                    var eff = SGLlm.effectiveCost(res);
+                                    cmdReply(true, {
+                                        content: res.content, model: res.model, finishReason: res.finish,
+                                        usage: { promptTokens: (res.usage && res.usage.prompt_tokens) || 0,
+                                                 completionTokens: (res.usage && res.usage.completion_tokens) || 0 },
+                                        cost: { value: eff.value, source: eff.source, estimated: eff.estimated },
+                                        id: res.id, aborted: !!res.aborted
+                                    });
+                                    self._emitBridgeCall('llm.chat', { ok: true, model: res.model, ms: Date.now() - t0 });
+                                    // Authoritative cost lands a beat later — upgrade the ledger.
+                                    s.client.reconcileCost(res).then(function (up) {
+                                        if (up && rec) VaultLlmLog.update(rec.key, self._llmLedgerPatch(res, model));
+                                    });
+                                }).catch(function (err) {
+                                    flush();
+                                    delete self._llmInflight[cmdId];
+                                    var aborted = err && err.name === 'AbortError';
+                                    if (rec) VaultLlmLog.update(rec.key, {
+                                        status: aborted ? 'aborted' : 'error',
+                                        error : aborted ? null : ((err && err.message) || 'failed')
+                                    });
+                                    cmdReply(false, null, (err && err.message) || 'LLM call failed',
+                                             aborted ? 'EABORT' : ((err && err.code) || 'EPROTO'));
+                                    self._emitBridgeCall('llm.chat', { ok: false, err: (err && err.code) || 'EPROTO' });
+                                });
+                                });          // ← visionGate
+                            });
+                        }).catch(function (err) {
+                            cmdReply(false, null, (err && err.message) || 'LLM error', (err && err.code) || 'EPROTO');
+                            self._emitBridgeCall('llm.' + lAct, { ok: false, err: (err && err.message) || 'error' });
+                        });
+                        return;
+                    }
+
                     // ── fs mutations (move / delete / mkdir) ──────────────────────
                     if (e.data.__sgCmdType === 'fs') {
                         var fsAct = e.data.action;
-                        if (!dataSource.writable) { cmdReply(false, null, 'Read-only vault'); return; }   // EREADONLY (no token)
                         var _np = function (p) { return AppPermissions.normalizePath(p || ''); };
                         var _split = function (n) { var s = n.lastIndexOf('/'); return { dir: s > 0 ? '/' + n.slice(0, s) : '/', name: n.slice(s + 1) }; };
+                        // Declared / runtime mounts (S2, S3, D1 — AppSec decision 09/08). Same order as
+                        // vfs.write: floor, then mount resolve BEFORE the parent's own grant — across a
+                        // mount the parent's authorization is the broker + the child's policy.
+                        var _hit = function (p) { return (p && self._mounts && self._mounts.resolve(p)) || null; };
+                        var _fsRelayReply = function (verb, path, extra) {
+                            return function (r) {
+                                cmdReply(true, Object.assign({ mounted: true, commit_id: (r && r.commit_id) || null, published: !!(r && r.published) }, extra));
+                                self._emitBridgeCall(verb, Object.assign({ path: path, ok: true, mounted: true }, extra));
+                            };
+                        };
+                        var _fsRelayFail = function (verb, path) {
+                            return function (err) { cmdReply(false, null, err.message || (verb + ' failed'), err.code || 'EPROTO'); self._emitBridgeCall(verb, { path: path, ok: false, err: err.code || err.message }); };
+                        };
+                        if (fsAct === 'mkdir' && _hit(_np(e.data.path))) {
+                            var mkPath = _np(e.data.path);
+                            if (AppPermissions.isFloor('mkdir', mkPath)) { cmdReply(false, null, 'Protected path', 'EPROTECTED'); return; }
+                            self._handleVfsViv('mkdir', { path: mkPath }).then(_fsRelayReply('fs.mkdir', mkPath, { created: true })).catch(_fsRelayFail('fs.mkdir', mkPath));
+                            return;
+                        }
+                        if (fsAct === 'delete' && _hit(_np(e.data.path))) {
+                            // D1: destructive verbs across a vault boundary need per-request elevation
+                            // (VivCredentialTiers). The issuance path does not exist yet — say so with the
+                            // tier's own code instead of the composite adapter's EMOUNT_RO.
+                            var delPath = _np(e.data.path);
+                            cmdReply(false, null, 'delete across a mount needs per-request elevation (not available yet)', 'EUNDERPRIVILEGED');
+                            self._emitBridgeCall('fs.delete', { path: delPath, ok: false, err: 'EUNDERPRIVILEGED', mounted: true });
+                            return;
+                        }
+                        if (fsAct === 'move') {
+                            var hFrom = _hit(_np(e.data.from)), hTo = _hit(_np(e.data.to));
+                            if (hFrom || hTo) {
+                                var mvFrom = _np(e.data.from), mvTo = _np(e.data.to);
+                                if (AppPermissions.isFloor('move', mvFrom) || AppPermissions.isFloor('move', mvTo)) { cmdReply(false, null, 'Protected path', 'EPROTECTED'); return; }
+                                if (!hFrom || !hTo || hFrom.mount.mountId !== hTo.mount.mountId) {
+                                    // N4: a move between two vaults is a copy + delete on two stores.
+                                    cmdReply(false, null, 'move across a mount boundary is not supported (EXDEV)', 'EXDEV');
+                                    self._emitBridgeCall('fs.move', { from: mvFrom, to: mvTo, ok: false, err: 'EXDEV' });
+                                    return;
+                                }
+                                self._handleVfsViv('move', { path: mvFrom, to: hTo.rest }).then(_fsRelayReply('fs.move', mvFrom, { moved: true, to: mvTo })).catch(_fsRelayFail('fs.move', mvFrom));
+                                return;
+                            }
+                        }
+                        if (!dataSource.writable) { cmdReply(false, null, 'Read-only vault', 'EREADONLY'); return; }   // EREADONLY (no token)
                         if (fsAct === 'move') {
                             var mFrom = _np(e.data.from), mTo = _np(e.data.to);
                             if (!self._can('fs.move', mFrom) || !self._can('fs.move', mTo)) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('fs.move', { from: mFrom, to: mTo, ok: false, err: 'EPERM' }); return; }
@@ -2136,7 +4323,7 @@
                             var p = (f.dir === t.dir)
                                 ? dataSource.renameFile(f.dir, f.name, t.name)
                                 : dataSource.moveFile(f.dir, f.name, t.dir).then(function () { if (t.name !== f.name) return dataSource.renameFile(t.dir, f.name, t.name); });
-                            p.then(function () { cmdReply(true, { moved: true }); self._emitBridgeCall('fs.move', { from: mFrom, to: mTo, ok: true }); })
+                            p.then(function () { cmdReply(true, { moved: true }); self._emitBridgeCall('fs.move', { from: mFrom, to: mTo, ok: true }); self._scheduleAutoPush(); })
                              .catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('fs.move', { from: mFrom, to: mTo, ok: false, err: err.message }); });
                             return;
                         }
@@ -2144,7 +4331,7 @@
                             var dPath = _np(e.data.path); var d = _split(dPath);
                             if (!self._can('fs.delete', dPath)) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('fs.delete', { path: dPath, ok: false, err: 'EPERM' }); return; }
                             dataSource.deleteFile(d.dir, d.name)
-                                .then(function () { cmdReply(true, { deleted: true }); self._emitBridgeCall('fs.delete', { path: dPath, ok: true }); })
+                                .then(function () { cmdReply(true, { deleted: true }); self._emitBridgeCall('fs.delete', { path: dPath, ok: true }); self._scheduleAutoPush(); })
                                 .catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('fs.delete', { path: dPath, ok: false, err: err.message }); });
                             return;
                         }
@@ -2152,7 +4339,7 @@
                             var kPath = _np(e.data.path);
                             if (!self._can('fs.mkdir', kPath)) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('fs.mkdir', { path: kPath, ok: false, err: 'EPERM' }); return; }
                             dataSource.createFolder('/' + kPath)
-                                .then(function () { cmdReply(true, { created: true }); self._emitBridgeCall('fs.mkdir', { path: kPath, ok: true }); })
+                                .then(function () { cmdReply(true, { created: true }); self._emitBridgeCall('fs.mkdir', { path: kPath, ok: true }); self._scheduleAutoPush(); })
                                 .catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('fs.mkdir', { path: kPath, ok: false, err: err.message }); });
                             return;
                         }
@@ -2176,6 +4363,33 @@
                             }
                             return;
                         }
+                        // sg.ui.preview — host-side quick-look overlay. Permission chain is
+                        // EXACTLY vfs.read's (floor → mounts → fs.read): if the app can read
+                        // the bytes, it can ask the host to display them. No grant, no
+                        // confirm — the bytes never leave the browser and the overlay is host
+                        // DOM the app can't reach (can't fake chrome, can't suppress the ✕).
+                        if (uiAct === 'preview') {
+                            var pvPath     = e.data.path || '';
+                            var pvResolved = pvPath.startsWith('/') ? pvPath.slice(1) : self._resolvePath(self._htmlDir, pvPath);
+                            if (AppPermissions.isFloor('read', pvResolved)) { cmdReply(false, null, 'Protected path'); self._emitBridgeCall('ui.preview', { path: pvResolved, ok: false, err: 'EPROTECTED' }); return; }
+                            if (!self._can('fs.read', pvResolved)) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('ui.preview', { path: pvResolved, ok: false, err: 'EPERM' }); return; }
+                            var pvBytes = (self._mounts && self._mounts.resolve(pvResolved))
+                                ? self._handleVfsViv('read', { path: pvResolved })
+                                : compositeReady.then(function () { return ensureMountOpen(pvResolved); }).then(function () {
+                                      var m = self._findEntryStrict(dataSource.getFileList(), pvResolved);
+                                      if (!m) { var e2 = new Error('No such file: ' + pvResolved); e2.code = 'ENOENT'; throw e2; }
+                                      return dataSource.getFileBytes(m.path);
+                                  });
+                            pvBytes.then(function (buf) {
+                                var kind = self._openHostPreview(pvResolved.split('/').pop() || pvResolved, buf);
+                                cmdReply(true, { ok: true, path: pvResolved, type: kind, bytes: buf.byteLength });
+                                self._emitBridgeCall('ui.preview', { path: pvResolved, type: kind, bytes: buf.byteLength, ok: true });
+                            }).catch(function (err) {
+                                cmdReply(false, null, (err && err.message) || 'Preview failed');
+                                self._emitBridgeCall('ui.preview', { path: pvResolved, ok: false, err: (err && err.code) || (err && err.message) });
+                            });
+                            return;
+                        }
                         cmdReply(false, null, 'Unsupported ui action: ' + uiAct);
                         return;
                     }
@@ -2183,17 +4397,112 @@
                     // ── vault lifecycle (create / unlink / delete) ────────────────
                     if (e.data.__sgCmdType === 'vault') {
                         var vAct  = e.data.action;
+                        // Read-only-safe actions FIRST. `notify` runs a lane check (a list on the
+                        // child's append lane) — it mutates nothing, and a parent opened with only
+                        // its read key still resolves child lanes through ro-links, so it must not
+                        // sit behind the writability gate the mutating verbs need.
+                        // sg.vault.notify(mountId, name, payload) — the C6 "peer wake". Documented
+                        // and permission-parsed since v0.33.5, but no host branch existed: every
+                        // call fell through to "Unsupported vault action". Semantics now: run the
+                        // named DECLARED mount's lane check immediately (the child kernel has no
+                        // checker of its own — see MountLanes). `name`/`payload` are accepted for
+                        // the documented signature and recorded, not forwarded anywhere.
+                        if (vAct === 'notify') {
+                            if (!self._can('vault.notify', '')) {
+                                cmdReply(false, null, 'Permission denied: app.json needs "permissions": { "vault": { "notify": true } }', 'EPERM');
+                                self._emitBridgeCall('vault.notify', { ok: false, err: 'EPERM' }); return;
+                            }
+                            var nId = String(e.data.mountId || '');
+                            var nM  = nId && self._mounts ? self._mounts.get(nId) : null;
+                            if (!nM) { cmdReply(false, null, 'No such mount: ' + nId, 'ENOENT'); self._emitBridgeCall('vault.notify', { mountId: nId, ok: false, err: 'ENOENT' }); return; }
+                            self._initLaneCheckers().then(function () {
+                                var ck = self._laneCheckers && self._laneCheckers[nId];
+                                if (!ck) { cmdReply(false, null, 'Mount ' + nId + ' has no derivable append lane', 'ENOLANE'); self._emitBridgeCall('vault.notify', { mountId: nId, ok: false, err: 'ENOLANE' }); return; }
+                                return Promise.resolve(ck.check('peer:' + String(e.data.name || 'notify'))).then(function () {
+                                    cmdReply(true, { mountId: nId, checked: true });
+                                    self._emitBridgeCall('vault.notify', { mountId: nId, ok: true });
+                                });
+                            }).catch(function (err) {
+                                cmdReply(false, null, (err && err.message) || String(err), (err && err.code) || 'EAPPEND');
+                                self._emitBridgeCall('vault.notify', { mountId: nId, ok: false, err: (err && err.code) || 'error' });
+                            });
+                            return;
+                        }
                         if (!dataSource.writable) { cmdReply(false, null, 'Read-only vault'); return; }   // EREADONLY
                         var vPath = AppPermissions.normalizePath(e.data.path || '');
                         if (vAct === 'create') {
-                            var vLabel = String(e.data.label || 'vault');
-                            if (!self._can('vault.create', vPath)) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('vault.create', { path: vPath, ok: false, err: 'EPERM' }); return; }
-                            self._consent('vault.create', vPath).then(function (ok) {
-                                if (!ok) { cmdReply(false, null, 'Consent declined'); self._emitBridgeCall('vault.create', { path: vPath, ok: false, err: 'ECONSENT' }); return; }
-                                return self._createChildVault(vPath, vLabel).then(function (res) {
-                                    cmdReply(true, res); self._emitBridgeCall('vault.create', { path: vPath, ok: true, vault_id: res.vault_id });
+                            var cLink      = e.data.link;
+                            var cLinkPath  = (cLink && cLink.path != null) ? AppPermissions.normalizePath(cLink.path) : '';
+                            var cReturnKey = e.data.returnKey === true;
+                            var cOpts = { label: String(e.data.label || 'vault'), link: cLink,
+                                          returnKey: cReturnKey, custody: e.data.custody !== false, seedFrom: e.data.seedFrom,
+                                          accessToken: e.data.accessToken };
+                            // gate: linked create needs vault.create on the path; standalone needs vault.standalone
+                            if (cLink && cLink.path != null) {
+                                if (!self._can('vault.create', cLinkPath)) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('vault.create', { path: cLinkPath, ok: false, err: 'EPERM' }); return; }
+                            } else {
+                                if (!self._can('vault.standalone', '')) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('vault.create', { ok: false, err: 'EPERM', standalone: true }); return; }
+                            }
+                            // gate: returning the key needs the stronger grant (createKey on the path, or standalone)
+                            if (cReturnKey) {
+                                var keyOk = (cLink && cLink.path != null) ? self._can('vault.createKey', cLinkPath) : self._can('vault.standalone', '');
+                                if (!keyOk) { cmdReply(false, null, 'Permission denied (createKey)'); self._emitBridgeCall('vault.create', { path: cLinkPath, ok: false, err: 'EPERM' }); return; }
+                            }
+                            // gate: embedding a backend access token needs vault.embedAccessToken
+                            if (cOpts.accessToken) {
+                                if (!self._can('vault.embedAccessToken', cLinkPath)) { cmdReply(false, null, 'Permission denied (embedAccessToken)'); self._emitBridgeCall('vault.create', { path: cLinkPath, ok: false, err: 'EPERM' }); return; }
+                            }
+                            // gate: seedFrom (skip for raw keys — possession is authority, Q4)
+                            if (cOpts.seedFrom && String(cOpts.seedFrom).indexOf(':') === -1) {
+                                var sgPath = String(cOpts.seedFrom).indexOf('self:') === 0 ? AppPermissions.normalizePath(String(cOpts.seedFrom).slice(5)) : String(cOpts.seedFrom);
+                                if (!self._can('vault.seedFrom', sgPath)) { cmdReply(false, null, 'Permission denied (seedFrom)'); self._emitBridgeCall('vault.create', { ok: false, err: 'EPERM', seedFrom: cOpts.seedFrom }); return; }
+                            }
+                            // key-return ALWAYS re-confirms (vault.createKey); plain create one-time cached
+                            var cVerb = cReturnKey ? 'vault.createKey' : 'vault.create';
+                            self._consent(cVerb, cLinkPath).then(function (ok) {
+                                if (!ok) { cmdReply(false, null, 'Consent declined'); self._emitBridgeCall('vault.create', { path: cLinkPath, ok: false, err: 'ECONSENT' }); return; }
+                                return self._createChildVault(cOpts).then(function (res) {
+                                    cmdReply(true, res);
+                                    self._emitBridgeCall('vault.create', { path: cLinkPath, ok: true, vault_id: res.vault_id, returnedKey: !!res.key, custody: cOpts.custody, writableLink: !!res.writable_link });   // NEVER log the key/token
                                 });
-                            }).catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('vault.create', { path: vPath, ok: false, err: err.message }); });
+                            }).catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('vault.create', { path: cLinkPath, ok: false, err: err.message }); });
+                            return;
+                        }
+                        if (vAct === 'getKey') {
+                            var gkRef    = String(e.data.ref || '');
+                            var ckGrant  = self._perm && self._perm.vault && self._perm.vault.createKey;
+                            var canGetKey = (ckGrant === true) || (Array.isArray(ckGrant) && ckGrant.length > 0);
+                            if (!canGetKey) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('vault.getKey', { ref: gkRef, ok: false, err: 'EPERM' }); return; }
+                            self._consent('vault.createKey', gkRef).then(function (ok) {
+                                if (!ok) { cmdReply(false, null, 'Consent declined'); self._emitBridgeCall('vault.getKey', { ref: gkRef, ok: false, err: 'ECONSENT' }); return; }
+                                return self._getVaultKey(gkRef).then(function (res) {
+                                    cmdReply(true, res); self._emitBridgeCall('vault.getKey', { ref: gkRef, ok: true, returnedKey: true });   // NEVER log the key
+                                });
+                            }).catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('vault.getKey', { ref: gkRef, ok: false, err: err.message }); });
+                            return;
+                        }
+                        if (vAct === 'openApp') {
+                            if (!self._can('vault.openApp', '')) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('vault.openApp', { ok: false, err: 'EPERM' }); return; }
+                            self._openAppVault(e.data.ref, { deepLink: e.data.deepLink, target: e.data.target })
+                                .then(function (res) { cmdReply(true, res); self._emitBridgeCall('vault.openApp', { ok: true, opened: res.opened }); })
+                                .catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('vault.openApp', { ok: false, err: err.message }); });
+                            return;
+                        }
+                        if (vAct === 'list') {
+                            self._listChildVaults()
+                                .then(function (res) { cmdReply(true, { vaults: res }); self._emitBridgeCall('vault.list', { ok: true, count: res.length }); })
+                                .catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('vault.list', { ok: false, err: err.message }); });
+                            return;
+                        }
+                        if (vAct === 'setAccessToken') {
+                            var stRef = String(e.data.ref || '');
+                            if (!self._can('vault.embedAccessToken', '')) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('vault.setAccessToken', { ref: stRef, ok: false, err: 'EPERM' }); return; }
+                            self._consent('vault.embedAccessToken', stRef).then(function (ok) {
+                                if (!ok) { cmdReply(false, null, 'Consent declined'); self._emitBridgeCall('vault.setAccessToken', { ref: stRef, ok: false, err: 'ECONSENT' }); return; }
+                                return self._setVaultAccessToken(stRef, e.data.value).then(function (res) {
+                                    cmdReply(true, res); self._emitBridgeCall('vault.setAccessToken', { ref: stRef, ok: true });   // NEVER log the token
+                                });
+                            }).catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('vault.setAccessToken', { ref: stRef, ok: false, err: err.message }); });
                             return;
                         }
                         if (vAct === 'unlink') {
@@ -2204,12 +4513,19 @@
                             return;
                         }
                         if (vAct === 'delete') {
-                            // Server-side destroy needs the child WRITE key. There is no owner-secret
-                            // tier to store it (ro-links.json is read-tier, readable by parent readers),
-                            // so a secure implementation requires a new owner-secret credential store +
-                            // AppSec sign-off on the destructive endpoint. Deferred — Phase 5.
-                            cmdReply(false, null, 'vault.delete not yet available (needs owner-secret credential store + AppSec sign-off)');
-                            self._emitBridgeCall('vault.delete', { path: vPath, ok: false, err: 'ENOTIMPL' });
+                            // Key custody is solved by the owner-secret store; the key is retrieved
+                            // kernel-side to authorise teardown. Server-side destroy needs
+                            // SGVault.destroy() — if absent, the custody record + link are removed and
+                            // { server_teardown:false } is reported (the server vault is retained until
+                            // the teardown endpoint ships — see dev plan §16). Always-confirm consent.
+                            var dRef = String(e.data.ref || e.data.path || '');
+                            if (!self._can('vault.delete', dRef)) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('vault.delete', { ref: dRef, ok: false, err: 'EPERM' }); return; }
+                            self._consent('vault.delete', dRef).then(function (ok) {
+                                if (!ok) { cmdReply(false, null, 'Consent declined'); self._emitBridgeCall('vault.delete', { ref: dRef, ok: false, err: 'ECONSENT' }); return; }
+                                return self._deleteChildVault(dRef).then(function (res) {
+                                    cmdReply(true, res); self._emitBridgeCall('vault.delete', { ref: dRef, ok: true, server_teardown: res.server_teardown });
+                                });
+                            }).catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('vault.delete', { ref: dRef, ok: false, err: err.message }); });
                             return;
                         }
                         // ── ViV Phase 2: vault.mount / unmount / mounts ────────────────
@@ -2230,13 +4546,13 @@
                         }
                         if (vAct === 'unmount') {
                             var uMountId = String(e.data.mountId || '');
-                            self._unmountChildVault(uMountId)
+                            self._unmountChildVault(uMountId, { byApp: true })
                                 .then(function (res) { cmdReply(true, res); self._emitBridgeCall('vault.unmount', { mountId: uMountId, ok: true }); })
                                 .catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('vault.unmount', { mountId: uMountId, ok: false, err: err.message }); });
                             return;
                         }
                         if (vAct === 'mounts') {
-                            cmdReply(true, self._listMounts());
+                            cmdReply(true, self._listMountsForApps());
                             return;
                         }
                         cmdReply(false, null, 'Unsupported vault action: ' + vAct);
@@ -2267,6 +4583,55 @@
                             return;
                         }
                         cmdReply(false, null, 'Unsupported git action: ' + action);
+                        return;
+                    }
+
+                    // sg.vfs.download — host-fulfilled save-to-device. The bytes travel the same
+                    // guarded read path as vfs.read (floor → mounts → fs.read grant), but the
+                    // <a download> click happens in THIS document (real origin, unsandboxed), so
+                    // the app frame needs no allow-downloads token. Consent: without the
+                    // `downloads` grant every call surfaces a one-click HUD confirm naming the
+                    // file and size; dismissing rejects with ECONSENT. The blob URL is revoked
+                    // after 60s (long enough for the save dialog, short enough not to leak).
+                    if (e.data.__sgCmdType === 'download') {
+                        var dlPath     = e.data.path || '';
+                        var dlResolved = dlPath.startsWith('/') ? dlPath.slice(1) : self._resolvePath(self._htmlDir, dlPath);
+                        if (AppPermissions.isFloor('read', dlResolved)) { cmdReply(false, null, 'Protected path'); self._emitBridgeCall('vfs.download', { path: dlResolved, ok: false, err: 'EPROTECTED' }); return; }
+                        if (!self._can('fs.read', dlResolved)) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('vfs.download', { path: dlResolved, ok: false, err: 'EPERM' }); return; }
+                        // Filename: caller override or basename; never path separators/controls.
+                        var dlName = String(e.data.filename || dlResolved.split('/').pop() || 'download')
+                            .replace(/[\/\\]/g, '_').replace(/[^\x20-\x7e\u00a0-\uffff]/g, '').slice(0, 200) || 'download';
+                        var dlBytes = function () {
+                            if (self._mounts && self._mounts.resolve(dlResolved)) return self._handleVfsViv('read', { path: dlResolved });
+                            return compositeReady.then(function () { return ensureMountOpen(dlResolved); }).then(function () {
+                                var m = self._findEntryStrict(dataSource.getFileList(), dlResolved);
+                                if (!m) { var e2 = new Error('No such file: ' + dlResolved); e2.code = 'ENOENT'; throw e2; }
+                                return dataSource.getFileBytes(m.path);
+                            });
+                        };
+                        var dlRun = function () {
+                            dlBytes().then(function (buf) {
+                                var blob = new Blob([buf]);
+                                var url  = URL.createObjectURL(blob);
+                                var an   = document.createElement('a');
+                                an.href = url; an.download = dlName; an.style.display = 'none';
+                                document.body.appendChild(an); an.click(); an.remove();
+                                setTimeout(function () { try { URL.revokeObjectURL(url); } catch (_) {} }, 60000);
+                                cmdReply(true, { ok: true, path: dlResolved, filename: dlName, bytes: buf.byteLength });
+                                self._emitBridgeCall('vfs.download', { path: dlResolved, bytes: buf.byteLength, ok: true });
+                            }).catch(function (err) {
+                                cmdReply(false, null, (err && err.message) || 'Download failed');
+                                self._emitBridgeCall('vfs.download', { path: dlResolved, ok: false, err: (err && err.code) || (err && err.message) });
+                            });
+                        };
+                        if (self._perm && self._perm.downloads) { dlRun(); return; }
+                        // No grant → per-file confirm. Size shown when cheaply known from the list.
+                        var dlSize = '';
+                        try { var le = self._findEntryStrict(dataSource.getFileList(), dlResolved); if (le && le.size) dlSize = le.size > 1048576 ? (le.size / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(le.size / 1024)) + ' KB'; } catch (_) {}
+                        self._promptDownload(dlName, dlSize, function (go) {
+                            if (go) dlRun();
+                            else { cmdReply(false, null, 'Download not approved'); self._emitBridgeCall('vfs.download', { path: dlResolved, ok: false, err: 'ECONSENT' }); }
+                        });
                         return;
                     }
 
@@ -2399,8 +4764,17 @@
                 // as a persistent error toast (ttl null). Replaces the old same-origin
                 // contentWindow.onerror injection which is dead under null-origin.
                 if (e.data.type === 'sg-app-error') {
-                    self._lastIframeError = String(e.data.message || 'App error');
-                    self._emitVaultEvent('app-error', { label: 'App error', message: self._lastIframeError });
+                    // Attribute it. An unlabelled "Uncaught SyntaxError: …" on vault chrome
+                    // reads as a fault in the vault, and the first hour of debugging goes to
+                    // the wrong codebase. The app's own file name is the whole fix.
+                    var eRaw  = String(e.data.message || 'App error');
+                    var eFile = String(e.data.appPath || self._appPath || '') || 'app';
+                    self._lastIframeError = 'App code (' + eFile + '): ' + eRaw;
+                    try {
+                        console.error('[vault-app] ' + eFile + ' — thrown by the APP\'s own JavaScript, ' +
+                                      'not the vault platform:\n' + eRaw);
+                    } catch (_) {}
+                    self._emitVaultEvent('app-error', { label: 'App error', message: self._lastIframeError, path: eFile });
                     var ehud = document.getElementById('app-hud') || document.querySelector('app-hud');
                     if (ehud && typeof ehud.showMessage === 'function') {
                         ehud.showMessage('sg-app-error', self._lastIframeError, 'error', null);
@@ -2496,6 +4870,23 @@
         }
 
     }
+
+    // ── Consent floors ───────────────────────────────────────────────────────────────
+    // The MINIMUM consent strength for a verb. app.json may raise a verb above its floor
+    // but never below it, because app.json is authored by the app (untrusted: it declares
+    // intent, it does not grant capability). Verbs absent from this map keep the legacy
+    // behaviour — the manifest can still set 'auto' on them.
+    //   llm.chat   → 'once'   spends the vault owner's money; 'auto' must not be possible
+    //   llm.listen → 'always' a microphone is not a capability to grant once and forget
+    AppShell.CONSENT_FLOOR = { 'llm.chat': 'once', 'llm.listen': 'always' };
+
+    // Strictness order: auto < once < always. Returns the stricter of the two.
+    AppShell.strictestConsent = function (a, b) {
+        var rank = { auto: 0, once: 1, always: 2 };
+        var ra = (a in rank) ? rank[a] : 1;          // unknown/malformed → treat as 'once'
+        var rb = (b in rank) ? rank[b] : 1;
+        return (ra >= rb) ? (a in rank ? a : 'once') : (b in rank ? b : 'once');
+    };
 
     customElements.define('app-shell', AppShell);
 })();

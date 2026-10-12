@@ -6,7 +6,7 @@
 
 ## Reality Check — READ FIRST
 
-Before starting any Explorer session, read **`team/roles/librarian/reality/v0.16.26__what-exists-today.md`** — this is the code-verified record of what exists. When processing briefs or writing assessments, always distinguish between what EXISTS (listed in reality doc) and what is PROPOSED (not yet built). **When you ship new code, update the reality document in the same commit.**
+Before starting any Explorer session, read **`team/roles/librarian/reality/index.md`** — this is the code-verified record of what exists. When processing briefs or writing assessments, always distinguish between what EXISTS (listed in reality doc) and what is PROPOSED (not yet built). **When you ship new code, update the reality document in the same commit.**
 
 ---
 
@@ -108,13 +108,13 @@ When a component is mature enough for the Villager team:
 
 | Document | Path |
 |----------|------|
-| **Reality document** | `team/roles/librarian/reality/v0.16.26__what-exists-today.md` |
+| **Reality document** | `team/roles/librarian/reality/index.md` |
 | Explorer role definition | `team/humans/dinis_cruz/briefs/02/14/v0.3.2__role-definition__explorer.md` |
 | Wardley Maps context | `team/humans/dinis_cruz/briefs/02/14/v0.3.2__briefs__wardley-maps-in-sgraph-project.md` |
 | IFD guide | `library/guides/development/ifd/v1.2.1__ifd__intro-and-how-to-use.md` |
-| Latest debrief | `team/humans/dinis_cruz/debriefs/03/18/v0.16.26__debrief__briefs-processing-13-to-18-march.md` |
-| Session handoff | `team/humans/dinis_cruz/debriefs/03/18/v0.16.26__session-handoff__explorer-librarian-brief-processing.md` |
-| Master index | `team/roles/librarian/reviews/03/18/v0.16.26__master-index__briefs-13-to-18-march.md` |
+| Latest debrief | `team/humans/dinis_cruz/debriefs/08/08/v0.33.53__debrief__daily-check-08-aug-2026.md` |
+| Latest code-change debrief | `team/humans/dinis_cruz/debriefs/08/06/v0.33.53__debrief__code-changes-04-aug-2026.md` |
+| Master index | `team/roles/librarian/reviews/08/08/v0.33.53__master-index__daily-check-08-aug-2026.md` |
 
 ---
 

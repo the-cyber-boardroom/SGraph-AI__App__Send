@@ -99,6 +99,18 @@ class test_Routes__Vault__Pointer(TestCase):
         response = self._read(file_id='nonexistent')
         assert response.status_code == 404
 
+    def test__read__immutable_object_is_cacheable(self):                          # imm objects → long-lived HTTP cache
+        self._write(file_id='bare/data/obj-cas-imm-aaaaaaaaaaaa', payload=b'imm')
+        response = self._read(file_id='bare/data/obj-cas-imm-aaaaaaaaaaaa')
+        assert response.status_code              == 200
+        assert response.headers['cache-control'] == 'public, max-age=31536000, immutable'
+
+    def test__read__mutable_ref_is_not_cached(self):                              # refs/indexes → never cached
+        self._write(file_id='bare/refs/ref-pid-muw-bbbbbbbbbbbb', payload=b'ref')
+        response = self._read(file_id='bare/refs/ref-pid-muw-bbbbbbbbbbbb')
+        assert response.status_code              == 200
+        assert response.headers['cache-control'] == 'no-store'
+
     # --- Read-base64 endpoint (MCP-compatible) ---
 
     def test__read_base64__existing(self):

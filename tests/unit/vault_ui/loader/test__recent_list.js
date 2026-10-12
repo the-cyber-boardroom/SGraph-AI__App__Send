@@ -55,6 +55,12 @@ suite('VaultLoaderRecent — add and list', ({ test, before }) => {
         assert.equal(entries[0].key, 'coral-stamp-5678', 'most-recent first');
         assert.equal(entries[1].key, 'apple-river-1234');
     });
+
+    test('storage cap keeps many entries (raised from 20 → 200; old vaults not silently dropped)', () => {
+        clearVaultStorage();
+        for (let i = 0; i < 30; i++) VaultLoader.recent.add('word-vault-' + (1000 + i), 'V' + i);
+        assert.equal(VaultLoader.recent.list().length, 30, 'all 30 retained (was capped at 20)');
+    });
 });
 
 // ---------------------------------------------------------------------------

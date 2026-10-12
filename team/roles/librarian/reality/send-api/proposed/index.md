@@ -68,3 +68,25 @@ vault snapshot. PROPOSED — open question, not yet decided.
 | `sgit secrets store/get/list/delete` (OS keychain) | PROPOSED — not in sgit |
 
 *Full source: `../v0.16.26__what-exists-today.md` Section 6 (lines 817–903), Section 30 (lines 2745–2830)*
+
+---
+
+## SG/Relay — Content-Blind Vault Routing Service (06/16 briefs, v0.32.4)
+
+All items below are PROPOSED — does not exist yet. The vault inbox (v0.29.1), enum_key derivation, and Storage_FS backends are EXISTS.
+
+SG/Relay is a separate service whose only job is routing opaque payloads between external
+comms systems (email/SMS/SES/IMAP/SQS/SNS) and vault inboxes. It never decrypts, never
+holds the vault's read key, never stores messages. The relay is stateless w.r.t. content.
+
+**Security property:** Inbound relay holds no vault secret (routes to append_token = H(pubkey)).
+Outbound relay holds enum_key only (inbox drain, not read_key). Compromised relay cannot
+reach vault plaintext.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-248 | SG/Relay routing core | Stateless content-blind relay; ports-and-adapters design (both vault and external are adapters); routing config + dedup cursor as only durable state; retry with exponential back-off; v1.0 inbound, v1.1 outbound+drain | 06/16 arch-pack (relay README, 01__architecture, 04__flows) |
+| P-249 | Transport adapters | Vault-inbox reference adapter (maps to shipped inbox endpoints); SES inbound/outbound; IMAP; SMS; SQS; SNS — all behind the same adapter port contract (Type_Safe); v1.0 scope: vault-inbox + SES only | 06/16 arch-pack (02__adapters) |
+| P-250 | Drain client → `mail/` tree population | Outbound leg: drain client reads vault inbox via enum_key, populates `mail/` tree in recipient vault; vault is system of record; drain client is not the relay | 06/16 arch-pack (04__flows) |
+| P-251 | Vault-native inbox UX | Compose window, inbox view, chrome-extension bridge (3b) for real-inbox bridging; chrome-extension bridge depends on P-157 (sealed-box); vault-native inbox (3a) ships first | 06/16 arch-pack (05__ux-mockups) |
+| P-252 | SG/Relay phased deployment | SG/Compute serverless (Lambda/Fargate), event/schedule-triggered; v1.0 proves on 2 vaults (inbound only); v1.1 adds outbound/drain with 5 vaults; acceptance criteria defined in 06__deployment-and-acceptance.md | 06/16 arch-pack (06__deployment-and-acceptance) |

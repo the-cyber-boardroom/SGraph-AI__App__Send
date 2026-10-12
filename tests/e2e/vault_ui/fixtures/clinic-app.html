@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Clinic App</title>
+<style>
+  :root { color-scheme: light; }
+  body { margin: 0; font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background: #f5f7fb; color: #1d2433; }
+  header { background: #16324f; color: #fff; padding: 18px 28px; }
+  header h1 { margin: 0 0 4px; font-size: 22px; }
+  header p  { margin: 0; opacity: .85; font-size: 14px; }
+  header code { background: rgba(255,255,255,.15); padding: 1px 6px; border-radius: 4px; }
+  main { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding: 22px 28px; }
+  section { background: #fff; border: 1px solid #dfe5ee; border-radius: 10px; padding: 16px 18px; }
+  h2 { margin: 0 0 10px; font-size: 15px; color: #3a4558; text-transform: uppercase; letter-spacing: .06em; }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li { display: flex; justify-content: space-between; padding: 6px 8px; border-bottom: 1px solid #eef2f7; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
+  li span.size { color: #7a869a; }
+  textarea { width: 100%; box-sizing: border-box; min-height: 130px; font: 13px ui-monospace, Menlo, monospace; border: 1px solid #cfd8e3; border-radius: 6px; padding: 8px; }
+  button { margin-top: 10px; background: #1f6feb; color: #fff; border: 0; border-radius: 6px; padding: 9px 16px; font-size: 14px; cursor: pointer; }
+  button:disabled { background: #9db6d9; }
+  #status { margin-left: 12px; font-size: 13px; color: #1a7f37; }
+  #status.err { color: #b42318; }
+  #log { grid-column: 1 / -1; margin: 0; background: #0f172a; color: #cbd5e1; border-radius: 10px; padding: 14px 16px; font-size: 12.5px; max-height: 200px; overflow: auto; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Clinic App</h1>
+  <p>This app reads and writes <code>/data/…</code> with plain <code>sg.vfs</code> calls. It has no idea that folder is another vault.</p>
+</header>
+<main>
+  <section>
+    <h2>Files under /data</h2>
+    <ul id="list"><li><span>loading…</span></li></ul>
+  </section>
+  <section>
+    <h2>Report → /data/report.json</h2>
+    <textarea id="report" spellcheck="false">{ "title": "Q3 report", "status": "draft" }</textarea>
+    <div><button id="save">Save report</button><span id="status"></span></div>
+  </section>
+  <pre id="log"></pre>
+</main>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var lines = 0;
+  function log(msg) { $('log').textContent += (lines++ ? '\n' : '') + new Date().toISOString().slice(11, 19) + '  ' + msg; $('log').scrollTop = 1e9; }
+  function status(msg, err) { var s = $('status'); s.textContent = msg; s.className = err ? 'err' : ''; }
+
+  async function refresh() {
+    var entries = await sg.vfs.list('data');
+    var files = entries.filter(function (e) { return e.type !== 'folder'; })
+                       .sort(function (a, b) { return a.path < b.path ? -1 : 1; });
+    $('list').innerHTML = files.length
+      ? files.map(function (e) { return '<li><span>' + e.path + '</span><span class="size">' + e.size + ' B</span></li>'; }).join('')
+      : '<li><span>(empty)</span></li>';
+    log('list data → ' + files.length + ' file(s)');
+    return files;
+  }
+
+  async function save() {
+    var text = $('report').value;
+    $('save').disabled = true; status('saving…');
+    try {
+      var res = await sg.vfs.write('data/report.json', new TextEncoder().encode(text));
+      status('saved ' + res.size + ' bytes');
+      log('write data/report.json → ok (' + res.size + ' B)');
+      await refresh();
+      return res;
+    } catch (err) {
+      status('write failed: ' + (err.code || err.message), true);
+      log('write data/report.json → ' + (err.code || err.message));
+      throw err;
+    } finally { $('save').disabled = false; }
+  }
+
+  async function readText(path) {
+    var t = await sg.vfs.readText(path);
+    log('read ' + path + ' → ' + t.length + ' chars');
+    return t;
+  }
+
+  window.__app = { refresh: refresh, save: save, readText: readText, ready: false };
+  $('save').addEventListener('click', function () { save().catch(function () {}); });
+
+  (function boot() {
+    if (!(window.sg && window.sg.vfs)) { setTimeout(boot, 50); return; }
+    log('sg bridge ready · vault "' + (sg.app && sg.app.vaultName || '?') + '" · writable=' + !!(sg.app && sg.app.writable));
+    refresh().then(function () { window.__app.ready = true; })
+             .catch(function (err) { status('list failed: ' + (err.code || err.message), true); log('list data → ' + (err.code || err.message)); window.__app.ready = true; });
+  })();
+})();
+</script>
+</body>
+</html>

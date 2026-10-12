@@ -81,6 +81,17 @@ jobs:
       - name: Generate i18n locale pages
         run: python scripts/generate_vault_i18n_pages.py --version ${{ env.UI_VERSION }}
 
+      - name: Inject build-info.js (app version + UI version)
+        # vault index.html loads /_common/js/build-info.js — without this step the file
+        # is missing on deploy (403 in console) and the header can't show the running
+        # app version. inject_build_version.py reads sgraph_ai_app_send/version and the
+        # UI manifest, then writes build-info.js into the version dir.
+        run: |
+          python scripts/inject_build_version.py \
+            --ui-base sgraph_ai_app_send__ui__vault \
+            --version ${{ env.UI_VERSION }} \
+            --output-subdir _common/js
+
       - name: Generate en-gb/vault/index.html (vault shell at clean /en-gb/vault URL)
         # history.replaceState sets the URL to /en-gb/vault after a vault opens.
         # S3 needs a real file there so a page refresh doesn't 404.

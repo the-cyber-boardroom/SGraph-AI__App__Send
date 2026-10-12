@@ -1,6 +1,6 @@
 import os
 
-from osbot_fast_api.api.routes.Routes__Set_Cookie                               import Routes__Set_Cookie
+from sgraph_ai_app_send__docker.Routes__Auth__Login                             import Routes__Auth__Login
 from osbot_utils.utils.Env                                                      import get_env
 from starlette.responses                                                        import FileResponse
 from starlette.staticfiles                                                      import StaticFiles
@@ -63,7 +63,7 @@ class Fast_API__SGraph__Send__Container(Fast_API__SGraph__App__Send__User):
 
     def setup_routes(self):
         super().setup_routes()
-        self.add_routes(Routes__Set_Cookie)
+        self.add_routes(Routes__Auth__Login)                                    # friendly single-key login page (ADR-12) — same auth-excluded paths as the osbot original
         # NOTE: do NOT call self.setup_static_routes() here — the base
         # Fast_API.setup() already invokes it polymorphically (line 142
         # of osbot_fast_api/api/Fast_API.py), and an explicit call would

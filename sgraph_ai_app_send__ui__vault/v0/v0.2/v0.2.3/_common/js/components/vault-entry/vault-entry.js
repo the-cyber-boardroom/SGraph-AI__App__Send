@@ -37,8 +37,15 @@ class VaultEntry extends VaultComponent {
     }
 
     onReady() {
-        // Restore server endpoint — only if a non-default value is stored
-        const savedEndpoint = sessionStorage.getItem('sg-vault-endpoint')
+        // Restore server endpoint — only if a non-default value is stored.
+        // Wrap in try/catch: when this vault is hosted inside a sandboxed (null-origin)
+        // iframe — e.g. a parent vault opening another vault via the embed protocol —
+        // sessionStorage access throws synchronously ("The document is sandboxed and
+        // lacks the 'allow-same-origin' flag."). Without this guard, onReady crashes
+        // BEFORE getCurrentKey() runs and the parent's postMessage handshake never
+        // gets a chance to auto-open the vault.
+        let savedEndpoint = null;
+        try { savedEndpoint = sessionStorage.getItem('sg-vault-endpoint'); } catch (_) {}
         if (savedEndpoint) this._endpointInput.value = savedEndpoint
 
         // Restore access key
@@ -53,6 +60,19 @@ class VaultEntry extends VaultComponent {
 
         // Show recent vaults
         this._renderRecentVaults()
+
+        // Embed mode (?embed=1): the key arrives from the PARENT page by postMessage
+        // (vault-shell._initEmbed) — never from storage. A stray sg-vault-key from a
+        // previous session (or an earlier embed in the same storage partition) must
+        // not auto-open the wrong vault under the parent's handshake. DEP-FREE check
+        // (not EmbedProtocol.isEmbedMode) so the guard holds even if embed-protocol.js
+        // failed to load.
+        let isEmbedPage = false
+        try { isEmbedPage = new URLSearchParams(window.location.search).get('embed') === '1' } catch (_) {}
+        if (isEmbedPage) {
+            this._showStatus('Waiting for vault key from the embedding page…')
+            return
+        }
 
         // The head routing script handles any /#token hash: it saves the token to
         // localStorage('sg-vault-key') and strips the hash before this runs.

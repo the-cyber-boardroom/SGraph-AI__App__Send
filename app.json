@@ -1,0 +1,25 @@
+{
+  "name": "SG/Send Vault Server",
+  "description": "Zero-knowledge encrypted vault server + web UI. The server only ever stores ciphertext - keys never leave your browser or CLI.",
+  "repository": "https://github.com/the-cyber-boardroom/SGraph-AI__App__Send",
+  "keywords": ["encryption", "zero-knowledge", "vault", "file-sharing", "sgit"],
+  "stack": "container",
+  "env": {
+    "SEND__STORAGE_MODE": {
+      "description": "Storage backend: 'memory' (ephemeral - data is lost on dyno restart, by design) or 's3' (durable - also set SEND__S3_BUCKET + AWS credentials). Heroku's filesystem is ephemeral, so 'disk' is not valid here.",
+      "value": "memory",
+      "required": true
+    },
+    "SGRAPH_SEND__ACCESS_TOKEN": {
+      "description": "The deployment's access key (licensing key). Gates ALL routes including reads. Leave empty only if you explicitly want an open instance.",
+      "required": false
+    },
+    "SEND__S3_BUCKET": {
+      "description": "S3 bucket name (only for SEND__STORAGE_MODE=s3).",
+      "required": false
+    },
+    "AWS_ACCESS_KEY_ID":     { "description": "AWS access key (only for s3 mode).", "required": false },
+    "AWS_SECRET_ACCESS_KEY": { "description": "AWS secret key (only for s3 mode).", "required": false },
+    "AWS_DEFAULT_REGION":    { "description": "AWS region of the bucket (only for s3 mode).", "required": false }
+  }
+}

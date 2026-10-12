@@ -93,23 +93,51 @@ await suite('VaultLoader.open() — format 3: passphrase:alnum_id', ({ test, bef
 });
 
 // ---------------------------------------------------------------------------
-// Format 4 — read-only (not yet supported)
+// Formats 4 + 6 — read-key open (the "not yet supported" stub is GONE: ref
+// discovery derives from the read key via SGVaultCrypto.deriveReadOnlyCreds)
 // ---------------------------------------------------------------------------
-await suite('VaultLoader.open() — format 4: read-only throws', ({ test, before }) => {
-    before(clearIntegrationStorage);
+await suite('VaultLoader.open() — formats 4/6: read-key open', ({ test, before }) => {
+    const RK   = 'abcdef0123456789'.repeat(4);      // 64-hex read key
+    const VID  = 'abcdef012345';
+    const KEY6 = RK + ':' + VID;                    // format 6 (colon, CLI parity)
+    const KEY4 = VID + ' ' + RK;                    // format 4 (space, legacy)
 
-    const READ_ONLY_KEY = 'abcdef012345 ' + '0'.repeat(64);
-
-    test('throws with "not yet supported" message', async () => {
-        await assert.rejects(
-            () => VaultLoader.open(READ_ONLY_KEY),
-            /not yet supported/i
-        );
+    before(() => {
+        clearIntegrationStorage();
+        SGVault._openReadOnlyCalls.length = 0;
+        SGVault._seed('ro:' + VID, 'RO Vault');
     });
 
-    test('emits vault-open-failed event', async () => {
+    test('format 6 resolves read-only via SGVault.openReadOnly', async () => {
+        const r = await VaultLoader.open(KEY6);
+        assert.equal(r.format, 6);
+        assert.equal(r.vaultKey, KEY6);
+        assert.equal(r.vault.writable, false);
+        assert.equal(SGVault._openReadOnlyCalls.length, 1);
+        assert.equal(SGVault._openReadOnlyCalls[0].vaultId, VID);
+        assert.match(SGVault._openReadOnlyCalls[0].refFileId, /^ref-pid-muw-[0-9a-f]{12}$/);
+    });
+
+    test('format 4 resolves through the same path (canonical key is format 6)', async () => {
+        const r = await VaultLoader.open(KEY4);
+        assert.equal(r.vaultKey, KEY6);
+        assert.equal(SGVault._openReadOnlyCalls.length, 1);
+    });
+
+    test('VAULT_OPENED carries readOnly:true', async () => {
         sgraphVault.events.clearLog();
-        await VaultLoader.open(READ_ONLY_KEY).catch(() => {});
+        await VaultLoader.open(KEY6);
+        const ev = sgraphVault.events._log.find(e => e.name === 'vault-opened');
+        assert.ok(ev, 'vault-opened emitted');
+        assert.equal(ev.detail.readOnly, true);
+    });
+
+    test('unknown vault rejects with HEAD-ref error and emits vault-open-failed', async () => {
+        sgraphVault.events.clearLog();
+        await assert.rejects(
+            () => VaultLoader.open(RK + ':aaaabbbbcccc'),
+            /HEAD ref missing/
+        );
         const ev = sgraphVault.events._log.find(e => e.name === 'vault-open-failed');
         assert.ok(ev, 'vault-open-failed emitted');
     });

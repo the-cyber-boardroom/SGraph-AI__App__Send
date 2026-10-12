@@ -27,6 +27,60 @@ class SGVaultCrypto {
     static KEY_LENGTH     = 256
     static FILE_ID_LENGTH = 12                                                 // 12 hex chars = 6 bytes
 
+    // --- Key input normalisation --------------------------------------------------
+    // The sgit CLI ships self-identifying key prefixes (design contract 08/14,
+    // naming revised 08/17 — sgit-ai 0.16.0 `Vault__Crypto.KEY_PREFIXES`):
+    //   sgit_private_vault_{passphrase}:{vault_id}  — vault key (read AND write)
+    //   sgit_private_read_{64-hex}[:{vault_id}]     — read key, keep secret
+    //   sgit_public_read_{64-hex}[:{vault_id}]      — read key, deliberately published
+    //   sgit_vk1_ / sgit_rk1_                       — legacy (v0.15.5), input-only
+    // The value AFTER the prefix is byte-identical to the bare key, so derivation and
+    // every stored artifact are unchanged; the prefix exists so scanners and humans
+    // recognise a key AND its intent on sight. Stripping is the single normalisation
+    // point for key INPUT — a key pasted from CLI output must reach the derivation
+    // bare, or PBKDF2 runs over the prefix and the vault cannot be found
+    // ("Vault not found: HEAD ref missing"). Pure string op — no crypto.
+    static KEY_PREFIXES = ['sgit_private_vault_', 'sgit_private_read_', 'sgit_public_read_',
+                           'sgit_vk1_', 'sgit_rk1_']
+
+    static stripKeyPrefix(input) {
+        const s = String(input || '').trim()
+        for (const prefix of this.KEY_PREFIXES) {
+            if (s.startsWith(prefix)) return s.slice(prefix.length)
+        }
+        return s
+    }
+
+    // What does this credential DECLARE itself to be? Classification is by
+    // declaration, never by shape — mirrors sgit's `classify_key`. Lets a
+    // read-only surface refuse write capability instead of inferring intent.
+    // Bare/legacy keys are 'unknown' and resolved by context (format detection).
+    static classifyKey(input) {
+        const s = String(input || '').trim()
+        if (s.startsWith('sgit_public_read_'))                                  return 'read-public'
+        if (s.startsWith('sgit_private_read_') || s.startsWith('sgit_rk1_'))    return 'read-private'
+        if (s.startsWith('sgit_private_vault_') || s.startsWith('sgit_vk1_'))   return 'vault'
+        return 'unknown'
+    }
+
+    // --- Read-only credential parsing ---------------------------------------------
+    // ONE matcher for read-key credentials, shared by every dispatch site that can't
+    // use vault-loader-format.js (app-shell loads no loader scripts; the loader module
+    // itself stays dep-free and keeps its own regex, drift-guarded by tests).
+    // Accepts, after key-prefix stripping (see KEY_PREFIXES):
+    //   format 6:  <64-hex read_key>:<vault_id>     (colon — sgit CLI clone parity)
+    //   format 4:  <vault_id> <64-hex read_key>     (space — legacy web form)
+    // Returns { vaultId, readKeyHex } or null (never throws — callers fall through
+    // to their passphrase path on null).
+    static parseReadOnlyCredential(input) {
+        const s = this.stripKeyPrefix(input)
+        let m = /^([a-f0-9]{64}):([a-z0-9]{4,24})$/.exec(s)
+        if (m) return { vaultId: m[2], readKeyHex: m[1] }
+        m = /^([a-z0-9]{4,24})\s+([a-f0-9]{64})$/.exec(s)
+        if (m) return { vaultId: m[1], readKeyHex: m[2] }
+        return null
+    }
+
     // --- Vault Key Parsing ------------------------------------------------------
 
     static parseVaultKey(fullVaultKey) {
@@ -178,6 +232,35 @@ class SGVaultCrypto {
             writeKey,
             hmacKey,
             vaultId,
+            refFileId:         'ref-pid-muw-' + refHex,
+            branchIndexFileId: 'idx-pid-muw-' + branchIndexHex
+        }
+    }
+
+    // --- Read-Only Credentials from a raw read key ---------------------------------
+    // The capability triple {vault_id, read_key, ref_file_id} that SGVault.openReadOnly
+    // consumes is FULLY derivable from (vault_id, read_key): the ref file id is
+    // HMAC(read_key, domain) — no passphrase needed. This is what makes the
+    // <read_key>:<vault_id> credential (format 6, sgit CLI read-only clone parity)
+    // openable without any server registry. branchIndexFileId is derivable the same
+    // way and returned for parity with deriveKeys (not yet consumed by openReadOnly).
+    // Invariant (unit-tested): for any vault key, deriveReadOnlyCreds(vaultId,
+    // hex(readKey)) returns the same refFileId as deriveKeys(passphrase, vaultId).
+    static async deriveReadOnlyCreds(vaultId, readKeyHex) {
+        if (!/^[a-f0-9]{64}$/.test(readKeyHex)) {
+            throw new Error('read key must be 64 lowercase hex characters')
+        }
+        const readBits = Uint8Array.from(readKeyHex.match(/../g).map(h => parseInt(h, 16)))
+        const hmacKey  = await crypto.subtle.importKey(
+            'raw', readBits, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+        )
+        const [refHex, branchIndexHex] = await Promise.all([
+            this._deriveFileId(hmacKey, `sg-vault-v1:file-id:ref:${vaultId}`),
+            this._deriveFileId(hmacKey, `sg-vault-v1:file-id:branch-index:${vaultId}`)
+        ])
+        return {
+            vaultId,
+            readKeyB64:        btoa(String.fromCharCode.apply(null, readBits)),
             refFileId:         'ref-pid-muw-' + refHex,
             branchIndexFileId: 'idx-pid-muw-' + branchIndexHex
         }

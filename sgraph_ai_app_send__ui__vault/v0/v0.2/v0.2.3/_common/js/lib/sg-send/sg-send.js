@@ -12,9 +12,26 @@
 
 class SGSend {
 
-    constructor({ endpoint, token } = {}) {
+    constructor({ endpoint, token, staticMode } = {}) {
         this.endpoint = (endpoint || '').replace(/\/$/, '')
         this.token    = token || ''
+        // Static mode: the backend is a plain static file host (GitHub Pages / S3), not the
+        // FastAPI. Reads are GETs to the same paths; there is no /batch POST and no write
+        // endpoint. So batchLoad fans out to individual GET reads, and writes reject cleanly
+        // with EREADONLY instead of an opaque 405/404. Opt in per-instance via
+        // {staticMode:true}, or globally via window.SG_STATIC=true (so a statically-hosted
+        // page enables it once without threading a flag through every construction site).
+        // Default OFF → behaviour is byte-identical to before.
+        this.staticMode = (staticMode != null)
+            ? !!staticMode
+            : (typeof window !== 'undefined' && window.SG_STATIC === true)
+    }
+
+    _readOnly(what) {
+        return Object.assign(
+            new Error('Static host is read-only: ' + what + ' needs the API backend.'),
+            { code: 'EREADONLY', staticMode: true }
+        )
     }
 
     // --- Auth Headers ---------------------------------------------------------
@@ -127,6 +144,7 @@ class SGSend {
     // --- Vault Pointer API ------------------------------------------------------
 
     async vaultWrite(vaultId, fileId, writeKey, data) {
+        if (this.staticMode) throw this._readOnly('writing')
         const response = await this._fetch('PUT', `/api/vault/write/${vaultId}/${fileId}`, {
             headers: {
                 'Content-Type':              'application/octet-stream',
@@ -139,10 +157,18 @@ class SGSend {
 
     async vaultRead(vaultId, fileId) {
         const url      = `${this.endpoint}/api/vault/read/${vaultId}/${fileId}`
-        // cache: 'no-store' — refs are mutable server-side (overwritten by every push). The browser's
-        // default heuristic freshness would otherwise serve a stale ref ciphertext from disk cache,
-        // causing the Files panel to render a previous commit's tree after a Cmd-R reload.
-        const response = await fetch(url, { method: 'GET', mode: 'cors', cache: 'no-store' })     // No auth required (zero-knowledge)
+        // Immutable objects (obj-cas-imm-*, key-rnd-imm-*) never change → allow the browser HTTP
+        // cache (use the default mode). This persists across reloads EVEN in null-origin sandboxed
+        // iframes, where the Cache API / localStorage / IndexedDB are all unavailable — the HTTP
+        // cache is browser-managed and not gated by origin-storage permissions. Needs the server to
+        // send a cacheable response for these paths (recommended: `Cache-Control: public, max-age=
+        // 31536000, immutable`); without it the browser may still heuristically cache.
+        // Everything else (mutable refs ref-pid-*, indexes idx-pid-*) MUST stay no-store, or a
+        // Cmd-R reload would render a previous commit's tree from a stale ref ciphertext.
+        const isImmutable = typeof fileId === 'string' && fileId.includes('-imm-')
+        const fetchOpts   = isImmutable ? { method: 'GET', mode: 'cors' }
+                                        : { method: 'GET', mode: 'cors', cache: 'no-store' }
+        const response = await fetch(url, fetchOpts)     // No auth required (zero-knowledge)
         if (response.status === 404) return null
         if (!response.ok) {
             const detail = await response.text().catch(() => response.statusText)
@@ -157,6 +183,8 @@ class SGSend {
     //     On 400 (memory mode / presigned not available): falls back to vaultRead().
 
     async vaultReadLarge(vaultId, filePath) {
+        // Static host: no presigned endpoint — go straight to the GET read (avoids a 404).
+        if (this.staticMode) return this.vaultRead(vaultId, filePath)
         try {
             const presignResp = await fetch(
                 `${this.endpoint}/api/vault/presigned/read-url/${vaultId}/${filePath}`,
@@ -175,6 +203,7 @@ class SGSend {
     }
 
     async vaultDelete(vaultId, fileId, writeKey) {
+        if (this.staticMode) throw this._readOnly('deleting')
         const response = await this._fetch('DELETE', `/api/vault/delete/${vaultId}/${fileId}`, {
             headers: { 'x-sgraph-vault-write-key': writeKey }
         })
@@ -189,6 +218,24 @@ class SGSend {
     // Auto-chunks at 50 ops (server hard limit is 100).
 
     async vaultBatch(vaultId, writeKey, ops) {
+        // Static host: there is no /batch POST endpoint. Read-only batches (op:'read') fan out
+        // to individual GET reads and return the SAME result shape ([{status,file_id,data}])
+        // so callers (e.g. SGVaultObjectStore.batchLoad) need zero changes. Any write op
+        // rejects cleanly. Reads run in parallel — same net effect, just N GETs not one POST.
+        if (this.staticMode) {
+            ops = ops || []
+            for (var oi = 0; oi < ops.length; oi++) {
+                if (ops[oi] && ops[oi].op !== 'read') throw this._readOnly('batch writes')
+            }
+            return Promise.all(ops.map((o) => {
+                return this.vaultRead(vaultId, o.file_id).then((buf) => {
+                    return (buf == null)
+                        ? { status: 'not_found', file_id: o.file_id }
+                        : { status: 'ok', file_id: o.file_id, data: SGSend._abToB64(buf) }
+                }).catch(() => ({ status: 'error', file_id: o.file_id }))
+            }))
+        }
+
         const CHUNK      = 50
         const allResults = []
         for (let i = 0; i < ops.length; i += CHUNK) {
@@ -203,5 +250,26 @@ class SGSend {
             allResults.push(...(data.results || []))
         }
         return allResults
+    }
+
+    // ArrayBuffer/Uint8Array → base64 (chunked to avoid call-stack overflow on large blobs).
+    // Used by the static-mode batch fan-out to match the API batch result shape ({data:<b64>}).
+    static _abToB64(buf) {
+        const bytes = buf instanceof ArrayBuffer ? new Uint8Array(buf) : buf
+        let binary = ''
+        const CH = 8192
+        for (let i = 0; i < bytes.length; i += CH) {
+            binary += String.fromCharCode.apply(null, bytes.subarray(i, i + CH))
+        }
+        return btoa(binary)
+    }
+
+    // base64 → Uint8Array (inverse of _abToB64). Used by the CAS ref writer to cache the
+    // server's CURRENT ref bytes returned on a write-if-match conflict.
+    static _b64ToBytes(b64) {
+        const binary = atob(b64)
+        const out    = new Uint8Array(binary.length)
+        for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i)
+        return out
     }
 }

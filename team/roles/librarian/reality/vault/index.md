@@ -1,6 +1,6 @@
 # vault — Reality Index
 
-**Domain:** `vault/` | **Last updated:** 2026-04-28 | **Maintained by:** Librarian (daily run)
+**Domain:** `vault/` | **Last updated:** 2026-09-07 | **Maintained by:** Librarian (daily run)
 
 The vault/SGit cryptographic storage system. This domain covers the encryption layer, the
 object storage model, the browser JS client, PKI, and the sgit CLI as it relates to vault
@@ -10,6 +10,9 @@ shared cryptographic and storage design.
 
 **⚠️ Active design change:** The structure key encryption split (04/28 Architect Review)
 is a four-team change. See `proposed/structure-key-split.md`.
+
+> **Code index (2026-07-24):** per-file navigation for the browser vault implementation
+> (`sgraph_ai_app_send__ui__vault/`) lives at `team/roles/librarian/code-index/vault-web/`.
 
 ---
 
@@ -67,6 +70,27 @@ Objects are stored in a content-addressable store (CAS) with opaque IDs:
 | Refs | `bare/refs/` | Mutable |
 | Branch index | `bare/indexes/` | Mutable |
 
+### Server-Side I/O — Auth Cache + Catch-404 Reads (v0.33.5, 2026-06-08)
+
+| Behaviour | Status | Evidence |
+|-----------|--------|---------|
+| **Access-token validation cache** — positive `token_lookup` results cached for a Lambda-lifetime TTL (default 60s, `SGRAPH_SEND__TOKEN_CACHE_TTL`) so repeated writes/batches in a warm instance do **not** re-hit the Admin Lambda. Negatives never cached. Mirrors `_manifest_cache`. | **EXISTS** | `Service__Access_Token` (6 tests); used by `Routes__Vault__Pointer.check_access_token` + `Routes__Vault__Inbox._check_access_token` |
+| **Catch-404 reads** — `Storage_FS__S3.file__bytes`/`file__str` do a single GetObject and catch the missing-key `ClientError` (return `None`) instead of a pre-`HeadObject`. `file__json` inherits it. `file__delete` unchanged (S3 delete is idempotent; its existence check is semantic). | **EXISTS** | `Storage_FS__S3._is_not_found` + tests in `test_Storage_FS__S3.py` |
+| **No service-level pre-exists checks** — `Service__Vault__Pointer.read`/`_batch_read`/`_cas_write`/`write_if_match` rely on `file__bytes` returning `None` on miss (one read, not Head+read). | **EXISTS** | `test_Service__Vault__Pointer.py` (existing not-found cases still green) |
+| **Write-key auth** — manifest loaded once per Lambda lifetime via `_manifest_cache`; warm writes do 0 S3 for auth, 1 PutObject for the object. | **EXISTS** | `Service__Vault__Pointer._load_manifest` |
+
+> **Client-side commit batching — SHIPPED (was PROPOSED here):** the `sg-vault` browser library now collapses a commit's per-object/ref `PUT`s into one `POST /api/vault/batch`. See the **"Batched commit writes"** section below for the code-verified details. The note that this was "not yet used by the browser library" predates that change.
+
+### Static-host mode — same vault app, no backend (2026-06-30)
+
+| Behaviour | Status | Evidence |
+|-----------|--------|---------|
+| **`SGSend.staticMode`** — opt-in (constructor `{staticMode}` or global `window.SG_STATIC===true`; default **false** → live behaviour byte-identical). Lets the **same** vault-app HTML run against a plain static file host (GitHub Pages / S3) instead of the FastAPI: reads are deterministic GETs (file IDs are content-hash/HMAC of the key — no list/discovery call), writes reject with `EREADONLY`. | **EXISTS** | `sg-send.js`; `test__sgsend_static_mode.js` (12, incl. non-static regression guard); kernel bundle regenerated |
+| **Batch-read fan-out** — in static mode `vaultBatch` (no `/batch` POST on a static host) fans `op:'read'` out to parallel `vaultRead` GETs and returns the **identical** `[{status,file_id,data:<b64>}]` shape, so `SGVaultObjectStore.batchLoad` (and any caller) is unchanged. A write op in a static batch → `EREADONLY`. `vaultReadLarge` skips presigned and reads directly; `vaultWrite`/`vaultDelete` → `EREADONLY`. | **EXISTS** | `sg-send.js` |
+| Read-only open (no access token) → `sg.app.writable===false`; the bridge gates writes before the transport. So static = read-only snapshot; the app HTML is unchanged. | **EXISTS** | by construction (writable tier) |
+
+Guide for the consuming team: `library/guides/vault-html/HOSTING-ON-STATIC-STORAGE.md` (GH Pages/S3 layout, `window.SG_STATIC`/`SG_ENDPOINT`, path-mirroring, cache headers, what works/doesn't). **PROPOSED follow-on:** configurable read-path template on `SGSend` so the static layout need not mirror the literal `/api/vault/read/<vaultId>/` prefix.
+
 ### Vault Round-Trip: AI-Native Access (v0.13.22)
 
 | Capability | Status | Evidence |
@@ -80,7 +104,259 @@ Objects are stored in a content-addressable store (CAS) with opaque IDs:
 **Known constraint:** Claude.ai bash_tool egress proxy blocks direct HTTP to `send.sgraph.ai`
 unless domain is on allowlist. Domain allowlist changes only take effect in a new conversation.
 
+### Vault Append — Append-Only Gate-Controlled Storage (v0.32.7)
+
+Generic append-only storage primitive. Not messaging-specific — same infrastructure serves
+logs, signals, control messages, state flows, and email-style workflows. The server stores
+encrypted ciphertext and checks capability gates (`H(key) == stored_hash`). All crypto
+(key derivation, encryption, decryption) is **client-side** — done in sgit CLI and vault web.
+
+**Storage lives inside `bare/append/`** — managed by sgit but not in the commit DAG
+(managed-but-unversioned). This preserves zero-knowledge while enabling sgit awareness.
+
+| Capability | Status | Evidence |
+|------------|--------|---------|
+| Four-tier gate model (append_token, enum_key, write_key, private_key) | **EXISTS** | `Service__Vault__Append.py`, 133 tests |
+| Blind append (no id/count leaked to sender) | **EXISTS** | `test__append__blindness_no_file_id_returned` |
+| Paginated listing with cursor (`after_file_id`) | **EXISTS** | `test__list_entries__*` |
+| Metadata-only listing (zero payload reads) | **EXISTS** | `test__list_entries__metadata_only_omits_size_and_content` |
+| Copy+delete mark-processed (idempotent) | **EXISTS** | `test__mark_processed__*` |
+| Path traversal defense via `Safe_Str__*` | **EXISTS** | 8 traversal negative tests |
+| Batch operation cap (100 file_ids) | **EXISTS** | `test__*_rejects_oversized_batch` |
+| Incremental content ceiling check (M-1 fix) | **EXISTS** | `test__list_entries__incremental_ceiling_check` |
+| Separate append config — authoritative (L-2 fix) | **EXISTS** | `test__configure__writes_separate_config_file`, `test__configure__does_not_write_append_fields_to_manifest` |
+| list_files never returns append entries | **EXISTS** | `test__list_files__never_returns_append_entries` |
+| Account-less write surface (no access token) | **EXISTS** | `test__write__no_auth_token_required` |
+
+**What lives where:**
+- Server (SG/API): stores `H(enum_key)`, `H(append_token)`; gate checks; file storage; no crypto
+- Client (sgit CLI / vault web): `enum_key` derivation, `append_token = H(pubkey)`, X25519 keygen,
+  seal/open — all client-side. **Not SG/API work.**
+
+See `send-api/index.md` for the 6 HTTP endpoints.
+
+### Vault-App Vault Management — `sg.vault.*` create/manage (v0.33.5, 2026-06-08)
+
+A vault app (sandboxed iframe under `/en-gb/app/`) can create and manage other vaults via the
+kernel bridge, gated by `app.json` grants. Code: `app-shell.js` (`_createChildVault`,
+`_ownerSecret*`, `_getVaultKey`, `_openAppVault`, `_listChildVaults`, `_deleteChildVault`,
+`_seedVaultTree`), `app-permissions.js` (new vault grants), `sg-vault-owner-secrets.js` (new).
+
+| Capability | Status | Evidence |
+|------------|--------|---------|
+| `sg.vault.create({returnKey})` returns the **composed** openable key `passphrase:vault_id` | **EXISTS** | `_createChildVault`; round-trip in tests |
+| Standalone create (no parent-tree mutation) | **EXISTS** | `_createChildVault` (link omitted) |
+| **Owner-secret store** — child write-keys sealed under a `write_key`-derived key at `.vault/owner/secrets/` (owner-tier; RO sessions cannot decrypt) | **EXISTS** | `SGVaultOwnerSecrets` (9 tests); `_ownerSecret*` |
+| `sg.vault.getKey(ref)` / `openApp(ref)` / `list()` | **EXISTS** | bridge dispatch + helpers |
+| `sg.vault.delete(ref)` — key custody solved; **server teardown pending** `SGVault.destroy()` | **PARTIAL** | `_deleteChildVault` returns `server_teardown:false` until the endpoint ships |
+| `sg.vault.seedFrom` — copy a template tree into the new vault (skips `.vault/**`) | **EXISTS** | `_seedVaultTree`/`_collectTree` |
+| **Embedded access token** — `create({accessToken:'inherit'\|'<token>'})` writes `.vault/access-token.json` (floored, read_key-encrypted) so a **key-only link opens WRITABLE**; token never in the URL. `accessToken:'new'` → ENOTIMPL (mint endpoint = separate workflow). `sg.vault.setAccessToken(ref,value)` rotates it. Embedded token wins over the localStorage cache at open. **Read on open by BOTH `/app` (app-shell) and `/vault` (vault-shell) — parity.** The reader expands the lazy `.vault` sub-tree (`needsLoading`/`loadSubTreeOnDemand`) before reading — `.vault` is `_loaded:false` after open, so `listFolder('/.vault')` returns `[]` and the token would be missed otherwise (this was the bug that kept the editor read-only). | **EXISTS** | `_readEmbeddedAccessToken`/`_writeEmbeddedAccessToken`/`_resolveEmbedToken`/`_setVaultAccessToken` (app-shell.js + vault-shell.js) |
+| New grants: `vault.createKey`/`standalone`/`seedFrom`/`openApp`/`embedAccessToken` (default-deny; `createKey` stronger than `create`) | **EXISTS** | `app-permissions.js` (30 tests) |
+| **Per-verb consent policy** — `app.json` `permissions.consent[verb]` = `always`/`once`/`auto`; tunes (never grants) the HUD confirmation. Default unchanged: always-confirm for createKey/delete. Lets a trusted app disable repeated prompts. | **EXISTS** | `_consentPolicy`/`_consent` |
+| HUD consent banner ellipsizes (no overflow over title/buttons); message shortened, ref-id hidden | **EXISTS** | `app-hud.js` CSS |
+
+### CLI Interop — branch index + reconcile-on-open (v0.33.5, 2026-06-08)
+
+Closes two `sgit`-CLI-team briefs about web↔CLI two-ref-model interop.
+
+| Fix | Status | Evidence |
+|-----|--------|---------|
+| Web vaults now write a single-branch index (`branch_index_v1`) at `bare/indexes/<idx-pid-muw-*>` on **create** and every **push** → `sgit clone <web-vault>` no longer errors "No branch index found" | **EXISTS** | `SGVaultRefManager.writeBranchIndex` (9 tests); called in `SGVault.create` + `push()` |
+| `SGVault.open` reconcile-on-open: when the clone ref is **cleanly behind** the named ref (strict ancestor), load the **named** head, not the stale clone — fixes the "open prefers clone, silently shadows CLI pushes" bug | **EXISTS** | `sg-vault.js` open (`_isAncestor` clean-behind check); diverged/ahead clones keep their head (no data loss) |
+| Branch-index path already aligned (`bare/indexes/`, not the CLI brief's feared `bare/idx/`) | **EXISTS** | `sg-vault-ref-manager.js` |
+
+The web writes the index pointing at the **named** ref only (never the clone ref), so the CLI keeps cloning the canonical published branch. Brief responses: `team/comms/briefs/06/08/v0.33.5__brief__cli-interop-branch-index-and-reconcile.md`.
+
+### Immutable-block caching in null-origin iframes (v0.33.5, 2026-06-08)
+
+The Cache-API imm-block cache (`sg-vault-blocks`) is **inert in null-origin sandboxed iframes**
+(the ViV kernel / embed context) — `caches`, `localStorage`, `indexedDB` all throw/are absent
+there, so every imm read re-hit the network. Added a universal tier + HTTP-cache cooperation:
+
+| Tier | Status | Notes |
+|------|--------|-------|
+| In-memory imm cache (module-level Map, 64 MB LRU) in `SGVaultObjectStore` | **EXISTS** | Works EVERYWHERE incl. null-origin; session-scoped; promotes Cache-API hits; content-addressed-safe. Tests: `test__object_store_mem_cache.js` (7) |
+| Cache API tier (`sg-vault-blocks`) | EXISTS (unchanged) | Persistent where available; bypassed in sandboxes |
+| `vaultRead` allows HTTP caching for `-imm-` GETs (keeps `no-store` for refs) | **EXISTS** | Browser HTTP cache survives reload even in null-origin (not storage-gated) |
+| Server sends `Cache-Control: public, max-age=31536000, immutable` for `-imm-` reads (`no-store` for refs) | **EXISTS** | `Routes__Vault__Pointer.read__vault_id__file_id`; tests `test_Routes__Vault__Pointer.py` (+2) |
+
+### Batched commit writes — one POST /batch instead of N preflighted PUTs (v0.33.5, 2026-06-08)
+
+A commit/push emitted ~5 separate PUTs (blob, tree, commit, clone-ref, named-ref + index), each a
+CORS-preflighted, unique-URL (uncacheable) request → ~half of a one-message send was OPTIONS rows.
+
+| Change | Status | Evidence |
+|--------|--------|---------|
+| Transparent write-batch scope on `SGVaultObjectStore` (`beginBatch`/`flushBatch`/`discardBatch`/`batching`/`_stage`); `store()` stages when batching | **EXISTS** | `sg-vault-object-store.js`; tests `test__write_batch.js` (15) |
+| `SGVaultRefManager.writeRef`/`writeBranchIndex` join the active batch (objectStore ref) | **EXISTS** | `sg-vault-ref-manager.js` |
+| Re-entrant `SGVault._withBatch`; `_commit`, `create`, `push`, `addFile`/`addFiles`/`updateFile` wrapped → each logical write = ONE `POST /api/vault/batch/{vault_id}` | **EXISTS** | `sg-vault.js`, `sg-vault--sync.js`, `sg-vault--file-ops.js` |
+| Ordering: objects → indexes → refs within the batch (a ref never precedes its target) | **EXISTS** | `flushBatch` sort; test asserts ordering |
+
+Reuses the existing write-capable batch endpoint (`Service__Vault__Pointer.batch`); no backend change.
+The fixed batch URL makes the single preflight cacheable. Architect spec + debrief:
+`team/roles/architect/reviews/06/08/v0.33.5__architect-spec__batched-commit-writes.md`.
+| `sg.vault.mount({mode:'rw'})` writable mount | **PROPOSED** | separate brief `team/comms/briefs/06/08/v0.33.5__brief__vault-writable-mount.md` |
+
+Plan: `team/roles/dev/reviews/06/08/v0.33.5__dev-plan__vault-create-return-key.md`.
+
+### Vault Inbox — C1 through C4 (v0.33.14–v0.33.16, 2026-06-09/10)
+
+The inbox transport, check-on-events model, and app bridge are all shipped. The **full inbox spec** (CLI support, main UI section, app methods beyond the bridge) remains PROPOSED — see the PROPOSED section.
+
+> **Rename (v0.32.7, 2026-06-15): `inbox` → `append`.** The transport was renamed across the stack —
+> lib is now `_common/js/lib/sg-append/` (`sg-append.js`, `sg-append-checker.js`), the bridge namespace
+> is **`sg.append.*`**, the write verb is **`write`** (was `append`), permission grants are
+> `permissions.append.*`, and host events are `append.new-messages` / `append.error`. Recorded in
+> `team/comms/changelog/06/15/v0.32.7__changelog__sg-inbox-client-append-url-migration.md`. The table
+> below reflects the current (post-rename) names; the C1–C4 commit ids refer to the original
+> pre-rename landing.
+
+| Component | Status | Evidence |
+|-----------|--------|---------|
+| `sg-append.js` — append transport client; reads append objects from vault storage via raw pointer API; `read_key` raw-bytes getter for append objects | **EXISTS** | C1 (`ab62be8`, as `sg-inbox.js`); `tests/unit/vault_ui/loader/test__sg_append_client.js` |
+| `sg-append-checker.js` — check-on-events model; polls/checks the append feed on trigger events; vault-shell triggers on receive | **EXISTS** | C2 (`7f19541`); `tests/unit/vault_ui/loader/test__sg_append_checker.js` |
+| Host-events allowlist + `sg.on/off` event subscription API + append permission grants | **EXISTS** | C3 foundation (`a7a1239`); `tests/unit/vault_ui/loader/test__app_host_events.js`, `test__app_permissions__append.js` |
+| Kernel→app event push: `_initAppendChecker` + `_pushHostEvent` in `app-shell.js`; checker runs on tab focus, pushes `append.new-messages` / `append.error` gated by `app.json host_events` allowlist | **EXISTS** | C3 kernel push (`bb41013`); `sg-append-checker.js` loaded in `en-gb/app/index.html` |
+| `sg.append.*` transport bridge (request/response) in `/en-gb/app/` — verbs: `configure`, `write`, `list`, `fetch`, `markProcessed`, `purge`; `_getAppendClient()` per-vault transport helper; `sg.on/sg.off` event registry + `sg-event` receiver in iframe surface; RO sessions fail closed (null `enum_key`) | **EXISTS** | C4 (`a0c16c5`); `app-shell.js` `_buildVfsBridgeScript` (~line 2612) + `_setupVfsBridgeHandlers` (`__sgCmdType === 'append'`); `sg-append.js` loaded in `en-gb/app/index.html` |
+
+The append transport uses the raw vault-pointer API (not the commit/push flow). Append objects live outside the version-controlled commit tree by design. End-to-end: app declares `permissions.append.*` + `host_events['append.new-messages']`, calls `sg.on('append.new-messages', cb)` — one line in app code.
+
 ---
+
+### Open-as-App Auto-Refresh + Per-Folder app.json (v0.33.16, 2026-06-10)
+
+Two connected bugs in the `/en-gb/app/` mount path fixed (`6583aca`):
+
+| Fix | Status | Evidence |
+|-----|--------|---------|
+| **Auto-refresh keeps the opened file** — `_remountCurrent()` replays the persisted mount (`_mountStrategy`, `_effectiveAppJson`, `_mountedFilePath`) instead of re-running `_continue(root_manifest)`. `loadAllSubTrees()` called first so the entry is found. | **EXISTS** | `app-shell.js` `_remountCurrent`; `_checkBehind` calls it instead of `_continue` |
+| **Per-folder app.json governs sub-folder apps** — `_resolveFolderAppJson(deepPath)` loads the folder's own `app.json` when a sub-folder HTML is opened as an app; folder-relative resources resolve via `AppNavHelpers.resolveFolderManifest`; permissions / host_events / auth / title come from the folder manifest, not the root vault manifest. Sub-folders without their own `app.json` fall back to existing behaviour. | **EXISTS** | `app-shell.js` `_resolveFolderAppJson`/`_setActiveManifest`; `app-shell-nav-helpers.js` `resolveFolderManifest`; `test__app_shell_nav_helpers.js` (now 56, +10 assertions) |
+
+**Known limitation (out of scope):** The `app-shell:ready` HUD/auth intercept fires before the folder manifest is resolved — so `hud.*` config and `auth.required` still use the root manifest on first mount. Deferred.
+
+### /vault Editor — Embedded Access Token (v0.33.16, 2026-06-10)
+
+`vault-shell.js` now reads `.vault/access-token.json` on open (`_readEmbeddedAccessToken` helper), matching the existing `/app` behaviour (`f468ac5`):
+
+| Fix | Status | Evidence |
+|-----|--------|---------|
+| `_onVaultOpened` reads the embedded access token after vault open when no explicit `accessKey` was provided and the vault is writable; token threaded onto `vault._sgSend.token` so subsequent writes carry `x-sgraph-access-token` immediately | **EXISTS** | `vault-shell.js` `_readEmbeddedAccessToken` / `_onVaultOpened` |
+
+Consequence: vaults created with `create({ accessToken:'inherit' })` now open WRITABLE in both `/vault` and `/app` from the same key-only link. Previously `/vault` opened read-only while `/app` opened writable.
+
+---
+
+### `/app` Auto-Sync Parity (v0.33.5, 2026-06-08)
+
+`/en-gb/app/` (app-shell.js) now has the auto-sync engine `/vault` already had — previously
+it had neither auto-push nor auto-pull, so app writes committed to the working clone but never
+pushed → the clone diverged from the named ref → "↑N to push" on return to `/vault` + stale code
+on `/app` refresh (a diverged clone can't fast-forward).
+
+| Capability | Status |
+|------------|--------|
+| Debounced auto-push of app writes (`sg.fs.write`/`fs.*`) — coalesces a burst ~2.5s after the last write | **EXISTS** (`_scheduleAutoPush`/`_autoPushNow`) |
+| Auto-pull on tab focus + 1.5s after mount — fast-forwards a clean-behind clone + remounts the app | **EXISTS** (`_scheduleBehindCheck`/`_checkBehind`) |
+| Shared `localStorage['sg-vault-autosync']` flag governs BOTH `/app` and `/vault` | **EXISTS** |
+| Persistent HUD warning when unpushed + (auto-sync off / diverged / push-failed) | **EXISTS** (`_surfaceUnpushed`) |
+| `seedFrom` now pushes the child's named ref so seeded content is visible to other openers | **EXISTS** (fix) |
+
+Brief: `team/comms/briefs/06/08/v0.33.5__brief__app-vault-sync-parity.md`.
+
+### Read-Key Open + Embeddable Vault Surfaces (2026-08-15)
+
+Implements the 08/15 architect brief (read-key open + embeddable surfaces) Phases 1–4.
+The read-only capability triple `{vault_id, read_key, ref_file_id}` is now openable from a
+raw read key on BOTH surfaces, and both surfaces are embeddable via the shared handshake.
+
+| Capability | Status | Evidence |
+|-----------|--------|---------|
+| **Format 6 credential** — `<64-hex read_key>:<vault_id>` (bare and `sgit_rk1_`-prefixed) detected BEFORE formats 2/3; sgit CLI read-only-clone parity (CLI verified this shape empirically 08/14) | **EXISTS** | `vault-loader-format.js`; `test__format_detection.js` (format 6 suite) |
+| **`SGVaultCrypto.deriveReadOnlyCreds(vaultId, readKeyHex)`** — derives `refFileId` + `branchIndexFileId` from the read key alone (one HMAC each; no passphrase). Invariant vs `deriveKeys` unit-tested for standard AND simple-token vaults | **EXISTS** | `sg-vault-crypto.js`; `test__read_key_creds.js` |
+| **`SGVaultCrypto.stripKeyPrefix` + `KEY_PREFIXES`** — strips every sgit self-identifying prefix on each key-input path (`sgit_private_vault_`, `sgit_private_read_`, `sgit_public_read_`, legacy `sgit_vk1_`/`sgit_rk1_`; whole-prefix match — the two `sgit_private_*` share a stem and partial stripping derives a DIFFERENT vault). Matches sgit-ai 0.16.0 (naming revised 08/17); pinned by a known-answer test against literal `sgit vault derive-keys` output. `classifyKey()` reports declared intent (vault / read-private / read-public / unknown). | **EXISTS** | `sg-vault-crypto.js`; `test__sgit_key_prefixes.js`, `test__read_key_creds.js` |
+| **CLI → browser interop verified end-to-end** — `sgit-ai 0.16.0` `init/commit/push` → opened by this repo's browser stack against `Send__User_Lambda__Http_Server`: same `bare/` layout, bit-identical ref/index derivation, content read_key-encrypted in both (`bare/keys/` = PKI signing keys, not a content-key wrap). | **VERIFIED** | response brief `team/comms/briefs/08/24/v0.33.57__response__sgit-cli-browser-vault-format-interop.md` |
+| **`VaultLoader.openReadOnly` (was a throwing stub)** — formats 4 + 6 → derive creds → `SGVault.openReadOnly`; emits `VAULT_OPENED {readOnly:true}`; `opts.noPersist` keeps the credential out of storage (embed) | **EXISTS** | `vault-loader.js`; `test__vault_loader_open_readonly.js` (incl. storage-throws simulation) |
+| **App UI read-key open** — `_initWithKey` format-6 branch (same `deriveReadOnlyCreds`), RO handling identical to the ro-token path; entry-form badge shows "Read-only key" | **EXISTS** | `app-shell.js` |
+| **Shared embed receiver** — `embed-receiver.js` (one-shot, source/origin-validated handshake child side) consumed by BOTH `app-shell._initEmbed` (refactored, no behaviour change) and the NEW `vault-shell._initEmbed` | **EXISTS** | `embed-receiver.js`; `test__embed_receiver.js` |
+| **`/en-gb/vault/?embed=1`** — main vault UI (files + SGit view) opens inside a third-party iframe via postMessage; key never touches storage (`noPersist`); vault-entry suppresses storage auto-open in embed mode; `vault-ready` posted on browse mount | **EXISTS** | `vault-shell.js` `_initEmbed`; `vault-entry.js` guard; root `index.html` embed-aware glue |
+| **Vendorable parent helper** — `lib/sg-embed/sg-vault-embed.js`: `<sg-vault-embed surface="vault|app" key>` element + `SgVaultEmbed.mount()`; `app-shell._embedHelperSrc` now injects its `_mountImpl` (one implementation for websites AND vault apps); lazy-loads `SgEmbed` helpers from its own origin | **EXISTS** | `sg-vault-embed.js`; existing handshake glue removed from `app-shell.js` |
+
+Security posture unchanged: read keys cannot escalate to write (independent PBKDF2);
+`SGVault.openReadOnly` fails closed; a published read key exposes FULL history (structure-key
+split still inert) — publish only from dedicated publish-vaults.
+
+### Read-Key Open + Embed: Post-Review Fixes (2026-08-20)
+
+Round-1 and Round-2 review findings addressed after the initial surface landed:
+
+| Fix | Commits | Status |
+|-----|---------|--------|
+| **7 round-1 review findings** — error signalling on bad key, fail-closed behaviour on partial load, teardown on unmount, embed gate hardening | `5b468de` | **EXISTS** |
+| **Round-2 review findings** — dep-free embed gates (embed loads even if external deps fail), `sg-vault-embed` lifecycle corrections, doc version prefixes | `3582a32` | **EXISTS** |
+
+### Vault Browser UI: .vault-settings.json + App-Title Fallback (2026-08-20)
+
+| Capability | Status | Evidence |
+|------------|--------|---------|
+| **`.vault-settings.json` in file tree** — the vault's own settings file is now visible in the vault browser file tree (was previously hidden); allows direct in-browser inspection and editing of vault settings | **EXISTS** | `36eb6c2` (feat(vault): show .vault-settings.json in the file tree) |
+| **App-title fallback for unnamed vaults** — when a vault has no explicit title, the browser UI falls back to a generated display name instead of blank | **EXISTS** | `36eb6c2` |
+| **Settings panel credential display in read-only sessions** — the settings panel no longer shows write-key credential fields when the vault is opened in a read-only session | **EXISTS** | `06dca6e` |
+| **Walk every segment when expanding .vault subtree** — the `.vault` subtree expansion now walks every path segment, fixing cases where nested `.vault/` paths did not expand correctly | **EXISTS** | `e1fecad` |
+
+---
+
+### Composite sub-vault adapter — explicit read-only enforcement (2026-09-07)
+
+| Behaviour | Status | Evidence |
+|-----------|--------|---------|
+| **Mutations at/under a `.link.json` mount are refused with `EMOUNT_RO`** (all 8 verbs, move source AND destination, the mount root itself, locked mounts included) — previously a blind pass-through to the root that "failed" only because the virtual folder was absent, and **succeeded silently in the parent** when a real folder of the same name existed | **EXISTS** | `composite-data-source.js` `_refuseIfMounted`; `test__composite_data_source.js` (+20) |
+| **A real folder cannot shadow a mount in the tree** — the mount node is kept and flagged `_conflict:'shadowed-by-folder'`; shadowed parent entries hidden from `getFileList` | **EXISTS** | same; changelog `team/comms/changelog/09/07/` |
+| UI rendering of `_conflict` / `EMOUNT_RO` (disabled controls inside a mount, conflict badge) | **PROPOSED** | analysis §1 step "tell the truth in the interface" |
+| **Declared mounts** — the top kernel turns every owner `*.link.json` into an ordinary `KernelParent.mount()` at the four app-frame sites (after the sandbox is final, before the frame exists); the app reads/writes `/<name>/…` through broker → custody gate → tier gate → relay → child kernel → push **without ever calling `sg.vault.mount`**. Register eager / spawn lazy (`_ensureChannel`, concurrent callers share one spawn). Rules: top-kernel-only by construction (child kernels never auto-mount → no cycles); apps cannot unmount a declared mount (`EPERM`, `byApp`); child opens on a per-parent clone branch `viv:<parent id>`. | **EXISTS** | `declared-mounts.js`, `app-shell.js` `_mountDeclaredVaults`, `kernel-parent.js`; `test__declared_mounts.js` (15), `test__kernel_declared_mounts.js` (28) |
+| **Production mount-credential resolver** — owner-secret store (rw) → `ro-links.json` (ro, as a read credential) → device key → the `clinic.json` trial stub (now last). RO parent sessions fall through to ro, never rw. | **EXISTS** | `DeclaredMounts.resolveCredentials`; `app-shell._resolveChildCredentials` |
+| **Child kernel opens a read credential read-only** (`parseReadOnlyCredential` → `openReadOnly`), strips sgit prefixes, reads its OWN embedded access token (`SGVault.readEmbeddedAccessToken`, one implementation shared with both shells) — but a read-credential child is never writable (server also requires the write key). | **EXISTS** | `kernel-bootstrap.js`; test G in `test__kernel_declared_mounts.js` |
+| **`Via-Mount: <label> (declared\|runtime)` commit trailer** on every commit a child kernel makes for a parent (`SGVault._commitTrailer`) | **EXISTS** | `sg-vault.js` `_commit` |
+| **Browser e2e for a declared mount** — real API server, real vaults, shipped App UI, real null-origin app + child kernel iframes, a second writer racing the app; screenshots + guide | **EXISTS** | `tests/e2e/vault_ui/test__declared_mounts_e2e.spec.js` (4), fixtures in `tests/e2e/vault_ui/fixtures/`; `library/guides/vault-html/DECLARED-MOUNTS-E2E.md` |
+| HUD rendering of `declared` + access tier + sync state on the Mounts tab | **EXISTS** | `viv-mounts-view.js`, `app-debug-mounts.js` (screenshot 04 in the guide) |
+| HUD rendering of composite `_conflict` / `EMOUNT_RO` | **PROPOSED** | changelog 09/07 (composite) |
+| **Append lanes over declared mounts** — `sg.append.list/fetch/markProcessed({ path })` bind the transport to the declared mount's CHILD (vault id + enum key derived in the top kernel from the credential the parent already holds; the child is never opened; no write key carried). `purge`/`configure` with a path → `EPERM`; a path under a runtime `sg.vault.mount` → `ENOLANE`; no mount → `ENOENT`. Same boolean grants. | **EXISTS** | `mount-lanes.js` (pure; `laneBinding`), `app-shell.js` `_laneClientFor` + append branch; `test__mount_lanes.js` (20), `test__app_shell_bridge_build.js` |
+| **One append checker per declared mount** — `append.new-messages` / `append.error` events carry `mount` (prefix) + `mountId`; run on focus / app open with the root checker; a mount whose credential yields no read key is skipped with an `append-lane-skipped` vault event | **EXISTS** | `app-shell.js` `_initLaneCheckers`, `_scheduleAppendCheck` |
+| **`sg.vault.notify(mountId)` host handler** — runs that declared mount's lane check now → `{mountId, checked:true}`; `EPERM` without `vault.notify`; `ENOENT` unknown mount; `ENOLANE` no lane. Was documented + permission-parsed since v0.33.5 with **no host branch** (fell through to "Unsupported vault action"). | **EXISTS** (was a documented no-op) | `app-shell.js` vault branch |
+| **Nested (child) kernels carry no append transport** — `kernel-shell-bundle.js` has no `SGAppend`; `kernel-app-handlers.js` is `vfs.*` only — so an app inside a mounted child cannot call `sg.append.*`. Same shape as the recorded `sg.llm.*` parity gap (ui/index.md). Lane-draining therefore lives in the top kernel by design. | **DOES NOT EXIST** (recorded 2026-09-07) | grep of the bundle; `kernel-app-handlers.js` |
+| **Security note recorded:** `enum_key = SHA256("sg-inbox-enum:" ‖ read_key)` is a pure function of the read key; the web UI's non-extractable import on read-only opens is a courtesy, not a boundary. Publishing a vault's read key publishes lane enumeration. | **EXISTS** (documented) | `AUTHORING.md` append section |
+
+### Child-kernel sync discipline — reconcile-before-write, CAS push, status/sync (2026-09-07)
+
+| Item | Status | Evidence |
+|---|---|---|
+| **`SGVaultRefManager.writeRefIfMatch`** — CAS ref write via the server's `write-if-match` batch op against the exact ciphertext last read (`readRef` caches it; `lastRawRef`); `ECAS` on a moved ref, `ENOMATCH` if never read | **EXISTS** | `sg-vault-ref-manager.js`; live test suite 8 |
+| **`SGVault.pushIfMatch()`**; `merge(their, { publish: false })` | **EXISTS** | `sg-vault--sync.js` |
+| **Child kernel handlers**: reconcile-before-write (FF or three-way), CAS push with reconcile + one retry → `EDIVERGED`, throttled refresh-before-read (`registerKernelVfsHandlers.REFRESH_MS`, 5 s), `vfs.status`, `vfs.sync`, `onUpdated('/')` on a replaced tree; synthetic vaults (no ref manager) keep the plain-push path | **EXISTS** | `kernel-app-handlers.js`; `test__kernel_app_handlers_sync.js` (20); `tests/integration/vault_ui/live/test__child_kernel_sync_live.js` (45, real server) |
+| **`KernelParent.status/sync/syncAll`**, `list()` rows carry `sync`; `app-shell._checkBehind` (tab focus) → `syncAll()` | **EXISTS** | `kernel-parent.js`, `app-shell.js` |
+| Declared mounts set the broker policy to `auto` for fs verbs (app grant + app-level consent + child policy still gate) | **EXISTS** | `app-shell._mountDeclaredVaults` |
+| Child's `.vault-settings.json` hidden from mount listings and refused (`EPROTECTED`) | **EXISTS** | `kernel-app-handlers.js` `_isSettingsRecord` |
+| **Fixes found by the browser e2e** — srcdoc bootstrap race (`_spawnChildChannel` waits for `load`; `SecureChannel.create({ timeoutMs })`); lexical-binding lookup of `SGSend`/`SGVault`/`VaultDataSource` in the kernel shell; child app.json read via the data source; `loadAllSubTrees()` at child boot; `vfs.list` on a real `VaultDataSource`; `VaultDataSource.saveFile/renameFile/deleteFile` load a lazy target folder; `boot-error` reported to the parent | **EXISTS** | changelog `team/comms/changelog/09/07/v0.33.64__changelog__child-kernel-sync-discipline-and-declared-mounts-browser-e2e.md`; `test__secure_channel_timeout.js` (5) |
+| Real API server + real vault libraries as Node test fixtures (`startApiServer`, `seedDeclaredMounts`, `openAll`, `openReadOnlyAll`) | **EXISTS** | `tests/e2e/vault_ui/fixtures/api-server.{py,js}`, `sg-vault-node.js` |
+| Deployed-target verification: `SG_API_URL`/`SG_ACCESS_TOKEN`/`SG_UI_BASE`/`SG_REQUIRE_API` on the live test + e2e; read-only capability probe `scripts/probe_vault_ui_capabilities.mjs` (`npm run probe:vault-ui`, 17 markers + API health/versions); CI job `declared-mounts-e2e` | **EXISTS** | fixtures + spec; `.github/workflows/_test-ui-vault.yml`; brief `team/comms/briefs/09/07/` |
+| **`sg.vault.mounts()` (app-facing) returns the PROJECTION** `{ prefix, access, declared, state, at }` (`KernelParent.listForApps()`); the raw `list()` row (commit ids, `lastError` server text, custody, ref) is HUD-only. `state` is as of the last tab-focus behind-check (30 s debounce), never updated by a write | **EXISTS** (2026-09-08) | `kernel-parent.js` `listForApps()`; `app-shell._listMountsForApps`; e2e test 1 |
+| `sg.history.*` across a declared mount — always served by the PARENT (`logCommits({limit, from})` has no path option); a child's history is never reachable from an app | **DOES NOT EXIST** | `sg-vault--history.js` `logCommits`; `app-shell.js` history handler |
+| **Write receipts** — every `sg.vfs.write` / `sg.fs.mkdir` / `sg.fs.move` resolves `{ …, commit_id, published }` (one shape for local and mounted; local = `published:false` + `vfs.published` host event when auto-push lands); the child kernel returns `_receipt()` on write/delete/mkdir/move | **EXISTS** (2026-09-08) | `kernel-app-handlers.js` `_receipt`; `app-shell.js` write stub + `_autoPushNow`; `test__kernel_app_handlers_sync.js`; live 2/3c; e2e test 1 |
+| **`sg.fs.mkdir` and same-mount `sg.fs.move` through a declared/runtime mount**; child `vfs.move` handler (rename in place or move across folders, both gates, `ENOSYS` on a data source without move); cross-boundary move → `EXDEV`; `sg.fs.delete` across a mount → `EUNDERPRIVILEGED` (tier model; interim stated refusal, not `EMOUNT_RO`) | **EXISTS** (2026-09-08) | `app-shell.js` fs block (`_hit`, `_fsRelayReply`); `kernel-parent.relay` (`to`); e2e test 1 |
+| **`SecureChannel.request({ timeoutMs })`** (default none) and `KernelParent` relay timeout (`relayTimeoutMs`, 30 s) — an unhandled verb can no longer hang the caller | **EXISTS** (2026-09-08) | `secure-channel.js`; `kernel-parent.js`; `test__secure_channel_timeout.js` |
+| **Shadow pre-flight** — `declared-mount-shadows-folder` vault event when a `*.link.json` prefix coincides with a real parent folder (mount still wins the path) | **EXISTS** (2026-09-08) | `app-shell._mountDeclaredVaults` |
+| **`Via-Mount: <label> (declared\|runtime) parent=<parent vault id>`** — parent id sanitised to the vault-id alphabet; label already `\r\n`-stripped / 80 chars | **EXISTS** (2026-09-08) | `kernel-bootstrap.js`; `app-shell._spawnChildChannel` (`parentVaultId`) |
+| `sg.append.configure` through the bridge already publishes the enum-key hash derived from the open vault's read key (`SGAppend.deriveEnumKey`); a lane configured elsewhere with a random key refuses every bridge call. **Documented**, not changed. A public-read guard is a documented rule: the platform has no public-read flag to key it on | **EXISTS** (behaviour) / **PROPOSED** (guard) | `sg-append.js:63-85`; `app-shell.js` `_append` setup |
+| Append verbs validate `enum_key` presence before fetching (coded error instead of a transport failure) | **PROPOSED** | AppSec decision 09/08 (S9) — append-lanes owner |
+| `sg.fs.delete` through a mount (needs per-request elevation — tier model); `sg.history` across a mount (new verb + policy) | **PROPOSED — needs design** | AppSec decision 09/08 (D1, D2) |
+| Visible per-mount behind/diverged indicator on the HUD chip; `sgit` binary as the e2e's other writer; `EDIVERGED` surfaced to the app with conflict paths | **PROPOSED** | debrief 09/07 |
+
+---
+
+### Routing — the locale landing is a hash inbox (2026-09-09)
+
+| Item | Status | Evidence |
+|---|---|---|
+| **`/<locale>/#<key>` behaves exactly like `/#<key>`**: key saved to LS (verbatim — sgit prefixes are stripped later by the shells), deep-link / release pin saved, redirect to `/<locale>/app` with no hash. `/en-gb/` with **no** hash never redirects (the 353ef55 loop guard holds: the only redirect out of the landing carries no hash and lands on `/app`, which never bounces back). Root `/` unchanged (`/en-gb/app`). Applies to every generated locale (`en-us`, `pt-pt`, `pt-br`) because the decision lives in the shared module | **EXISTS** | `vault-loader-routing.js` `_consumeHashInbox` / `_appPathForLocale`; `test__routing_decisions.js` (7 landing cases); `test__routing.spec.js` Cell 4 (3 tests); `test__regression__no_locale_redirect_loop.spec.js` |
 
 ## DOES NOT EXIST (Commonly Confused)
 
@@ -106,11 +382,35 @@ Key proposals for this domain. Full details: see sub-files in `proposed/`.
 - **PKI Modes 2–4** — device provenance, author-identified, countersigned (Mode 1 exists) → `proposed/pki-modes.md`
 - **Vault migration / multi-remote** — pull from multiple remotes, migration tooling → `proposed/multi-remote.md`
 - **Named branch private key re-keying** — move from `read_key` to `write_key` (deferred, low current impact) → `proposed/structure-key-split.md`
+- **Vault Append client crypto (P1/P2 from briefing pack v0.32.1)** — HKDF derivations (`enum_key`, `append_token = H(pubkey)`), X25519 keygen, seal/open, cross-language KAT suite. **This is client-side work (sgit CLI + vault web), not SG/API server work.** The server's P0 (storage + gates) is done; the remaining phases belong to the vault client repos.
 - **P-227: Vault-per-user as SG/Send storage substrate** — PROPOSED: one vault per user for SG/Send; SG/Sentinel rules write user activity to their vault; removes backend complexity; zero-knowledge nuance preserved (activity visible, content unseen). Requires SG/Sentinel deployed. Source: doc 468, 05/24 briefs.
 - **Sub-Vaults via Web UI (Phases 1–3)** — EXISTS as of 05/25–26: `.link.json` convention files + ro-links owner records; link card UI (Phase 2); owner "Add link" UI (Phase 3); portable ro-links (open on any device); lazy-load (preserve open folders); sub-vault reads/lists via app bridge. Implements P-231 for the Web UI access point. CLI access remains PROPOSED (P-248).
 - **P-248: Sub-vaults CLI access (clone-within-clone)** — PROPOSED: sgit CLI path for sub-vaults — track storage locations, resolve nested clones step by step. Deferred; Web UI prioritised first. Source: doc 490, 05/25 briefs.
+- **Vault Inbox Full Spec** — PROPOSED: CLI commands (`sgit inbox list/read/accept-key`), main UI section (left-hand, refresh-checked, message count + key ID + config view), vault-app inbox methods (`sg.inbox.read()` under permission mapping), accepted-key configuration per vault. Email-FS-lite primitive. Source: `briefs/06/07/v0.32.7__dev-brief__sg-send-vault-inbox-cli-ui-app-public-key-controlled.md`. Foundation shipped (C1/C2/C3 — see EXISTS above).
+- **Deterministic Value Indexes** — PROPOSED: index files at `bare/indexes/val-{sha256(value)}` where the hash is computed from the value (e.g. an email, a name), not the key. Requesting the file answers existence; reading it answers location (object ID + metadata). Derived from the value, not the key — the novel element. Enables hash-based existence check for large-file deduplication. Source: `briefs/06/07/v0.32.7__arch-brief__sg-send-deterministic-value-indexes-finding-in-encrypted-store.md`.
+- **PKI Public Key Registry** — PROPOSED: a vault that stores public keys + trust relationships (graph database); two-level trust (downward explicit: A trusts B; upward self-declared: B says A should trust it); clues not storage; federation across registries; caller-side resolver with graded partial results. Replaces a prior FastAPI prototype. Source: `briefs/06/05/v0.32.4__dev-brief__sg-send-pki-public-key-registry-on-vaults.md`.
+- **Large-File Chunked Vault Upload** — PROPOSED: 100% vault upload workflow for large files (live case: 15 GB); `file.slice()` streaming chunks; SHA-256 per chunk; existence check via deterministic value index; resumable upload; recipient loads vault structure without downloading data; selective chunk download; video slices (FFmpeg) + first-frame thumbnails. Source: `briefs/06/07/v0.32.7__dev-brief__sg-send-large-file-sharing-chunked-upload-ui.md`.
+- **Central Key Management / OpenRouter Distribution** — PROPOSED: parent vault manages OpenRouter key centrally; distributes to child vaults via vault-to-vault comms inbox; children use key for in-vault LLM capabilities (infographics, chat); return results to parent over comms. Per-child billing + credit allocation. Source: `briefs/06/07/v0.32.7__dev-brief__sg-send-central-key-management-openrouter-keys-to-child-vaults.md`.
 
 ---
+
+## Guides
+
+Operational guides for vault workflows (located at `library/guides/vault-html/`). See also the
+inline cross-reference on the static-host mode section above (HOSTING-ON-STATIC-STORAGE.md).
+
+| Guide | What It Covers |
+|-------|---------------|
+| [`AUTHORING.md`](../../../../../library/guides/vault-html/AUTHORING.md) | Vault content authoring workflow; file layout; update and commit cycle |
+| [`SUB-VAULTS-AND-LINKS.md`](../../../../../library/guides/vault-html/SUB-VAULTS-AND-LINKS.md) | Sub-vault architecture, `.link.json` convention, read-only link cards, owner link management |
+| [`EXTRACT-AND-EMBED-A-SUB-VAULT.md`](../../../../../library/guides/vault-html/EXTRACT-AND-EMBED-A-SUB-VAULT.md) | Extract and embed a sub-vault into a parent vault; sub-vault link convention; CLI round-trip (added Aug 2026) |
+| [`PUBLISHING-SGIT-VAULT-TO-GITHUB.md`](../../../../../library/guides/vault-html/PUBLISHING-SGIT-VAULT-TO-GITHUB.md) | Use a git remote as a second untrusted server for vault distribution; five-step workflow; GitHub Actions secret pattern (added Aug 2026) |
+| [`HOSTING-ON-STATIC-STORAGE.md`](../../../../../library/guides/vault-html/HOSTING-ON-STATIC-STORAGE.md) | GitHub Pages / S3 static hosting for vault apps; `window.SG_STATIC` / `SG_ENDPOINT`; path-mirroring |
+| [`MIGRATING-TO-THE-PERMISSION-MODEL.md`](../../../../../library/guides/vault-html/MIGRATING-TO-THE-PERMISSION-MODEL.md) | Migrating vault apps to the per-verb consent permission model |
+| [`PLAYWRIGHT-VAULT-APP-ACCESS.md`](../../../../../library/guides/vault-html/PLAYWRIGHT-VAULT-APP-ACCESS.md) | Accessing vault apps from Playwright tests; authentication; iframe interaction |
+
+---
+- `library/guides/vault-html/DECLARED-MOUNTS-E2E.md` — declared mounts end to end in a real browser: what the test proves, how to run/replicate it, the sync discipline table, the six defects it found (2026-09-07)
 
 ## Sub-files
 

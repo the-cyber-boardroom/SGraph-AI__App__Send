@@ -37,6 +37,16 @@ class test_Container__App__Auth(TestCase):
         response = self.client.get('/auth/set-cookie-form')
         assert response.status_code == 200
 
+    def test__4b__login_page_is_branded_and_functional(self):                   # ADR-12: friendly login page replaces the bare cookie editor
+        response = self.client.get('/auth/set-cookie-form')
+        assert response.status_code == 200
+        html = response.text
+        assert 'SG/SEND'                in html                                  # branding
+        assert 'Access key'             in html                                  # the input label
+        assert 'x-sgraph-access-token'  in html                                  # cookie name injected for the JS + header hint
+        assert '/api/info/health'       in html                                  # key verification call
+        assert 'sgit clone'             in html                                  # CLI hint
+
     def test__5__authenticated_via_header(self):
         headers = {'x-sgraph-access-token': 'test-secret-token'}
         response = self.client.get('/api/info/health', headers=headers)

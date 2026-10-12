@@ -37,7 +37,9 @@
     }
 
     // --- open(input, opts) → Promise<{ vault, format, vaultKey }> ------------------
-    // Accepts any of formats 1–4. Format 4 delegates to openReadOnly().
+    // Accepts any of formats 1–6. Formats 4 and 6 delegate to openReadOnly().
+    // opts.noPersist: skip setCurrentKey/recent bookkeeping — used by embed mode so
+    // the key never touches (partitioned) storage and stays in memory only.
 
     async function open(input, opts) {
         opts = opts || {};
@@ -49,7 +51,7 @@
             throw err;
         }
 
-        if (detected.format === 4) {
+        if (detected.format === 4 || detected.format === 6) {
             return openReadOnly(detected.parts.vaultId, detected.parts.readKeyHex, opts);
         }
 
@@ -57,7 +59,10 @@
             return openROToken(detected.parts.roToken, opts);
         }
 
-        var vaultKey = input.trim();
+        // parts.raw is the detector's normalised string (sgit_vk1_/sgit_rk1_ prefix
+        // stripped) — the derivation input. The raw pasted string must NOT reach
+        // SGVault.open, or a prefixed key would derive from the wrong passphrase.
+        var vaultKey = (detected.parts && detected.parts.raw) || input.trim();
         var sgSend   = _makeSGSend(opts);
         var vault;
         try {
@@ -67,8 +72,10 @@
             throw err;
         }
 
-        VaultLoaderStorage.setCurrentKey(vaultKey);
-        VaultLoaderRecent.add(vaultKey, vault.name || vaultKey);
+        if (!opts.noPersist) {
+            VaultLoaderStorage.setCurrentKey(vaultKey);
+            VaultLoaderRecent.add(vaultKey, vault.name || vaultKey);
+        }
 
         _emit(VaultLoaderEvents.VAULT_OPENED, {
             vault: vault, format: detected.format, vaultKey: vaultKey,
@@ -101,16 +108,39 @@
     }
 
     // --- openReadOnly(vaultId, readKeyHex, opts) → Promise<{ vault, vaultKey }> ----
-    // Format 4 open path (vaultId + 64-hex readKey string).
-    // Placeholder: format 4 requires further investigation for ref discovery.
+    // Formats 4 and 6 open path (vaultId + 64-hex readKey string). The full
+    // read-only capability triple {vault_id, read_key, ref_file_id} is derivable
+    // from the read key alone — SGVaultCrypto.deriveReadOnlyCreds does the one HMAC
+    // (ref discovery needs no passphrase; same derivation the ro-token payload
+    // writer used). Mirrors the sgit CLI's read-only clone of the same credential.
 
     async function openReadOnly(vaultId, readKeyHex, opts) {
-        var err = new Error(
-            'Read-only vault open (format 4) is not yet supported. ' +
-            'Use a ro-token (ro-word-word-NNNN) for read-only access.'
-        );
-        _emit(VaultLoaderEvents.VAULT_OPEN_FAILED, { error: err, vaultKey: vaultId });
-        throw err;
+        opts = opts || {};
+        var vaultKey = readKeyHex + ':' + vaultId;                 // canonical format-6 string
+
+        var creds, vault;
+        try {
+            creds = await SGVaultCrypto.deriveReadOnlyCreds(vaultId, readKeyHex);
+            var sgSend = _makeSGSend(opts);
+            vault = await SGVault.openReadOnly(sgSend, creds.vaultId, creds.readKeyB64, creds.refFileId);
+        } catch (err) {
+            _emit(VaultLoaderEvents.VAULT_OPEN_FAILED, { error: err, vaultKey: vaultKey });
+            throw err;
+        }
+
+        if (!opts.noPersist) {
+            // VaultLoaderStorage/Recent swallow storage exceptions internally, so this
+            // is safe in a sandboxed (null-origin) frame too — but embed callers pass
+            // noPersist so the credential never touches partitioned storage at all.
+            VaultLoaderStorage.setCurrentKey(vaultKey);
+            VaultLoaderRecent.add(vaultKey, vault.name || ('read-only ' + vaultId));
+        }
+
+        _emit(VaultLoaderEvents.VAULT_OPENED, {
+            vault: vault, format: 6, vaultKey: vaultKey,
+            accessKey: '', readOnly: true
+        });
+        return { vault: vault, format: 6, vaultKey: vaultKey };
     }
 
     // --- openROToken(roToken, opts) → Promise<{ vault, vaultKey }> -----------------
@@ -148,8 +178,10 @@
         var sgSend = _makeSGSend(opts);
         var vault  = await SGVault.openReadOnly(sgSend, vaultId, readKeyB64, refFileId);
 
-        VaultLoaderStorage.setCurrentKey('ro-' + roToken);
-        VaultLoaderRecent.add('ro-' + roToken, vault.name || ('ro-' + roToken));
+        if (!opts.noPersist) {
+            VaultLoaderStorage.setCurrentKey('ro-' + roToken);
+            VaultLoaderRecent.add('ro-' + roToken, vault.name || ('ro-' + roToken));
+        }
 
         _emit(VaultLoaderEvents.VAULT_OPENED, {
             vault: vault, format: 5, vaultKey: 'ro-' + roToken,

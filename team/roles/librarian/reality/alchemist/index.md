@@ -1,6 +1,6 @@
 # Alchemist — Reality Index
 
-**Domain:** alchemist/ | **Last updated:** 2026-06-04 | **Maintained by:** Librarian (daily run)
+**Domain:** alchemist/ | **Last updated:** 2026-07-30 | **Maintained by:** Librarian (daily run)
 
 This domain covers investor-facing materials, the Alchemist system (Town Planner team output), and business strategy documents. The Alchemist role translates technical output into investment and business value. Note: items in this domain are documents and strategic materials, not code features.
 
@@ -74,7 +74,111 @@ This domain covers investor-facing materials, the Alchemist system (Town Planner
 | P-309 | **Investment Strategy — Why Now + Alchemist Guidance** — investment thesis: operationalisation breakthrough + initial PMF as "why now"; use-of-funds model (humans own areas, agentic teams execute); foundational platform play; revenue: consumption/credit + model-access markup (25% OpenRouter premium) + premium gen-AI; B2C2B go-to-market; investor-as-user thesis; open-source as sovereignty signal; compliance via disclaimer; needs Alchemist session to translate into investor materials | PROPOSED — does not exist yet |
 | P-310 | **Investor Disclaimer Options for sgraph.ai/invest/the-ask** — five disclaimer versions (A: very short / B: short / C: moderate / D: comprehensive / E: most protective); open-company positioning with gated investment opportunity; needs compliance adviser review before going live; currently draft options only, not live on site | PROPOSED — does not exist yet |
 
+### Evidence Economy (07/05 briefs — docs 817–819)
+
+**PROPOSED — does not exist yet.** Three-part commercial arc from news-backed vaults → force of proof → supplier playbook.
+
+| # | Item | Status |
+|---|------|--------|
+| P-817 | **News-backed evidence vaults** — separate SG/Send vault run as a small editorial news organisation; news-graph-to-risk-graph connection (source-node-to-risk-node edges; citation is the flow, not a footnote); future-of-news stack applied to risk (MyFeeds, Trust-as-a-Service, semantic knowledge graphs, author micropayments); first deliverable: demonstrator vault with Replit DB deletion + EchoLeak incidents as first two evidence entries | PROPOSED — does not exist yet |
+| P-818 | **Evidence economy: force of proof, fact certification, two prices** — executive accountability + graph traceability = force of proof; two-pillar split: risk-acceptor (owns decision + consequence) vs fact-certifier (owns truth of inputs, carries warranty if guarantee fails); two prices visible simultaneously: cost-of-good-data (narrow the confidence band) + cost-of-underwriting (carry wide band); certified evidence as commercial product for news organisations, research institutes, internal departments | PROPOSED — does not exist yet |
+| P-819 | **Evidence packs as a service** — agentic-friendly API; sells legwork/graph (evidence trails) not finished article prose; LLM-maintains-the-graph inversion (journalist owns ground, LLM maintains semantic knowledge graph at scale); SG vault as evidence pack container (versioned, sovereign, sold like skills); per-call on-demand micropayment model, no lock-in; per-company personalisation at scale (one graph, many language/culture renderings) | PROPOSED — does not exist yet |
+
+### Agent Risk Thesis (07/05 briefs — docs 814–815)
+
+**PROPOSED — strategy documents, no code.** Board-facing thesis on agentic catastrophic failure risk, paired with communications discipline.
+
+| # | Item | Status |
+|---|------|--------|
+| P-814 | **Agent catastrophic failure board thesis** — adding agents increases catastrophic-failure risk because containment is immature; host-privilege blast radius (agent inherits full permissions of host account); accept-first-then-mitigate sequence (put risk on register, named, owned, time-bound, before designing mitigation); grounded in Replit DB deletion (July 2025) and EchoLeak/CVE-2025-32711 | PROPOSED — does not exist yet |
+| P-815 | **Grounded alarm communications discipline** — not FUD: keeps legitimate alarm, replaces uncertainty with certainty (known mechanism) and doubt with proof (documented incidents); weather-warning standard (frightening, calibrated, trusted, action-oriented, always grounded in a measurement reading); credibility loop: grounded alarm pays into credibility over time, FUD erodes it | PROPOSED — does not exist yet |
+
+### Plug Profile Model — RiskMandate (07/24 briefs — docs 847–859)
+
+**PROPOSED — does not exist yet.** Thirteen strategy briefs develop the plug-pull governance model. None of the items below are implemented.
+
+| # | Item | Status |
+|---|------|--------|
+| P-PLUG-001 | **Five-dimension plug profile model** (who, blast radius, speed, side effects, recoverability) — replaces binary yes/no assessment of AI system stoppability | PROPOSED — does not exist yet |
+| P-PLUG-002 | **Fractal plug maturity model of maturity models** — decomposes "can we stop our AI systems?" to facts and evidence at every altitude using the same register machinery | PROPOSED — does not exist yet |
+| P-PLUG-003 | **Plug-pull MVP/demo anchor** — tabletop exercises from simple scenarios (calendar, email, customer database) with digital twin grounding; proposed as the RiskMandate demo entry point | PROPOSED — does not exist yet |
+| P-PLUG-004 | **Plug register data model** — plug_profile schema with recoverability as first-class queryable field, delegation chains, on-call coverage windows, acceptance_interval | PROPOSED — does not exist yet |
+| P-PLUG-005 | **Zero-recoverability query** — flagship maturity probe: all accepted risks where recoverability = 0; stops the field being set high to shorten the list | PROPOSED — does not exist yet |
+| P-PLUG-006 | **Standards/regulation crosswalk** — EU AI Act Article 14 human oversight, incident-response functions vs plug profile dimensions; requested by voice-memo pillar | PROPOSED — does not exist yet |
+| P-PLUG-007 | **Recoverability scoring scale** — ranks irreversible risk above larger recoverable risk; encodes the finding that likelihood×impact scoring ranks irreversible risks exactly wrong | PROPOSED — does not exist yet |
+| P-PLUG-008 | **Plug-loaded observability** — logging oriented toward the stopping decision rather than generic system logs; 12–18h hyperscaler detection floor encoded as a constraint | PROPOSED — does not exist yet |
+| P-PLUG-009 | **Simple scenarios library** — tabletop plug-pull scenarios for demo and maturity assessment | PROPOSED — does not exist yet |
+| P-PLUG-010 | **Plug-pull series publication** — pillar (voice-memo model canonical) + recoverability + governance-reframe + maturity-close + never-in-line; blocked pending model reconciliation | PROPOSED — does not exist yet |
+
+**Open conflict (blocking publication):** Voice-memo pillar (detection/decision/blast-radius/reversibility intersecting in time) and series pillar (five-dimension static profile) are incompatible as shipped. Day-index recommends keeping voice-memo pillar canonical. Decision not yet taken.
+
+### OSMM — Ontology Sovereignty Maturity Model (07/24 briefs — docs 860–862)
+
+**PROPOSED — does not exist yet.** Three briefs (one arch, one research, one strategy) introduce and apply a new fractal maturity model for ontology sovereignty.
+
+| # | Item | Status |
+|---|------|--------|
+| P-OSMM-001 | **OSMM five-predicate query engine** — evaluates Readable, Portable, Modifiable, Survivable, Provable against any ontology node at any altitude; level is a graph query result, not a narrative claim | PROPOSED — does not exist yet |
+| P-OSMM-002 | **Change-of-Control Stress Test** — automated check that an OSI licence does not survive an acquisition; Survivable depends on distributed copyright and foundation-held trademark | PROPOSED — does not exist yet |
+| P-OSMM-003 | **OSMM Assessment report format** — scored artefact, counter-evidence queries, bounded-above vs measured distinction; first instance applied to Palantir Foundry and Scrydon (both Level 1) | PROPOSED — does not exist yet |
+| P-OSMM-004 | **SGraph self-assessment against OSMM** — prerequisite to publishing the model; trademark leg currently failing; must be completed before any vendor assessments are published | PROPOSED — does not exist yet |
+| P-OSMM-005 | **OSMM conjunctive level vs coverage report** — strict weakest-link composition for migration realism vs progress reporting distinction | PROPOSED — does not exist yet |
+| P-OSMM-006 | **Bounty milestone triggers as OSMM level transitions** — payment triggers expressed as L1→L2, L2→L3 predicate satisfaction rather than delivery milestones | PROPOSED — does not exist yet |
+| P-OSMM-007 | **CADA / SPDX / W3C / FAIR crosswalk to OSMM levels** — satisfying an OSMM level demonstrably satisfies a requirement in each framework | PROPOSED — does not exist yet |
+| P-OSMM-008 | **OSMM publication** — the model, self-assessment, vendor scorecards, and counter-evidence queries; blocked pending self-assessment | PROPOSED — does not exist yet |
+
+### Sovereignty Bounty Programme (07/24 briefs — doc 862)
+
+**PROPOSED — does not exist yet.** Grant and bounty programme paying for migration off proprietary platforms, milestones paid on customer survival rather than code delivery.
+
+| # | Item | Status |
+|---|------|--------|
+| P-SOV-001 | **Migration bounty programme** — milestones paid on customers still there at 6 and 12 months; harder migration = larger bounty; the price is the finding | PROPOSED — does not exist yet |
+| P-SOV-002 | **Difficulty pricing model** — bounty difficulty priced before the attempt rather than after; who administers it and at what altitude (open) | PROPOSED — does not exist yet |
+| P-SOV-003 | **Vendor-sponsored exit independence mechanism** — governance structure separating genuine no-lock-in claim from a marketing exercise the vendor scopes itself | PROPOSED — does not exist yet |
+| P-SOV-004 | **EU Data Act window positioning** — switching charges prohibited from 12 January 2027; six-month positioning window; right to switch with no proof switching works | PROPOSED — does not exist yet |
+| P-SOV-005 | **Bounty administration model** — who runs the programme, at what altitude, how difficulty is priced before the attempt | PROPOSED — does not exist yet |
+
+### First Product To Market — Commercial Kit (07/27 briefs — docs 863–865, v0.33.52)
+
+**PROPOSED — does not exist yet.** Three July 27 documents (arch brief + strategy brief + contract draft) define the commercial model for the first SGraph product and the reusable commercialisation kit it is intended to prove.
+
+| # | Item | Status |
+|---|------|--------|
+| P-COM-001 | **Reusable commercialisation kit — first instance** — token purchase + page + key provisioning, solved by not building billing: OpenRouter per-user keys with spend caps implement the markup as configuration; the test is whether the second product ships faster than the first | PROPOSED — does not exist yet |
+| P-COM-002 | **50/50 profit-share partnership model (90-day template)** — term from 1 August 2026 (90 days, auto-lapsing); 25% of Net Receipts after processor fee (not gross); 50/50 of Distributable Profit; openness removes ownership and confidentiality from the contract surface, leaving keys, passwords, financial data, and commercial terms; draft contract has 11 open points not yet settled | PROPOSED — does not exist yet |
+| P-COM-003 | **Credit minimum floor calculation** — minimum top-up set by processor fixed fee (Stripe £0.20 per domestic transaction); at £1 user receives only 59p of inference; at £5 user receives 71p; minimum purchase must be £5 at minimum (£10 preferred); memo's £1–2 suggestion is below the floor and must be revised before launch | PROPOSED — does not exist yet |
+
 *Full proposed items: [proposed/index.md](proposed/index.md)*
+
+---
+
+### Canonical AI Act Engine — EU Regulation Graph (07/31 briefs — docs 1–10, v0.33.54)
+
+**PROPOSED — does not exist yet.** Twenty-five July 31 documents develop the product around building and publishing a canonical version of the EU AI Act. No code implementation exists.
+
+| ID | Item | Status |
+|----|------|--------|
+| P-ACT-001 | **EU AI Act canonical version engine** — paragraph-as-file (confirmed Feb corpus position), amendment as native graph operation (substitute/insert/delete), computed projection rather than stored merged text; one engine for consolidation and per-customer customisation | PROPOSED — does not exist yet |
+| P-ACT-002 | **Provision identifier scheme** — positional hash (stable across content changes) + content hash (changes with amendment); must survive amendment; to be built on existing legal identifier work (AKN4EU XML), not invented | PROPOSED — does not exist yet |
+| P-ACT-003 | **Amendment node type in graph schema** — Amendment { operation, source_instrument, target_provision, replacement_content, effective_date }; edges: amends, substitutes, inserts, deletes, repealed_by, effective_from, references | PROPOSED — does not exist yet |
+| P-ACT-004 | **Repealed-not-deleted rule** — schema-enforced; a repealed provision is marked repealed_from:<date>, never removed; required for audit trail and point-in-time queries | PROPOSED — does not exist yet |
+| P-ACT-005 | **Point-in-time provision query** — "what did Article X say on date Y?" parameterised by date; requires four application-date windows from Regulation 2026/1744 | PROPOSED — does not exist yet |
+| P-ACT-006 | **Hash tree provision folder structure** — each provision is a folder with text.md, index.json (content hash + positional hash), derivation.json, analysis/; hash tree is the diff mechanism for amendment detection, analysis caching, and deployment delta (one structure, three uses) | PROPOSED — does not exist yet |
+| P-ACT-007 | **Vault-to-repo two-pass CI pipeline** — Job 1: read-only vault key, fetch hash-tree delta, commit to public repo; Job 2: on-commit trigger, build and publish live site; no vault credentials in Job 2; split-by-path enforced in pipeline | PROPOSED — does not exist yet |
+| P-ACT-008 | **Split-by-path ownership** — generated files (text.md, index.json, derivation.json, analysis/) flow vault→repo; contributed files (issues/, comments/, corrections/) flow repo→vault; a correction is a proposal, not an edit to published text | PROPOSED — does not exist yet |
+| P-ACT-009 | **"Talk to the Act" chat interface** — chat grounded in provisions rather than blank prompt; "what changed between version X and Y" as the unique question only this artefact can answer; version-diff as second product on the kit | PROPOSED — does not exist yet |
+| P-ACT-010 | **Standards-as-a-Service commercial model** — open artefact (CC BY 4.0), consortium funding ($10–20k per instrument or crowd-funded by 5–7 organisations); amendment is the recurring subscription revenue (re-derivation cost scales with change not size); three-role peer review (mapper/reviewer/approver) validated by incumbent market (100k mandates, $10k+/yr enterprise access) | PROPOSED — does not exist yet |
+| P-ACT-011 | **Shared conversations as examples / MCP export** — curated shared conversations as the entry examples (not a blank prompt); export protocol via MCP server rather than thread export | PROPOSED — does not exist yet |
+| P-ACT-012 | **Non-functional requirements maintenance service** — maintains what vibe-coded teams built (version control, reliability, resilience, security, backups, consistency, explainability, documentation); commercial trigger at ~90-day mission-critical transition; target supplier: displaced software services firms whose code-reading skill is the scarce asset | PROPOSED — does not exist yet |
+| P-ACT-013 | **Black Hat design pack** — multi-agent agentic session using existing 10-role ecosystem to produce a field-workflow design pack; vault-first review then repo publication; four design variations as experiment; mark executed vs written code; Librarian not optional | PROPOSED — does not exist yet |
+
+**Key facts established (grounded in public sources, 31 July 2026):**
+- Regulation (EU) 2026/1744 (Digital Omnibus on AI) adopted 8 July 2026, published 24 July, **in force 27 July 2026**
+- No consolidated version of the AI Act exists on the Union's legal portal as of 31 July 2026
+- Transparency obligations (Article 50) apply from **2 August 2026** — now live as of today (03 August 2026)
+- Annex III standalone high-risk obligations deferred to **2 December 2027** (was 2 August 2026)
+- Article 10(5) amended: extended legal basis for processing special category data for bias detection
 
 ---
 

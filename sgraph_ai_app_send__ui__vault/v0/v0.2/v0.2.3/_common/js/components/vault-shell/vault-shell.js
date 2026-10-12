@@ -30,11 +30,25 @@
             this._pendingAction = null;
             this._syncState     = { ahead: 0, behind: 0, diverged: false };
             this._isROMode      = false;     // true when vault opened via ro-token (no passphrase, no write key)
-            this._autoSyncEnabled = true;   // overridden from localStorage in _initAutoSync()
+            this._autoSyncEnabled = true;   // auto-PUSH of local commits (safe: it only preserves)
+            // auto-PULL is OFF by default. It used to remount the browse view under the
+            // user and destroyed unsaved editor work. See _checkAndAutoSync.
+            this._autoPullEnabled = false;
             this._autoSyncCheckPending = false;
             this._lastBehindCheckTime  = 0;
             this._behindCheckTimer     = null;
-            this._visibilityHandler    = () => { if (!document.hidden) this._scheduleBehindCheck(500); };
+            // Append check-on-events (no polling) — mirrors the behind-check machinery.
+            // Dormant until the owner enables the append lane (config.enabled), so vaults
+            // without it never hit the server or surface errors.
+            this._appendChecker         = null;
+            this._appendConfig          = { enabled: false, auto_fetch: false };
+            this._lastAppendCheckTime   = 0;
+            this._appendCheckTimer      = null;
+            this._visibilityHandler    = () => {
+                if (document.hidden) return;
+                this._scheduleBehindCheck(500);
+                this._scheduleAppendCheck(500);
+            };
         }
 
         connectedCallback() {
@@ -48,11 +62,102 @@
             // Restore the debug pane (right-side, resizable) from the last session — matches
             // /app mode: open/width/active-tab persisted to sessionStorage, survives reload.
             this._restoreDebugState();
+            // Embed mode (?embed=1): the key arrives from the parent page by postMessage,
+            // never from the hash or storage. Mirrors app-shell._initEmbed via the SHARED
+            // embed-receiver.js. The gate is DEP-FREE (not EmbedProtocol.isEmbedMode) so
+            // it holds even when the embed scripts themselves failed to load — missing
+            // modules fail CLOSED inside _initEmbed, never falling through to the
+            // normal storage-driven entry flow.
+            var isEmbedPage = false;
+            try { isEmbedPage = new URLSearchParams(window.location.search).get('embed') === '1'; } catch (_) {}
+            if (isEmbedPage) {
+                this._initEmbed();
+            }
+        }
+
+        // --- Embed mode (child side of the handshake — see embed-protocol.js) --------
+        _initEmbed() {
+            var self = this;
+            this._embedMode = true;
+
+            // Replace the entry card with a minimal waiting state. This is load-bearing,
+            // not cosmetic: the entry form and its recent-vaults Open buttons would
+            // otherwise stay live inside the embed and open vaults through the normal
+            // persisting path — writing credentials into the iframe's partitioned
+            // storage and posting vault-ready for a vault the parent never keyed.
+            var entryDiv = this.querySelector('.vs-entry');
+            var waitEl   = null;
+            if (entryDiv) {
+                entryDiv.innerHTML =
+                    '<div class="vs-embed-wait" style="display:flex;align-items:center;justify-content:center;' +
+                    'height:100%;padding:2rem;text-align:center;color:var(--muted,#6e7a8a);' +
+                    'font:0.9rem system-ui,sans-serif">Waiting for vault key from the embedding page…</div>';
+                waitEl = entryDiv.querySelector('.vs-embed-wait');
+            }
+
+            // Fail CLOSED if the embed modules didn't load (deploy skew): keep the
+            // waiting card as an explicit error, answer nothing.
+            if (typeof EmbedProtocol === 'undefined' || typeof EmbedReceiver === 'undefined') {
+                console.error('[vault-shell] embed mode requested but embed-protocol.js / embed-receiver.js is not loaded');
+                if (waitEl) waitEl.textContent = 'Embed mode unavailable: embed scripts failed to load. Reload the page.';
+                return;
+            }
+
+            this._embedReceiver = EmbedReceiver.start({
+                onOpen: function (parsed) {
+                    if (waitEl) waitEl.textContent = 'Opening vault…';
+                    // noPersist: the credential stays in memory for the embed session —
+                    // never written to (partitioned) storage, never in the recent list.
+                    VaultLoader.open(parsed.key, { noPersist: true })
+                        .then(function (result) {
+                            return self._onVaultOpened(result.vault, result.vaultKey, '', parsed.deepLink || null);
+                        })
+                        .catch(function (err) {
+                            console.error('[vault-shell] embed init failed:', err);
+                            var msg = (err && err.message) || String(err);
+                            if (waitEl) waitEl.textContent = 'Vault open failed: ' + msg;
+                            // Tell the parent — its mount() handles vault-error; without
+                            // this the only signal is its generic 14s handshake timeout.
+                            if (self._embedReceiver) self._embedReceiver.notifyError(msg);
+                        });
+                }
+            });
+
+            // vault-ready → parent, once the file browser is mounted and interactive.
+            // One-shot: _mountBrowse re-fires on refresh/remount; the parent only needs
+            // the first signal. Handler ref kept for disconnectedCallback teardown.
+            this._embedMountedHandler = function () {
+                window.sgraphVault.events.off('vault-browse-mounted', self._embedMountedHandler);
+                self._embedMountedHandler = null;
+                var fileCount = 0;
+                try {
+                    if (self._dataSource && self._dataSource.getFileList) {
+                        fileCount = self._dataSource.getFileList().length;
+                    }
+                } catch (_) {}
+                if (self._embedReceiver) {
+                    self._embedReceiver.notifyReady({
+                        vaultName: (self._vault && self._vault.name) || '',
+                        fileCount: fileCount,
+                        hasApp:    false                // the vault surface never auto-runs an app
+                    });
+                }
+            };
+            window.sgraphVault.events.on('vault-browse-mounted', this._embedMountedHandler);
         }
 
         disconnectedCallback() {
             document.removeEventListener('visibilitychange', this._visibilityHandler);
             clearTimeout(this._behindCheckTimer);
+            clearTimeout(this._appendCheckTimer);
+            // Embed teardown: disarm the window message listener and the one-shot
+            // bus subscription so a late parent message can't run an open against a
+            // disconnected component.
+            if (this._embedReceiver)       { this._embedReceiver.stop(); this._embedReceiver = null; }
+            if (this._embedMountedHandler) {
+                window.sgraphVault.events.off('vault-browse-mounted', this._embedMountedHandler);
+                this._embedMountedHandler = null;
+            }
         }
 
         // --- Render ---------------------------------------------------------------
@@ -89,9 +194,13 @@
                                 <div class="vs-view vs-view-settings" style="display:none">
                                     <div class="vs-stabs">
                                         <button class="vs-stab vs-stab--active" data-stab="settings">Vault Settings</button>
+                                        <button class="vs-stab" data-stab="versions">Versions</button>
                                         <button class="vs-stab" data-stab="preview">Public preview</button>
                                     </div>
                                     <div class="vs-spane" data-spane="settings"><vault-settings></vault-settings></div>
+                                    <!-- Publish/manage named releases (.vault/releases.json). Authoring lives
+                                         here; the /app HUD picker is the consuming surface. -->
+                                    <div class="vs-spane" data-spane="versions" style="display:none"><vault-releases-editor></vault-releases-editor></div>
                                     <div class="vs-spane" data-spane="preview" style="display:none">
                                         <div class="vs-pvp-split">
                                             <div class="vs-pvp-edit"><sg-public-preview-editor embedded></sg-public-preview-editor></div>
@@ -107,6 +216,18 @@
 
                         <!-- Right-side debug pane (built lazily by _ensureDebugContent) -->
                         <div class="vs-debug-sidebar" hidden></div>
+
+                        <!-- Native LLM chat + request ledger. Both are mounted as
+                             sg-layout panels (movable/resizable like every other pane)
+                             the moment send-browse's layout exists; this container is
+                             only the fallback host for when it doesn't (Settings view,
+                             layout still upgrading). Real origin, so the provider is
+                             called directly via SGLlm; the key comes from
+                             .vault/llm/config.json (owner-sealed). -->
+                        <div class="vs-llm-sidebar" hidden>
+                            <vault-llm-chat></vault-llm-chat>
+                            <vault-llm-requests hidden></vault-llm-requests>
+                        </div>
                     </div>
 
                     <vault-status-bar></vault-status-bar>
@@ -130,6 +251,25 @@
             this.addEventListener('vault-header-debug',   () => this._toggleDebug());
             this.addEventListener('vault-header-raw',     () => this._showRawVault());
             this.addEventListener('vault-header-rename',  (e) => this._onVaultRename(e.detail?.name));
+
+            // Native LLM chat. Both events are dispatched on `document` by
+            // vault-browse-edit (which patches SendBrowse's file renderer), so they are
+            // listened for there rather than on this element.
+            document.addEventListener('vault-file-viewing', (e) => {
+                this.querySelector('vault-llm-chat')?.setContextFile(e.detail || null);
+            });
+            document.addEventListener('vault-llm-open', () => this._openLlmChat());
+            // "Add to chat" from a file's action bar: attach the file, then reveal the
+            // panel. Opening is a side effect of adding — you should see what you attached.
+            document.addEventListener('vault-llm-add-file', (e) => {
+                this._openLlmChat().then((chat) => {
+                    if (chat && e.detail) chat.addContextFile(e.detail);
+                });
+            });
+            this.addEventListener('vault-header-llm',          () => this._openLlmChat());
+            this.addEventListener('vault-llm-close',           () => this._closeLlmPanel('chat'));
+            this.addEventListener('vault-llm-requests-open',   () => this._openLlmRequests());
+            this.addEventListener('vault-llm-requests-close',  () => this._closeLlmPanel('requests'));
 
             // Nav events
             this.addEventListener('vault-nav-switch', (e) => {
@@ -196,6 +336,23 @@
             this._vaultKey  = vaultKey;
             this._accessKey = accessKey || '';
 
+            // Embedded access token (parity with /app): if the vault carries .vault/access-token.json
+            // AND it's a writable open (read_key available to decrypt; true RO-token opens have
+            // _passphrase === null and can't read the .vault/ floor cleanly), adopt it as the access
+            // key. The /app shell already does this (app-shell.js:_readEmbeddedAccessToken); /vault
+            // didn't, so a vault created with create({ accessToken:'inherit' }) opened READ-ONLY
+            // here even though the token was right there in the tree. Explicit accessKey (from the
+            // entry form) still wins — embedded only fills the gap.
+            if (!this._accessKey && vault && vault._passphrase !== null) {
+                try {
+                    const embedded = await this._readEmbeddedAccessToken(vault);
+                    if (embedded) {
+                        this._accessKey = embedded;
+                        if (vault._sgSend) vault._sgSend.token = embedded;
+                    }
+                } catch (_) {}
+            }
+
             // Switch views
             this.querySelector('.vs-entry').style.display = 'none';
             this.querySelector('.vs-shell').style.display = 'grid';
@@ -224,6 +381,13 @@
 
             // Wire settings
             this.querySelector('vault-settings')?.setVault(vault, vaultKey, this._accessKey);
+            // Wire the native LLM chat (resolves its own key/policy from .vault/llm/)
+            this.querySelector('vault-llm-chat')?.setVault(vault);
+            // Versions tab. Writable == owner: a read-only opener still SEES published
+            // versions and their share links, but cannot publish or remove.
+            this.querySelector('vault-releases-editor')?.setContext({
+                vault: vault, vaultKey: vaultKey, writable: !!this._accessKey
+            });
 
             // Hand the live vault to the embedded Public-preview editor — no re-open, no
             // localStorage race. Set the access token on the shared sgSend so publish/delete work.
@@ -252,6 +416,12 @@
             // Check server for upstream changes shortly after open
             this._scheduleBehindCheck(1500);
 
+            // Build the append checker for this vault and run one check on open. It is a
+            // no-op while config.enabled is false (the default until the owner turns the
+            // append on in Settings — see C5), so this never touches the server for vaults
+            // that have no append lane configured.
+            await this._initAppend(vault);
+
             // Ensure files view is active
             this._switchView('files');
 
@@ -265,6 +435,9 @@
             this._vaultKey  = '';
             this._accessKey = '';
             this._isROMode  = false;
+            clearTimeout(this._appendCheckTimer);
+            this._appendChecker = null;
+            this._appendConfig  = { enabled: false, auto_fetch: false };
 
             this.querySelector('.vs-shell').style.display  = 'none';
             this.querySelector('.vs-entry').style.display   = '';
@@ -288,6 +461,32 @@
 
         // --- Sync Helper ----------------------------------------------------------
         // Aligns the in-memory working tree with the published named ref before render.
+        // Read the optional embedded backend access token at .vault/access-token.json. The /app
+        // shell has its own copy of this (app-shell.js:_readEmbeddedAccessToken); kept in sync
+        // here intentionally so both shells produce the same writable-from-key-only behaviour.
+        // The .vault/ folder is read_key-encrypted like the rest of the tree, so a writable open
+        // can decrypt it. Returns the token string or null when the file is absent / malformed.
+        async _readEmbeddedAccessToken(vault) {
+            // ONE implementation (SGVault.readEmbeddedAccessToken) shared with /app and the
+            // child kernel; the inline copy below only serves vault-likes that lack it.
+            if (vault && typeof vault.readEmbeddedAccessToken === 'function') return vault.readEmbeddedAccessToken();
+            try {
+                if (!vault) return null;
+                // `.vault` is a LAZY sub-tree right after open (_loadTreeFromCommit marks every
+                // top-level folder _loaded:false). listFolder('/.vault') therefore returns [] —
+                // and the token is never found — until the sub-tree is expanded. This was the
+                // real reason the editor stayed read-only despite the token being present.
+                if (vault.needsLoading && vault.needsLoading('/.vault')) {
+                    await vault.loadSubTreeOnDemand('/.vault');
+                }
+                const listed = vault.listFolder('/.vault') || [];
+                if (!listed.some((e) => e.name === 'access-token.json')) return null;
+                const bytes = await vault.getFile('/.vault', 'access-token.json');
+                const obj   = JSON.parse(new TextDecoder().decode(bytes));
+                return (obj && obj.token) ? String(obj.token) : null;
+            } catch (_) { return null; }
+        }
+
         // Writable vaults fast-forward the clone ref (vault.merge); read-only vaults
         // load the named commit's tree in memory only — without this, a read-only
         // collaborator's Refresh button silently caught the merge error and left the
@@ -316,13 +515,19 @@
             try {
                 let vault;
                 if (this._isROMode) {
-                    // RO-token vaults: re-open via VaultLoader so format 5 dispatch runs correctly.
-                    // SGVault.open() cannot handle ro-word-word-NNNN keys.
-                    const result = await VaultLoader.open(this._vaultKey);
+                    // RO vaults (ro-token format 5 / read-key format 6): re-open via
+                    // VaultLoader so the right dispatch runs — SGVault.open() cannot
+                    // handle either credential. noPersist in embed mode: a refresh must
+                    // not write the credential into (partitioned) storage.
+                    const result = await VaultLoader.open(this._vaultKey, { noPersist: !!this._embedMode });
                     vault = result.vault;
                 } else {
+                    // In embed mode the entry component was replaced by the waiting
+                    // card — reuse the open vault's transport instead of reading the
+                    // (absent) entry form.
                     const entry  = this.querySelector('vault-entry');
-                    const sgSend = entry._getSGSend();
+                    const sgSend = (entry && entry._getSGSend) ? entry._getSGSend()
+                        : (this._vault && this._vault._sgSend) || new SGSend({ endpoint: VaultLoader.storage.getEndpoint(), token: this._accessKey || '' });
                     vault = await SGVault.open(sgSend, this._vaultKey);
 
                     // Auto-merge if clone ref is behind named ref — Refresh should always
@@ -341,6 +546,13 @@
 
                 this._refreshSyncState();
                 this.querySelector('vault-header')?.setRefreshAvailable(false);
+                // Refresh the SGit view too — it holds its own _vault reference (now stale after
+                // the re-open) and only re-renders on tab switch, so without this the history/tree
+                // stayed stale until you navigated away and back (or reloaded the page).
+                if (this._activeView === 'sgit') {
+                    const sgit = this.querySelector('vault-sgit-view');
+                    if (sgit) { sgit.vault = this._vault; sgit.refresh(); }
+                }
                 window.sgraphVault.messages.success('Vault refreshed');
             } catch (err) {
                 window.sgraphVault.messages.error(`Refresh failed: ${err.message}`);
@@ -400,6 +612,10 @@
                 try { await dataSource.scan(); } catch (err) { console.warn('[vault-shell] sub-vault scan failed:', err && err.message); }
             }
 
+            // The AI panels live INSIDE send-browse's sg-layout, which this wipe destroys.
+            // Park them first (keeping transcript + attached files), re-mount them after.
+            const _llmOpen = this._detachLlmPanels();
+
             filesView.innerHTML = '';
 
             const browse = document.createElement('send-browse');
@@ -439,6 +655,8 @@
             }
 
             filesView.appendChild(browse);
+
+            this._reattachLlmPanels(_llmOpen);
         }
 
         _onTreeChanged() {
@@ -615,6 +833,11 @@
                 window.dispatchEvent(new CustomEvent('sg-vault-synced', {
                     detail: { prevHead, newHead }
                 }));
+                // Keep the SGit view in sync (same gap as _onRefresh — it doesn't re-render itself).
+                if (this._activeView === 'sgit') {
+                    const sgit = this.querySelector('vault-sgit-view');
+                    if (sgit) { sgit.vault = this._vault; sgit.refresh(); }
+                }
             }
 
             return { from: prevHead, to: newHead, changed: !!changed };
@@ -706,6 +929,46 @@
             }
         }
 
+        // --- Append check (check-on-events, no polling) --------------------------------
+
+        // Build an SGAppend + SGAppendChecker for the open vault. enum_key is derived from
+        // the read_key's raw bytes (owner sessions only — RO sessions get a null enum_key
+        // and the checker stays effectively idle). Config persistence + the enable toggle
+        // live in Settings (C5); until then this is dormant (config.enabled = false).
+        async _initAppend(vault) {
+            this._appendChecker = null;
+            if (typeof SGAppend === 'undefined' || typeof SGAppendChecker === 'undefined') return;
+            try {
+                const sgSend   = vault._sgSend || null;
+                const endpoint = (sgSend && sgSend.endpoint) || '';
+                const rawBytes = await vault.readKeyRawBytes();
+                const enumKey  = rawBytes ? await SGAppend.deriveEnumKey(rawBytes) : null;
+                const inbox    = new SGAppend({
+                    endpoint,
+                    vaultId    : vault.vaultId,
+                    enumKey,
+                    writeKeyHex: vault.writeKeyHex,
+                    accessToken: (sgSend && sgSend.token) || this._accessKey || null
+                });
+                this._appendChecker = new SGAppendChecker(inbox, window.sgraphVault.events, () => this._appendConfig);
+                // One check on open (no-op while disabled).
+                this._scheduleAppendCheck(0, 'vault-open');
+            } catch (_) { /* append is best-effort; never block vault open */ }
+        }
+
+        _scheduleAppendCheck(delayMs, trigger) {
+            if (!this._appendChecker) return;
+            const DEBOUNCE_MS = 1000;                                            // shorter floor than the behind-check: append list is cheap
+            const since = Date.now() - this._lastAppendCheckTime;
+            const wait  = Math.max(delayMs || 0, DEBOUNCE_MS - since);
+            const label = trigger || 'visibility';
+            clearTimeout(this._appendCheckTimer);
+            this._appendCheckTimer = setTimeout(() => {
+                this._lastAppendCheckTime = Date.now();
+                if (this._appendChecker) this._appendChecker.check(label);
+            }, Math.max(0, wait));
+        }
+
         // --- Auto-sync (activity-triggered, no polling) --------------------------------
 
         _scheduleAutoSyncCheck() {
@@ -742,7 +1005,16 @@
                 return
             }
 
-            // --- Auto-pull: check for upstream changes and merge if cleanly behind --
+            // --- New upstream content: NOTIFY, never auto-apply ---------------------
+            //
+            // This used to merge and then call _mountBrowse(), which tears down the browse
+            // view and every panel in it. It did that under whatever the user was doing —
+            // and it destroyed unsaved work in an open editor. A background task must not
+            // be able to discard something the user typed and has not saved.
+            //
+            // Detection stays; applying becomes a click. The "N new commits · Sync now →"
+            // banner already exists and already runs the same pull, so the notice is not
+            // new UI — it is the UI that was being skipped past.
             let liveNamedHead
             try {
                 liveNamedHead = await this._vault._refManager.readRef(this._vault._refFileId)
@@ -750,8 +1022,16 @@
 
             if (!liveNamedHead || liveNamedHead === this._vault._namedHeadId) return
 
-            // We are cleanly behind — safe to auto-pull
-            window.sgraphVault.messages.info('Syncing vault\u2026')
+            this._vault._namedHeadId = liveNamedHead
+            await this._refreshSyncState()          // renders the "Sync now →" banner
+
+            // Opt-in escape hatch for kiosks/demos with no editing. OFF by default and
+            // deliberately not exposed in Settings: a switch whose worst case is "silently
+            // loses what you were typing" should be hard to reach on purpose.
+            if (!this._autoPullEnabled) {
+                window.sgraphVault.messages.info('New version available \u2014 click "Sync now" to load it')
+                return
+            }
             try {
                 const autoSyncPrevHead = this._vault._headCommitId
                 const result = await this._vault.merge(liveNamedHead)
@@ -761,6 +1041,10 @@
                     window.dispatchEvent(new CustomEvent('sg-vault-synced', {
                         detail: { prevHead: autoSyncPrevHead, newHead: this._vault._headCommitId }
                     }))
+                    if (this._activeView === 'sgit') {
+                        const sgit = this.querySelector('vault-sgit-view')
+                        if (sgit) { sgit.vault = this._vault; sgit.refresh() }
+                    }
                     if (result.conflicts?.length > 0) {
                         window.sgraphVault.messages.warn(
                             `Synced \u2014 ${result.conflicts.length} conflict(s) saved as _conflict copies`
@@ -779,10 +1063,21 @@
             try { localStorage.setItem('sg-vault-autosync', String(enabled)) } catch (_) {}
         }
 
+        setAutoPull(enabled) {
+            this._autoPullEnabled = !!enabled
+            try { localStorage.setItem('sg-vault-autopull', String(!!enabled)) } catch (_) {}
+        }
+
         _initAutoSync() {
             try {
                 const stored = localStorage.getItem('sg-vault-autosync')
                 this._autoSyncEnabled = stored === null ? true : stored === 'true'
+                // Note the asymmetry, and that it is deliberate: auto-push defaults ON
+                // because its failure mode is "your commits are safely on the branch".
+                // Auto-pull defaults OFF because its failure mode was "your unsaved edits
+                // are gone". Absent key → OFF, so a fresh browser never auto-pulls.
+                const pull = localStorage.getItem('sg-vault-autopull')
+                this._autoPullEnabled = pull === 'true'
             } catch (_) {}
         }
 
@@ -916,6 +1211,76 @@
         // tab) persists to sessionStorage so it survives a page reload, same as /app.
 
         static get _DBG_KEYS() { return { open: 'vault-debug-open', width: 'vault-debug-width', tab: 'vault-debug-tab' }; }
+
+        // ── AI panels (chat + request ledger) ────────────────────────────────────
+        //
+        // Both are real sg-layout panels: draggable, resizable, closable from the tab
+        // bar, exactly like the tree and file panes. send-browse owns the layout
+        // (`_sgLayout`), so these mount into it. When the layout is not available —
+        // Settings view, or the custom element still upgrading — they fall back to the
+        // fixed right-hand sidebar rather than refusing to open. The panel resolves its
+        // own availability from .vault/llm/config.json (setVault) and renders the reason
+        // when it can't run: an always-present entry point beats a vanishing button.
+
+        // Resolve send-browse's layout once it is upgraded and built. Returns null if it
+        // never appears (~1s), which is the signal to use the sidebar fallback.
+        async _sgLayoutReady() {
+            try {
+                if (window.customElements && customElements.whenDefined) {
+                    await customElements.whenDefined('sg-layout');
+                }
+            } catch (_) { /* not fatal — poll below settles it either way */ }
+            for (let i = 0; i < 60; i++) {
+                const L = this._browse && this._browse._sgLayout;
+                if (L && typeof L.addPanel === 'function') return L;
+                await new Promise((r) => requestAnimationFrame(r));
+            }
+            return null;
+        }
+
+        // The panel bookkeeping lives in LlmPanels because /app needs exactly the same
+        // thing, and the one subtlety in it — sg-layout detaches an element BEFORE
+        // announcing the close, so the handler must hold a hard reference rather than
+        // re-query — is invisible enough that a second copy would get it wrong again.
+        _llmPanelHost() {
+            if (!this.__llmHost) {
+                this.__llmHost = LlmPanels.create({
+                    host     : this,
+                    sidebar  : () => this.querySelector('.vs-llm-sidebar'),
+                    getLayout: () => this._sgLayoutReady()
+                });
+                this._llmPanels = this.__llmHost.panels;      // live alias, never reassigned
+            }
+            return this.__llmHost;
+        }
+
+        _llmEl(kind)                { return this._llmPanelHost().el(kind); }
+        _watchPanelClose(layout)    { return this._llmPanelHost().watch(layout); }
+        async _showLlmPanel(k, t)   { return this._llmPanelHost().show(k, t); }
+        _parkLlmEl(kind)            { return this._llmPanelHost().park(kind); }
+
+        async _openLlmChat() {
+            const el = await this._showLlmPanel('chat', 'AI Chat');
+            if (el) el.open();
+            return el;
+        }
+
+        async _openLlmRequests() {
+            return this._showLlmPanel('requests', 'AI Requests');
+        }
+
+        _closeLlmPanel(kind) { return this._llmPanelHost().close(kind); }
+
+        // A browse remount destroys the layout (and every panel in it). Park the AI
+        // elements in the sidebar FIRST so they are not garbage-collected with it, then
+        // re-mount whichever were open once the new layout exists.
+        _detachLlmPanels() { return this._llmPanelHost().detachAll(); }
+
+        _reattachLlmPanels(kinds) {
+            if (!kinds || !kinds.length) return;
+            if (kinds.indexOf('chat') >= 0)     this._openLlmChat();
+            if (kinds.indexOf('requests') >= 0) this._openLlmRequests();
+        }
 
         // Build the sidebar content once (tab bar + lazily-instantiated panes).
         _ensureDebugContent() {
@@ -1217,6 +1582,18 @@
             border-left: 1px solid var(--color-border); background: var(--bg-surface);
         }
         .vs-debug-sidebar[hidden] { display: none; }
+        /* AI drawer — the FALLBACK host only. Normally the chat and request panes live
+           inside send-browse's sg-layout (draggable/resizable); this fixed drawer is used
+           when no layout exists yet. Same geometry as the debug pane. */
+        .vs-llm-sidebar {
+            flex: 0 0 380px; min-width: 300px; position: relative;
+            display: flex; flex-direction: column; overflow: hidden;
+            border-left: 1px solid var(--color-border); background: var(--bg-surface);
+        }
+        .vs-llm-sidebar[hidden] { display: none; }
+        .vs-llm-sidebar > *[hidden] { display: none; }
+        .vs-llm-sidebar vault-llm-chat,
+        .vs-llm-sidebar vault-llm-requests { flex: 1; min-width: 0; min-height: 0; }
         .vs-debug-handle {
             position: absolute; left: 0; top: 0; width: 6px; height: 100%;
             cursor: col-resize; z-index: 5; background: transparent;

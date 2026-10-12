@@ -1,10 +1,10 @@
 # send-api — Reality Index
 
-**Domain:** `send-api/` | **Last updated:** 2026-05-12 | **Maintained by:** Librarian (daily run)
+**Domain:** `send-api/` | **Last updated:** 2026-08-25 | **Maintained by:** Librarian (daily run)
 
 The User Lambda: the public-facing API at `send.sgraph.ai`. Handles encrypted file transfers,
-multipart uploads, vault blob storage (pointer model), room joins, early access signups, and
-MCP tool exposure. All 26 API endpoints are tested and passing.
+multipart uploads, vault blob storage (pointer model), vault append-only storage,
+room joins, early access signups, and MCP tool exposure. All 32 API endpoints are tested and passing.
 
 ---
 
@@ -57,31 +57,93 @@ Read-base64 response size limited to 3.75MB (Lambda response limit).
 Destroy without `purge` writes a tombstone at `vault/{id[:2]}/{id}/deleted.json` to block vault_id reuse.
 Destroy with `purge: true` skips the tombstone — vault_id is fully reusable afterwards.
 
-### Room Join (`/join/*`) — 3 endpoints
+### Vault Append (`/vault/append/*`) — 6 endpoints
+
+Generic append-only, gate-controlled storage primitive. Not messaging-specific — same infrastructure
+serves logs, signals, control messages, state flows, and email-style workflows.
+
+Four-tier capability model: `append_token` (write-only), `enum_key` (list/fetch/mark-processed),
+`write_key` (purge + configure), `private_key` (decrypt — client-only, never on server).
+Gates use `H(key) == stored_hash` pattern (SHA-256).
+
+**Account-less write surface:** No SGraph access token required for write/list/fetch/mark-processed.
+The append_token is the only gate. Deliberate design choice — enables cross-vault communication
+without requiring both parties to have SGraph accounts.
+
+| Method | Path | What It Does | Auth | Tested |
+|--------|------|-------------|------|--------|
+| POST | `/vault/append/configure/{vault_id}` | Store append config (enum_key_hash, append_token hashes) | write_key | Yes |
+| POST | `/vault/append/write/{vault_id}` | Append encrypted payload (blind — no id/count returned) | append_token (body) | Yes |
+| POST | `/vault/append/list/{vault_id}` | List pending entries (metadata or with content, paginated) | enum_key (header) | Yes |
+| POST | `/vault/append/fetch/{vault_id}` | Fetch content for specific file_ids (batched, max 100) | enum_key (header) | Yes |
+| POST | `/vault/append/mark-processed/{vault_id}` | Move entries pending → processed (copy+delete, idempotent) | enum_key (header) | Yes |
+| POST | `/vault/append/purge/{vault_id}` | Delete entries from pending or processed (batched, max 100) | write_key (header) | Yes |
+
+**Edge rewrites API 403 → static `404.html` — measured 7 Sep 2026, NOT an API defect.** The
+CDN in front of `send.sgraph.ai` applies the static site's `403 → /404.html` custom error
+response to `/api/*` as well, so a gate failure on the append routes (wrong `append_token`,
+wrong/missing `enum_key`) reaches clients as **404 with an HTML page**. Measured on the append
+routes only — other routes gate on an access token (401) before any 403; per-status rules make
+the same behaviour elsewhere likely but unverified. 400/401/404/405 pass through as JSON — a genuine route miss still answers 404 +
+JSON, so the HTML body is the tell, not the status. The API itself returns the documented 403
+(verified in-memory; 133 tests green). **Fix is infrastructure — no distribution config lives
+in this repo.** Client-side mitigation shipped: `SGAppend._errorForResponse` raises `EEDGE` on
+an HTML body and says the status is untrustworthy. Impact if unfixed: a rotated or revoked
+append token — the expected lifecycle event for a published lane — reports as "page not found".
+
+**Lane id (`inbox`) is the raw append token — code-verified 6 Sep 2026.** The pending/processed
+folder is named with the **raw** token (`path__vault_append_pending(vault_id, token, …)` in
+`Storage__Paths.py`, called with `token = _safe_token(append_token)`), and `list_entries()` returns
+that folder name as each entry's `inbox` field. So an `enum_key` holder listing a lane learns that
+lane's write token, and the raw token appears in storage object keys (and therefore in S3 access
+logs, inventories and backups). `config.append_anchors` stores only `H(token)`, so the hashing
+there buys less than it appears to. Not a privilege escalation — the append token is designed as a
+public lane address (`H(recipient public key)`), grants write only, and `list` already requires the
+`enum_key` — but it is unintended-looking and undocumented. Proposed fix: name the folder
+`sha256(token)` and return that as `inbox`; `write` keeps its wire contract (it receives the raw
+token and hashes it). Breaking change for existing lanes — needs migration.
+
+**Security hardening:**
+- Path-component inputs validated via `Safe_Str__Vault__Append_Token` and `Safe_Str__Vault__Append__File_Id` (Type_Safe strict validation) — blocks path traversal
+- Batch operations capped at `APPEND_BATCH_MAX_FILE_IDS = 100`
+- Per-message size cap: `APPEND_MAX_PAYLOAD = 5 MB`; per-token file-count cap: `APPEND_MAX_FILES = 1000`
+- Metadata-only listing reads zero payloads; content reads only for the paged window
+- Incremental ceiling check on include_content (M-1 fix) — bails early instead of reading all files
+- Append config stored in separate `config.json` (L-2 fix) — `config.json` is the authoritative source for gates; manifest never written with append fields
+- `Storage_FS__S3.folder__folders` implemented to prevent silent-empty drain on Lambda/S3
+- `list_files` on vault pointer never returns append entries (regression-tested)
+
+**Storage model:** Files stored inside `bare/append/` under the vault tree (managed-but-unversioned by sgit):
+- Pending: `{_ROOT}/vault/{vault_id[:2]}/{vault_id}/bare/append/{token}/pending/{timestamp}_{random}.enc`
+- Processed: `{_ROOT}/vault/{vault_id[:2]}/{vault_id}/bare/append/{token}/processed/{filename}`
+- Config: `{_ROOT}/vault/{vault_id[:2]}/{vault_id}/bare/append/config.json`
+
+**TODO — LocalStack S3 integration tests:** All append tests run on the memory backend.
+Behavioural parity on S3 is verified structurally (method-override assertions in `test_Storage_FS__S3.py`)
+but not exercised end-to-end via LocalStack. This is not urgent — the memory backend faithfully
+exercises all service logic — but should be done before production launch.
+
+### Vault Zip (`/vault/zip/*`) — 1 endpoint
 
 | Method | Path | What It Does | Tested |
 |--------|------|-------------|--------|
-| GET | `/join/validate/{invite_code}` | Validate room invite (no consumption) | Yes |
-| POST | `/join/accept/{invite_code}` | Accept invite, join room, get session | Yes |
-| GET | `/join/session-validate` | Validate room session token | Yes |
+| GET | `/vault/zip/{vault_id}` | Download vault as ZIP archive (content-addressable cached) | Yes (19 tests) |
 
-### Vault Inbox (`/api/vault/inbox/*`) — 6 endpoints
+Route registered at `Routes__Vault__Pointer.py:234`. `Service__Vault__Zip` is injected by
+`Fast_API__SGraph__App__Send__User` and reuses the vault storage backend for cache.
+**Corrected 2026-08-25:** Previously marked PROPOSED (OQ-2); code-verified as EXISTS.
 
-Append-only inbox layer for vault-to-vault communications. Four-tier capability model:
-`append_token` (write-only) → `enum_key` (list/fetch/mark-processed) → `private_key` (decrypt, client-side) → `write_key` (purge + configure).
+---
 
-| Method | Path | Auth | What It Does | Tested |
-|--------|------|------|-------------|--------|
-| POST | `/api/vault/inbox/append/{vault_id}` | append_token in body | Write-blind append of encrypted payload | Yes |
-| POST | `/api/vault/inbox/list/{vault_id}` | x-sgraph-vault-enum-key header | Paginated list; optional inline content | Yes |
-| POST | `/api/vault/inbox/fetch/{vault_id}` | x-sgraph-vault-enum-key header | Batch fetch by file_ids | Yes |
-| POST | `/api/vault/inbox/mark-processed/{vault_id}` | x-sgraph-vault-enum-key header | Reversible move: inbox/ → processed/ | Yes |
-| POST | `/api/vault/inbox/purge/{vault_id}` | x-sgraph-vault-write-key header | Irreversible delete (owner only) | Yes |
-| POST | `/api/vault/inbox/configure/{vault_id}` | x-sgraph-vault-write-key header | Set append_anchors + enum_key_hash | Yes |
+### Room Join (`/join/*`) — 0 live endpoints (orphaned code)
 
-**101 new tests** (62 service-level + 39 HTTP route tests). Shipped: commit `9d727b5`.
-
-**Security hardening** (commit `e365c60`, 2026-06-05): path traversal closed via `Safe_Str__Vault__Append_Token` + `Safe_Str__Vault__Inbox__File_Id`; S3 `folder__folders` silent-empty bug fixed; metadata listing reads zero payload bytes; batch cap 100 `file_ids`; additional traversal negative tests added.
+**Code-verified 2026-08-17:** `Routes__Join.py` exists on disk but is NOT registered in
+`Fast_API__SGraph__App__Send__User.setup_routes()` — no `/join/*` path appears in the live
+OpenAPI spec, and no other file references the class. The three endpoints previously listed
+here (`/join/validate/{invite_code}`, `/join/accept/{invite_code}`, `/join/session-validate`)
+do not exist on the deployed API. The file also imports 4 classes from `lambda__admin`
+(the only user→admin source coupling) and is a recorded deletion candidate — see
+`library/sgraph-send/dev_packs/v0.33.59__sgit-api-extraction/05__deletion-candidates.md`.
 
 ### Other — 2 endpoints
 
@@ -115,7 +177,7 @@ in browser (Milestone M-007).
 | Claimed | Reality |
 |---------|---------|
 | `GET /api/vault/bundle/{vault_id}/{bundle_file_id}` | PROPOSED — single-call vault clone, no code |
-| `GET /api/vault/zip/{vault_id}` (optional read-only snapshot) | PROPOSED — open question OQ-2 from 04/28 architect review |
+| `GET /api/vault/zip/{vault_id}` (optional read-only snapshot) | **EXISTS** — corrected 2026-08-25; see Vault Zip section above |
 | MCP `secrets_create` / `rooms_create` / `rooms_add_user` tools | PROPOSED — rooms API exists but not MCP-exposed |
 | Stripe webhook → auto-token creation | PROPOSED — manual token creation still required |
 | One-Time Secret Links (`/secret`) | No code |
@@ -131,7 +193,7 @@ Selected key proposals for this domain. Full list: [proposed/index.md](proposed/
 - **Large blob client phases 2–4** — client-side `large: bool` routing (Phase 1 server endpoints EXIST; client routing PROPOSED)
 - **WhatsApp share mode** — share-via-WhatsApp integration (doc 259)
 - **Four collaborative upload modes** — individual, room, vault-push, vault-merge (doc 231)
-- **`/api/vault/zip` read-only access** — accept structure_key for vault snapshot pull (OQ-2)
+- ~~**`/api/vault/zip` read-only access**~~ — **EXISTS** (corrected 2026-08-25; see Vault Zip section)
 - **Clone Pack endpoints** — `GET /vaults/{vault_id}/packs/{commit_id}/{flavour}` + `POST /vaults/{vault_id}/objects/missing` (doc 348 / brief 08b). Binary `SGPK` pack format. 40–100× clone speedup. PackBuilder + PackCache + pre-warming hook on push. Zero-knowledge preserved (ciphertext only). Requires 5 architect decisions before implementation.
 - **PackBuilder** — server-side binary pack assembler. Walks commit graph for `full`/`head`/`bare-full`/`bare-head` flavours, assembles sorted ciphertext into `SGPK` format. (doc 348)
 - **PackCache** — LRU on-disk cache under `packs/` storage namespace. Configurable budget: 100 packs OR 5 GB per vault. Eviction protects latest-3 packs per commit. (doc 348)

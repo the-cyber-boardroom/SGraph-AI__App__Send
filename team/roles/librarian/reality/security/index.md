@@ -1,6 +1,6 @@
 # Security — Reality Index
 
-**Domain:** security/ | **Last updated:** 2026-06-05 | **Maintained by:** Librarian (daily run)
+**Domain:** security/ | **Last updated:** 2026-06-08 | **Maintained by:** Librarian (daily run)
 
 This domain covers the security properties verified in code, known violations flagged for remediation, AppSec findings, external validations, and the performance baseline. It is the authoritative record for any security-related claim about SGraph Send.
 
@@ -40,6 +40,26 @@ This domain covers the security properties verified in code, known violations fl
 |----|----------|--------|-------------|
 | SEC-VIV-001 | High | Latent (see above) | same-origin app bypass — remedied by Phase 3 null-origin (shipped v0.31.3) |
 | **SEC-VIV-002** | **Medium** | **OPEN** | **`allow-popups-to-escape-sandbox` over-granted to inner-vault content.** The four app-frame render paths (`_mountApp`, `_mountPageLayout`, `_mountVaultFile` HTML, `_mountVaultFile` markdown) unconditionally set `allow-popups allow-popups-to-escape-sandbox` in the iframe sandbox. These same methods also render mounted sub-vault content via `CompositeDataSource`. Result: HTML/markdown from an inner vault inherits the ability to open a fully unsandboxed, real-origin browsing context — a capability it never requested and the security model never intended to grant. **Decision (Dinis, 05/31):** gate popups to the root vault only; inner/mounted sub-vault content must not receive popup capability; an inner vault wanting popups becomes a future request + parent-consent flow. **Fix:** PROPOSED (P-280) — depends on kernel path unification (P-279) for clean detection of inner-vault render paths. **Source:** `team/roles/appsec/reviews/05/31/v0.31.12__appsec__popup-capability-over-grant-to-inner-vaults.md` |
+
+### Vault-Embed Security Model (v0.33.5 — Added 2026-06-07, commits `3b30347`, `84ba117`, `159ec76`)
+
+The vault-embed postMessage handshake provides a hardened way to open a vault inside a foreign iframe without exposing the vault key in browser storage. Key security properties (code-verified):
+
+| Property | Implementation |
+|---------|---------------|
+| Key in memory only during embed session | `_initWithKey` skips all localStorage/sessionStorage writes when `this._embedMode` is true (verified by browser integration test: sg-vault-key NOT in storage) |
+| Reload re-triggers handshake | No persistence in embed mode — forced re-auth on reload |
+| One-shot listener | `vault-open` listener removed after first valid message; parent cannot re-key mid-session |
+| Sibling iframe rejection | `event.source === window.parent` check; sibling iframes are silently ignored |
+| Optional origin validation | `?parent=<origin>` validates parent's origin; accepts any origin including `null` when unspecified (required for null-origin App Iframe parents) |
+| deepLink via instance memory | Avoids sessionStorage write that would throw SecurityError in null-origin iframes (`self._embedDeepLink`, fix `84ba117`) |
+| Access-key write gated | `_setCachedAccessKey` early-returns on `this._embedMode` (fix `159ec76`) |
+
+**Unresolved gap (Low):** `sg-app-perm-ok:*` consent write at app-shell.js line 828 is not gated on `_embedMode`. Currently unreachable from embed flow (consent prompt not auto-invoked by the vault-open path). Would require an authed-vault embed session to reach. Tracked as OQ-embed-access-key-consent-1.
+
+### `sg-vault-object-store.js` Sandbox Safety (v0.33.4 — Added 2026-06-07, commit `d5f6f0a`)
+
+`typeof caches === 'undefined'` guards were placed outside the `try` block in `_cacheGet` and `_cachePut`. In sandboxed iframes without `allow-same-origin`, `window.caches` is a defined accessor that throws `SecurityError` when read — `typeof` does not suppress accessor-defined property accesses, only genuinely undeclared identifier references. Fix: guard moved inside `try`; catch takes the existing network-fallback path. Regression test added (sandboxed iframe test, commit `4b2a4bf`).
 
 ### Vault Inbox Security Hardening (v0.32.3 — Added 2026-06-05, commit `e365c60`)
 

@@ -1,0 +1,275 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  SG/Send vault appliance on a single EC2 instance: the sg-send-vault container behind a
+  caddy auto-TLS sidecar (ADR-5), data on a snapshot-on-delete EBS volume (ADR-7), access
+  token provided at launch and never stored (ADR-6). Boots from the baked SG/Send AMI when
+  SgSendAmiId is set (ADR-15); otherwise falls back to stock AL2023 + full install user-data.
+
+Parameters:
+
+  ImageRef:
+    Type: String
+    Default: 'diniscruz/sg-send-vault:latest'
+    Description: Container image (Docker Hub or ECR). Ignored on the baked-AMI path (image is pre-pulled).
+
+  SgSendAmiId:
+    Type: String
+    Default: ''
+    Description: >-
+      Optional: a baked sg-send-vault AMI id (see deploy/aws/ami-pipeline.cfn.yml).
+      Empty = stock Amazon Linux 2023 + install-at-boot user-data (slower first boot).
+
+  LatestAl2023AmiId:
+    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Default: '/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64'
+    Description: >-
+      Fallback base AMI (resolves AWS's public AL2023 parameter — arm64 to match the default
+      instance type; override the path for x86 instance types).
+
+  InstanceType:
+    Type: String
+    Default: t4g.small
+    Description: Instance type (default arm64; the image is multi-arch)
+
+  VolumeSize:
+    Type: Number
+    Default: 20
+    MinValue: 8
+    MaxValue: 1024
+    Description: Data volume size in GiB (disk storage mode)
+
+  StorageMode:
+    Type: String
+    Default: disk
+    AllowedValues: [disk, s3, memory]
+    Description: >-
+      disk = EBS data volume (default, appliance semantics). s3 = bucket by SG/Send naming
+      convention + scoped IAM. memory = ephemeral, no storage resources, no storage IAM.
+
+  AccessToken:
+    Type: String
+    Default: ''
+    NoEcho: true
+    Description: >-
+      The deployment's access key (licensing key) — provided at launch, never stored by the
+      stack (manage in GitHub Actions Secrets / an SG/Vault / your password manager).
+      Empty = explicitly open instance.
+
+  DomainName:
+    Type: String
+    Default: ''
+    Description: >-
+      Optional domain for caddy auto-TLS (Let's Encrypt). Requires the domain to resolve to
+      this instance — set HostedZoneId to have the stack create the record.
+
+  HostedZoneId:
+    Type: String
+    Default: ''
+    Description: Optional Route53 hosted zone id — creates the A record for DomainName
+
+  AllowedCidr:
+    Type: String
+    Default: '0.0.0.0/0'
+    AllowedPattern: '^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/\d{1,2}$'
+    Description: CIDR allowed to reach ports 80/443
+
+  KeyName:
+    Type: String
+    Default: ''
+    Description: 'Optional EC2 key pair. Default access path is SSM Session Manager (no SSH keys).'
+
+Conditions:
+  UseBakedAmi:    !Not [!Equals [!Ref SgSendAmiId, '']]
+  IsDiskMode:     !Equals [!Ref StorageMode, disk]
+  IsS3Mode:       !Equals [!Ref StorageMode, s3]
+  HasDomain:      !Not [!Equals [!Ref DomainName, '']]
+  HasDnsRecord:   !And [!Condition HasDomain, !Not [!Equals [!Ref HostedZoneId, '']]]
+  HasKeyName:     !Not [!Equals [!Ref KeyName, '']]
+
+Resources:
+
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: 'SG/Send appliance - HTTP/HTTPS in, nothing else'
+      SecurityGroupIngress:
+        - { IpProtocol: tcp, FromPort: 80,  ToPort: 80,  CidrIp: !Ref AllowedCidr }
+        - { IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIp: !Ref AllowedCidr }
+      Tags:
+        - { Key: Project, Value: sg-send }
+
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ec2.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore        # Session Manager shell access — no SSH keys needed
+      Policies:
+        - !If
+          - IsS3Mode
+          - PolicyName: sg-send-storage
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action: [s3:GetObject, s3:PutObject, s3:DeleteObject, s3:ListBucket, s3:CreateBucket, s3:GetBucketLocation]
+                  Resource:
+                    - !Sub 'arn:aws:s3:::${AWS::AccountId}--sgraph-send-transfers--${AWS::Region}'
+                    - !Sub 'arn:aws:s3:::${AWS::AccountId}--sgraph-send-transfers--${AWS::Region}/*'
+          - !Ref AWS::NoValue
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref InstanceRole]
+
+  DataVolume:
+    Type: AWS::EC2::Volume
+    Condition: IsDiskMode
+    DeletionPolicy: Snapshot                                          # ADR-7: stack delete snapshots the vaults
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      AvailabilityZone: !GetAtt Instance.AvailabilityZone
+      Size: !Ref VolumeSize
+      VolumeType: gp3
+      Encrypted: true
+      Tags:
+        - { Key: Project, Value: sg-send }
+        - { Key: Name,    Value: !Sub '${AWS::StackName}-data' }
+
+  DataVolumeAttachment:
+    Type: AWS::EC2::VolumeAttachment
+    Condition: IsDiskMode
+    Properties:
+      InstanceId: !Ref Instance
+      VolumeId: !Ref DataVolume
+      Device: /dev/xvdf
+
+  Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !If [UseBakedAmi, !Ref SgSendAmiId, !Ref LatestAl2023AmiId]
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !Ref InstanceProfile
+      SecurityGroupIds: [!GetAtt SecurityGroup.GroupId]
+      KeyName: !If [HasKeyName, !Ref KeyName, !Ref AWS::NoValue]
+      Tags:
+        - { Key: Project, Value: sg-send }
+        - { Key: Name,    Value: !Ref AWS::StackName }
+      UserData:
+        Fn::Base64: !Sub
+          - |
+            #!/bin/bash
+            set -euo pipefail
+            exec > /var/log/sg-send-boot.log 2>&1
+
+            # ── config (from stack parameters; token is env-only, never written to disk beyond this unit) ──
+            SG_IMAGE="${ImageRef}"
+            SG_DOMAIN="${DomainName}"
+            SG_STORAGE_MODE="${StorageMode}"
+            SG_BAKED="${IsBaked}"
+
+            # ── docker (baked AMI already has it + the image pre-pulled) ──
+            if [ "$SG_BAKED" != "true" ]; then
+              dnf install -y docker
+              systemctl enable --now docker
+              docker pull "$SG_IMAGE"
+              docker pull caddy:2
+            fi
+
+            # ── data volume (disk mode): format on first use, mount ──
+            if [ "$SG_STORAGE_MODE" = "disk" ]; then
+              DEV=/dev/xvdf; [ -e $DEV ] || DEV=/dev/nvme1n1
+              for i in $(seq 1 60); do [ -e $DEV ] && break; sleep 2; done
+              blkid $DEV || mkfs -t xfs $DEV
+              mkdir -p /var/lib/sg-send
+              grep -q sg-send /etc/fstab || echo "$DEV /var/lib/sg-send xfs defaults,nofail 0 2" >> /etc/fstab
+              mount -a
+            fi
+
+            # ── caddy config: auto-TLS when a domain is set, plain :80 otherwise ──
+            mkdir -p /etc/sg-send
+            if [ -n "$SG_DOMAIN" ]; then
+              printf '%s {\n    reverse_proxy app:8080\n}\n' "$SG_DOMAIN" > /etc/sg-send/Caddyfile
+            else
+              printf ':80 {\n    reverse_proxy app:8080\n}\n' > /etc/sg-send/Caddyfile
+            fi
+
+            # ── launcher: two containers on a shared network (app + caddy sidecar, ADR-5) ──
+            cat > /usr/local/bin/sg-send-up.sh <<'LAUNCH'
+            #!/bin/bash
+            set -e
+            docker network inspect sgsend >/dev/null 2>&1 || docker network create sgsend
+            docker rm -f sg-send-app sg-send-caddy 2>/dev/null || true
+            APP_ARGS=(-d --name sg-send-app --network sgsend --restart unless-stopped)
+            APP_ARGS+=(-e SEND__STORAGE_MODE="$SG_STORAGE_MODE")
+            if [ "$SG_STORAGE_MODE" = "disk" ]; then APP_ARGS+=(-v /var/lib/sg-send:/data); fi
+            if [ -n "${!SGRAPH_SEND__ACCESS_TOKEN:-}" ]; then APP_ARGS+=(-e SGRAPH_SEND__ACCESS_TOKEN="${!SGRAPH_SEND__ACCESS_TOKEN}"); fi
+            docker run "${!APP_ARGS[@]}" --network-alias app "$SG_IMAGE"
+            docker run -d --name sg-send-caddy --network sgsend --restart unless-stopped \
+              -p 80:80 -p 443:443 \
+              -v /etc/sg-send/Caddyfile:/etc/caddy/Caddyfile:ro \
+              -v caddy_data:/data \
+              caddy:2
+            LAUNCH
+            chmod +x /usr/local/bin/sg-send-up.sh
+
+            # ── systemd unit: token lives ONLY in the unit's environment (root-readable), per ADR-6 ──
+            cat > /etc/systemd/system/sg-send.service <<UNIT
+            [Unit]
+            Description=SG/Send vault appliance
+            Requires=docker.service
+            After=docker.service
+
+            [Service]
+            Type=oneshot
+            RemainAfterExit=yes
+            Environment=SG_IMAGE=$SG_IMAGE
+            Environment=SG_STORAGE_MODE=$SG_STORAGE_MODE
+            Environment=SGRAPH_SEND__ACCESS_TOKEN=${AccessToken}
+            ExecStart=/usr/local/bin/sg-send-up.sh
+            ExecStop=/usr/bin/docker rm -f sg-send-app sg-send-caddy
+
+            [Install]
+            WantedBy=multi-user.target
+            UNIT
+            chmod 600 /etc/systemd/system/sg-send.service
+            systemctl daemon-reload
+            systemctl enable --now sg-send.service
+          - IsBaked: !If [UseBakedAmi, 'true', 'false']
+
+  ElasticIp:
+    Type: AWS::EC2::EIP
+    Properties:
+      InstanceId: !Ref Instance
+      Tags:
+        - { Key: Project, Value: sg-send }
+
+  DnsRecord:
+    Type: AWS::Route53::RecordSet
+    Condition: HasDnsRecord
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref DomainName
+      Type: A
+      TTL: '300'
+      ResourceRecords: [!Ref ElasticIp]
+
+Outputs:
+  PublicUrl:
+    Description: The URL to open (HTTPS with a valid cert when DomainName is set)
+    Value: !If [HasDomain, !Sub 'https://${DomainName}/', !Sub 'http://${ElasticIp}/']
+  InstanceId:
+    Description: Instance id (shell access via SSM Session Manager)
+    Value: !Ref Instance
+  DataRecovery:
+    Description: What happens to your data on stack delete
+    Value: !If
+      - IsDiskMode
+      - 'Data volume is SNAPSHOT on stack delete — restore by creating a volume from the snapshot'
+      - !If [IsS3Mode, 'Data lives in the S3 bucket (not deleted with the stack)', 'memory mode — data is ephemeral by design']

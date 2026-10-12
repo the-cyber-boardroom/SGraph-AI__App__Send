@@ -1,6 +1,12 @@
 osbot-utils
 osbot_fast_api_serverless
 fastapi-mcp
+# Upper bound required: fastapi-mcp 0.4.0 declares only `mcp>=1.12.0` (no upper bound) but
+# calls `Server(name, description)` POSITIONALLY. mcp 2.0.0 made everything after `name`
+# keyword-only, so an unpinned resolve picks 2.x and every Fast_API setup_mcp() dies with
+# "Server.__init__() takes 2 positional arguments but 3 were given". Drop this pin once
+# fastapi-mcp ships mcp 2.x support.
+mcp<2
 
 # for issue tracking
 issues-fs

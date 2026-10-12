@@ -1,9 +1,14 @@
 ---
 name: vault-html-app
-description: Build a polished, self-contained HTML application that lives inside an SG/Send vault and renders from index.html — a photo gallery, strategy microsite, dashboard, report, journal, or any single-page experience. Use this whenever the user wants to create a vault app, build an HTML app for a vault, make a website inside a vault, render a page from a vault, or auto-open a vault as an app — even when they only describe the content (gallery, report, microsite, slide deck, form, presentation) without saying "app". Covers the authoring contract all vault HTML must follow, the data-plus-app project shape that works, the patterns that survive both the SG/App host and the vault browser preview, the sgit commit-and-push workflow, and cross-references the canonical window.sg API reference (library/guides/vault-html/AUTHORING.md) and the sg-playwright screenshot guide.
+description: Build a polished, self-contained HTML application that lives inside an SG/Send vault and renders from index.html — a photo gallery, strategy microsite, dashboard, report, journal, or any single-page experience. Use this whenever the user wants to create a vault app, build an HTML app for a vault, make a website inside a vault, render a page from a vault, or auto-open a vault as an app — even when they only describe the content (gallery, report, microsite, slide deck, form, presentation) without saying "app". Covers the authoring contract all vault HTML must follow, the data-plus-app project shape that works, the patterns that survive both the SG/App host and the vault browser preview, the sgit commit-and-push workflow, calling an LLM from inside a vault app via sg.llm.* without ever holding an API key, and cross-references the canonical window.sg API reference (library/guides/vault-html/AUTHORING.md) and the sg-playwright screenshot guide.
 ---
 
 # Building HTML Apps That Live Inside an SG/Vault
+
+> **Canonical source:** `library/skills/create-vault-apps/SKILL.md` in the
+> `SGraph-AI__App__Send` repo. **Last verified:** 2026-08-03 against app-shell v0.2.3 and
+> sgit-ai v0.14.27. If your copy of this skill came from anywhere else (a vault, a manual
+> upload), check the repo for a newer version before trusting details.
 
 A vault app is a single `index.html` (plus its data and assets) that lives inside an SG/Send vault and renders straight from it. When the vault opens, the app launches: full-screen, talking to the vault through a bridge, with the encrypted blob serving as both the storage and the distribution mechanism. The medium is the message — sharing the vault link *is* sharing the app.
 
@@ -16,11 +21,11 @@ This file is the agent-facing **how-to** — patterns, traps, sample skeletons. 
 `app-shell`/`app-hud` source code:
 
 - **`library/guides/vault-html/AUTHORING.md`** — the full `window.sg.*` runtime API,
-  every namespace (`vfs`, `fs`, `vault`, `history`, `sync`, `auth`, `ui`, `state`,
+  every namespace (`vfs`, `fs`, `vault`, `history`, `sync`, `auth`, `ui`, `state`, `llm`,
   `loadCss`/`loadJs`, `app`), what the host does automatically (nav, hash anchors,
   external links, friendly 404, print, consent overlays), and the `app.json`
   `hud.{mode, show.*}` config schema for the chrome.
-- **`library/skills/sg-playwright-guide.md`** — how to drive `sg-playwright` from a
+- **`library/skills/use-sg-playwright/SKILL.md`** — how to drive `sg-playwright` from a
   Claude session to screenshot a live vault app (no local Chromium required).
 
 **Cross-check AUTHORING.md before you write any `sg.*` call from this skill.** Some
@@ -46,9 +51,17 @@ This is the part you cannot skip. Vault HTML runs inside an iframe loaded from a
 2. **No `<script src="…">` against vault files.** Inline all JS, or use `window.sg.loadJs(path)`.
 
 > Note on what's verified: in all three apps this session I **inlined** all CSS and JS, and that is the path I can vouch for. The `window.sg.loadCss` / `loadJs` alternatives come from the vault's AUTHORING.md guide and are the documented mechanism, but I did not exercise them — prefer inlining unless you have a reason to load lazily, and verify the `sg.*` calls if you do.
+>
+> **Verified against source (2026-08-09): `loadCss`/`loadJs` require no separate grant.** Both are
+> `_readText(path)` under the hood — the identical bridge call `sg.vfs.readText` makes — plus a DOM
+> injection step. There is no `load` permission verb; they ride `fs.read`, which is default-allow
+> today. If one of them fails, the promise rejects with `ENOENT` (bad path, or the file was written
+> locally but never `sgit commit` + `sgit push`ed) or a script error — not `EPERM`. See
+> AUTHORING.md §2 and `MIGRATING-TO-THE-PERMISSION-MODEL.md` for the forward-looking `fs.read`
+> deny-by-default flip, which will apply to these loaders too since they share the verb.
 3. **No `<img src="…">` in markup against vault files.** Set `img.src = '…'` from JS once the bridge is up. (A `MutationObserver` does intercept `<img>` markup in the SG/App host, but it is not guaranteed in the vault-browser preview — set `src` from JS to be safe everywhere.)
 4. **No `<iframe src>`, no `<source src>`, no CSS `@import`, no ESM `import`, no `new Worker()` against vault files.** These all run too early.
-5. **`fetch('something.json')` works** — the bridge patches `fetch`. This is the right way to load data.
+5. **`fetch('something.json')` does NOT work** — `window.fetch` is **not** patched; a vault-relative fetch resolves against the iframe's opaque origin and 404s. Load data with `await sg.vfs.readText('content.json')` (or `.read` for binary). Plain `fetch` is only useful as the first hop of a fallback chain that catches the failure and uses an inlined copy (see below, and the "Heads-up" section).
 6. **`<a href="vault-path">` works** — clicks are postMessage-intercepted by the host.
 
 Two more things that follow from the contract:
@@ -80,14 +93,40 @@ to ship redundant UI that ages out of sync with the platform. As of 2026-05-30:
 | Capability | Where it lives | What it means for your app |
 |---|---|---|
 | **Hash anchors** in vault links — `<a href="page.html#section">` | Host click interceptor + parent scroll-to-anchor postMessage | Just write the link; the host strips the fragment for the path lookup, then scrolls the new doc to the anchor on `DOMContentLoaded`. (Used to be broken — 403'd against the static host.) |
-| **External links** — `<a href="https://example.com">` | Iframe sandbox `allow-popups allow-popups-to-escape-sandbox` + click interceptor → `window.open` from inside the gesture | Don't add `target="_blank"`; the host opens it in a new tab with `noopener,noreferrer`. |
+| **External links** — `<a href="https://example.com">` | **Default-deny with a one-click host confirm** (updated 2026-06-15): the click posts to the host, which shows a confirm bar in the HUD and opens the link in a new tab with `noopener,noreferrer`. The app sandbox does NOT get `allow-popups-to-escape-sandbox` by default. | Don't add `target="_blank"`. For frictionless in-frame `window.open`, declare `"externalLinks": true` in `app.json` `permissions` — only then does the sandbox gain the popup tokens. |
 | **Back / forward / Home / Reload / Recent pages** | The `<app-hud>` nav row above your iframe | Don't build app-side back buttons. The HUD has a browser-style toolbar with a parent-side history stack, a recent-pages dropdown (last 15, chronological), and an editable URL bar (click → type vault-absolute path → Enter). |
 | **Friendly 404 / access-denied overlay** | `_renderBrokenLinkOverlay` in `app-shell.js` | A click on a missing or `.vault/**`-floored path lands on a host-rendered dead-end page with a ‹ back arrow. You don't need to handle broken-link routing. |
 | **Print** | HUD "🖨 Print" button → bridge RPC → DOM snapshot with `blob:`→`data:` inlining → `SgPrint.printHtml` | Hide it via `hud.show.print: false` if your app shouldn't be printed; otherwise it just works. (Restored 2026-05-30 — was broken under null-origin srcdoc.) |
 | **Toast notifications** | `sg.ui.message(text, type, opts)` → `<app-hud>` toast row | Don't build your own notification UI. The HUD has one. |
 | **Consent prompts** for grant-gated verbs (`sg.fs.*`, `sg.vault.*`) | Host HUD overlay + `sg.ui.requestPermission(verb, path)` | Apps that declare permissions in `app.json` get the consent UI for free. Don't build a homegrown "are you sure?" modal. |
 | **Device-local prefs** — theme, panel widths, "don't show again" | `sg.state.{get,set,remove,clear,keys}` (NEW 2026-05-30) | Namespaced top-level-kernel `localStorage`, 64 KiB/value. Survives reload, NOT a vault write. For vault-persistent state use `sg.fs.write('.app-state/...')` instead. |
-| **Hide / dim the chrome** | `app.json` `hud.mode: "minimal" \| "hidden"` (NEW 2026-05-30) | Declare in `app.json`; don't try to suppress the HUD from inside the iframe (it's not reachable from your DOM and you shouldn't). See AUTHORING.md → "Configuring the host chrome". |
+| **Hide / dim the chrome** | `app.json` `hud.mode: "minimal" \| "hidden" \| "none"` (`none` added 2026-06-11) | Declare in `app.json`; don't try to suppress the HUD from inside the iframe (it's not reachable from your DOM and you shouldn't). Even `"none"` keeps the sovereignty rail (consent prompts, external-link confirms). See AUTHORING.md → "Configuring the host chrome". |
+| **Append-only lanes** — send messages/telemetry to another vault, or receive them from other agents | `sg.append.{configure,write,list,fetch,markProcessed,purge}` (renamed from `sg.inbox.*` 2026-06-15; the write verb is `write`, not `append`) | Requires an `append.*` grant in `app.json` `permissions` — booleans, default-deny, **not** path-scoped. Watch three things. **(1) `fetch` is gated by `append.read`**, not `append.fetch`. **(2) Only `write` crosses vaults** — it takes an explicit `vault_id` and is the account-less delivery path; `list`/`fetch`/`markProcessed`/`purge`/`configure` all act on the *currently open* vault and ignore any vault you name, so **you cannot drain a remote lane from an app** (by design — the `enum_key` is the recipient's). **(3) A read-only session does NOT block `sg.append.write`** — the grant is the only gate, and `sg.app.writable` is irrelevant here; it's the *read* verbs that fail closed without a derivable `enum_key`. `inbox` is the lane id from `list` output — pass it back verbatim, and note it is currently the append token itself. See AUTHORING.md → "Receiving messages". |
+| **Calling a third-party API directly** — an external host, not a vault path | Blocked: the frame ships `<meta http-equiv="Content-Security-Policy" content="connect-src blob: data:">` | **No network host is reachable from your frame.** `fetch`/XHR/WebSocket to any `http(s)://` origin fail in ~1–15 ms ("Load failed") and fire `securitypolicyviolation` with `effectiveDirective: "connect-src"` — this is not a 404 and no amount of retrying fixes it. The escape hatch is `"permissions": {"network": true}`, which omits the meta entirely and shows a standing "direct network access" chip in the HUD. **Treat it as a last resort** — it reopens egress to *every* host from a frame holding decrypted vault content. Check first whether an `sg.*` namespace already covers it: `sg.llm.*` for models, `sg.append.write` for delivering into another vault's lane. Those run in the host, keep credentials out of your frame, and need no CSP change. See AUTHORING.md → "Egress". |
+| **Static-host / read-only mode** | `SGSend.staticMode` (`window.SG_STATIC === true`) — vault served from GitHub Pages / S3 with no backend | Reads work identically; every write rejects with `{code:'EREADONLY'}`. Check `sg.app.writable` and degrade gracefully. See `library/guides/vault-html/HOSTING-ON-STATIC-STORAGE.md`. |
+| **File downloads** — save a vault file to the user's device | `sg.vfs.download(path, {filename?})` (NEW 2026-07-31) — host-fulfilled: the save happens in the host document, so the app sandbox never needs `allow-downloads` | Don't build blob-URL + programmatic-anchor downloads in-frame (Chromium silently drops them — no `allow-downloads` token). Default: one-click HUD confirm per file; `"permissions": {"downloads": true}` for frictionless. Direct hrefs to vault paths (`<a href="/exports/x.pdf" download>`) can never work — vault files aren't URLs. |
+| **In-page anchors** — `<a href="#section">` | Host interceptor scrolls in-frame (fixed 2026-07-31) | Just write the anchor. Never assign `location.hash` from JS (srcdoc frames re-navigate). Opt out of interception with `data-sg-native` or window-capture `preventDefault` if your app routes clicks itself. |
+| **Voice input** — speak instead of type | `sg.llm.listen()` (NEW 2026-08-03) → `{text,…}` — the HOST opens the mic (a sandboxed frame has no `navigator.mediaDevices`), shows a recording bar, transcribes with the vault key | Requires `"llm": {"listen": true}` — a **separate grant, never implied by `chat`**, and consented per use by default. Audio never enters your frame. Works on iPad (records `m4a`, sent as-is); Chrome records `webm` and the host transcodes to WAV for you. Codes: `ENOMIC`, `EINSECURE`, `EABORT`, `EMODEL`. Don't build your own recorder — a sandboxed frame cannot reach the microphone. **If you render your own record button, drive the take with `sg.llm.listenStop()` / `sg.llm.listenCancel()`** (same grant, no consent prompt); the transcript comes back through the original `listen()` promise. `sg.llm.listening()` → `{recording}` for button state. A second `listen()` while one is running is refused with `EBUSY`. **Don't pass `model` either**: transcription uses an audio-capable model (default `google/gemini-3.5-flash`), not the vault's chat model — chat models 404 with "No endpoints found that support input audio". |
+| **AI Chat beside your app** — the user asks a model about this vault, by text or voice | A `✨ AI` button in the HUD opens the host's own chat panel (NEW 2026-08-03) | **You get this for free and must not rebuild it.** It is host chrome: it runs at the real origin, holds the vault key and the microphone directly, and your frame sees neither and cannot read the conversation. No permission needed. Hide it with `hud.show.llm: false` if a chat control would clash with your UI; force it on in `minimal` with `true` (off there by default). Use `sg.llm.*` below only when you want AI *inside* your own UI. |
+| **Sending an image to a model** — a screenshot, a chart, a scan | `sg.llm.imagePart(blob\|bytes\|dataURL)` → a content part for `chat()` (NEW 2026-08-03) | No new grant — an image is an ordinary `llm.chat` call. **Use the helper, don't encode it yourself**: it chunks base64 at 8190, not 8192 (`8192 % 3 === 2` puts `=` padding mid-string and `atob()` rejects it — shipped three times in this repo). png/jpeg/webp/gif only. The host checks the model can actually READ images from the live catalogue and returns `EMODEL` naming it, rather than letting the provider answer with an error that names nothing; it also caps the payload (`EIMGSIZE`). |
+| **Calling an LLM** — chat/summarise/extract, streaming | `sg.llm.{available,models,chat,cancel,usage}` (NEW 2026-08-02) — the vault's key stays in the HOST; your frame never sees it | Requires `"llm": {"chat": true}` in `app.json` `permissions`. **Always call `sg.llm.available()` first** and degrade on `ENOKEY`/`EPERM`/`EREADONLY` — unlike other namespaces this depends on runtime state (key configured? budget left?). Host clamps `maxTokens`, filters `models()` by the vault allow-list, enforces spend caps (`EBUDGET`), and raises the consent prompt. Costs are labelled `estimated` — render those with `~`. See AUTHORING.md "Calling an LLM". |
+| **File preview (incl. PDFs)** — quick-look overlay | `sg.ui.preview(path)` (NEW 2026-07-31) — host-rendered at the real origin, so Chrome's native PDF viewer works (it is BLOCKED inside the app sandbox — don't build blob-iframe PDF previews in-frame) | One call, no grant, no confirm (same permission chain as `vfs.read`). Previews pdf/image/video/audio/text. For a PDF inside your own layout, bundle PDF.js to canvas — see AUTHORING.md "Displaying PDFs inline". |
+
+> **Permissions are deny-by-default.** All mutation namespaces (`sg.vfs.write`, `sg.fs.*`,
+> `sg.vault.*`, `sg.append.*`, `sg.llm.*`) must be declared in `app.json` `permissions` or they
+> throw `EPERM`; `.vault/**` is always off-limits (`EPROTECTED`). See
+> `library/guides/vault-html/MIGRATING-TO-THE-PERMISSION-MODEL.md`.
+>
+> **Reads — including `sg.loadCss`/`sg.loadJs` — are the one exception, and only for now.**
+> `sg.vfs.read`/`readText`/`list` and both loaders share a single `fs.read` grant that is
+> **default-allow** today (no `app.json` declaration needed). It is planned to flip to
+> deny-by-default in a later phase, so scope it explicitly if you want the app to keep working
+> unchanged after that flip:
+> ```json
+> { "permissions": { "fs": { "read": ["theme.css", "app-src/"] } } }
+> ```
+> Grant syntax is **not glob** — a trailing `/` means "this path and everything under it" (folder
+> prefix), no trailing slash means an exact file. `"app-src/**"` is not valid; use `"app-src/"`.
 
 ### Heads-up: `fetch()` of vault paths is NOT patched
 
@@ -99,6 +138,13 @@ The right call is `await sg.vfs.readText('content.json')` (or `.read` for binary
 inlined `FALLBACK` pattern below works as a *fallback* (catches the 404 and uses the
 embedded copy) but the "fetch-first, fallback second" sample in this skill is a
 **fallback chain**, not a "fetch works" claim. AUTHORING.md is the ground truth here.
+
+**And `fetch()` of an *external* host fails for a different reason** — the frame's CSP
+(`connect-src blob: data:`) blocks it outright. That one is not a 404: it fails in
+milliseconds with "Load failed" and a `securitypolicyviolation` event. Don't debug it as a
+routing problem. Either use the `sg.*` namespace that covers what you need (`sg.llm.*`,
+`sg.append.write`), or declare `"permissions": {"network": true}` and accept that you have
+reopened egress to every host from a frame holding decrypted vault content.
 
 ## The project shape that works
 
@@ -263,12 +309,12 @@ The full loop, condensed:
    sgit push --token <access-token>     # token goes after the subcommand
    sgit status                          # confirm "in sync with remote"
    ```
-   Note the token position — `sgit --token X push` does not work in the version I tested; it must be `sgit push --token X`.
+   Both token positions work in current sgit (verified v0.14.27): `sgit push --token X` and `sgit --token X push` are equivalent (the per-command flag overrides the global one). Older versions only accepted the after-subcommand form, so prefer `sgit push --token X` for maximum compatibility.
 
 9. **Screenshot it yourself with `sg-playwright`, then ask the user to confirm.** The
    long-standing assumption that agents "can't render the page" is **no longer
    universally true** — when the operator has spun up an `sg-playwright` service,
-   you can drive a real Chromium over HTTP with no local install (`library/skills/sg-playwright-guide.md`
+   you can drive a real Chromium over HTTP with no local install (`library/skills/use-sg-playwright/SKILL.md`
    is the operator-and-agent guide). Take a screenshot of the live vault URL, eyeball
    it, fix obvious layout / contrast / overflow issues yourself, and **then** hand to
    the user for a human-eyes pass on subjective quality (does the grid actually look
@@ -371,7 +417,8 @@ getData().then(build).catch(err => {
 | "Could not load content" or blank page in some contexts | You only `fetch('content.json')` with no fallback. Always provide the inlined `FALLBACK`. |
 | Drop cap appears on every intro paragraph instead of just the first | Your selector is `.intro p::first-letter` rather than `.intro p:first-of-type::first-letter`. |
 | Emojis render as boxes in collages or stamped images | The server-side font (DejaVu) lacks the glyph. Draw the shape in SVG or skip the emoji. |
-| `sgit push` says "no access token configured" even with `--token X` | Token argument position. Use `sgit push --token X`, not `sgit --token X push`. |
+| `sgit push` says "no access token configured" even with `--token X` | On older sgit versions only `sgit push --token X` worked. Current sgit (v0.14.27+) accepts both positions; `sgit update` if you hit this. |
+| App renders blank or unstyled after `sg.loadCss`/`sg.loadJs` | **Usually not a permission problem** — `fs.read` (which these loaders use) is default-allow today. Check the console for the actual rejection: `ENOENT` means the path is wrong or the file was written locally but never `sgit commit` + `sgit push`ed; a thrown script error means the loaded JS itself failed. Always chain `.catch(err => console.error(...))` on the load promise so the real code surfaces instead of a silent spinner. |
 
 ## The medium is the argument
 
@@ -387,6 +434,6 @@ That single paragraph turns "here are some photos" into "and by the way, here's 
 - ~~**The full `window.sg` runtime API.**~~ **Now covered by `library/guides/vault-html/AUTHORING.md`** — that doc is the authoritative reference for every namespace (`vfs`, `fs`, `vault`, `history`, `sync`, `auth`, `ui`, `state`, `loadCss`/`loadJs`, `app`), with shapes, return types, and consent semantics. Don't duplicate it here.
 - **Service-worker upgrade path.** When the vault ships a service worker, the declarative restrictions in the contract lift — `<link>` and `<script src>` against vault paths will start working. Until then, the JS-only approach is what's safe. (See `library/guides/vault-html/service-worker-future.md`.)
 - **Multi-app vaults** (more than one `app.json` / multiple entries). Not yet shipped in the version I worked against.
-- ~~**Screenshotting the live app for visual review.**~~ **Now covered by `library/skills/sg-playwright-guide.md`** — drive a real Chromium over HTTP, no local install. Use it before falling back to "ask the user to screenshot".
+- ~~**Screenshotting the live app for visual review.**~~ **Now covered by `library/skills/use-sg-playwright/SKILL.md`** — drive a real Chromium over HTTP, no local install. Use it before falling back to "ask the user to screenshot".
 
 When any of those become relevant, add a reference file and link to it from here rather than expanding the body.

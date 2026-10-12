@@ -42,6 +42,7 @@ class Routes__Vault__Pointer(Fast_API__Routes):                                 
     public_vault_service : Service__Vault__Pointer = None                        # Public vault service (optional — None if public bucket not configured)
     vault_zip_service    : Service__Vault__Zip      = None                       # Vault zip builder (optional — injected by app)
     admin_service_client : object = None                                         # Optional Admin__Service__Client
+    access_token_service : object = None                                         # Lazily-built Service__Access_Token (token-validation cache)
 
     @staticmethod
     def _validate_vault_id(vault_id):                                            # Reject non-opaque vault IDs (security: prevents leaking names into S3/logs)
@@ -49,39 +50,20 @@ class Routes__Vault__Pointer(Fast_API__Routes):                                 
             raise HTTPException(status_code = 400,
                                 detail      = 'vault_id must be an opaque lowercase alphanumeric string (8-24 chars, no hyphens)')
 
-    def check_access_token(self, request: Request):                              # Validate access token from header
-        from osbot_utils.utils.Env import get_env
-        from sgraph_ai_app_send.lambda__user.user__config import ENV_VAR__SGRAPH_SEND__ACCESS_TOKEN
+    def _access_token_service(self):                                            # Lazy singleton — cache persists for the Lambda lifetime (like _manifest_cache)
+        if self.access_token_service is None:
+            from osbot_utils.utils.Env                                 import get_env
+            from sgraph_ai_app_send.lambda__user.service.Service__Access_Token import Service__Access_Token
+            from sgraph_ai_app_send.lambda__user.user__config          import (ENV_VAR__SGRAPH_SEND__TOKEN_CACHE_TTL ,
+                                                                               DEFAULT__SGRAPH_SEND__TOKEN_CACHE_TTL )
+            ttl = int(get_env(ENV_VAR__SGRAPH_SEND__TOKEN_CACHE_TTL, DEFAULT__SGRAPH_SEND__TOKEN_CACHE_TTL))
+            self.access_token_service = Service__Access_Token(admin_service_client = self.admin_service_client,
+                                                              ttl_seconds          = ttl                      )
+        return self.access_token_service
+
+    def check_access_token(self, request: Request):                              # Validate access token from header (cached — see Service__Access_Token)
         provided_token = request.headers.get(HEADER__SGRAPH_SEND__ACCESS_TOKEN, '')
-
-        if self.admin_service_client is not None:                                # Admin service available — validate via token_lookup
-            if not provided_token:
-                raise HTTPException(status_code = 401,
-                                    detail      = 'Access token required')
-            try:
-                response = self.admin_service_client.token_lookup(provided_token)
-                if response.status_code == 404:
-                    raise HTTPException(status_code = 401,
-                                        detail      = 'Invalid access token')
-                data = response.json()
-                if data.get('status') != 'active':
-                    raise HTTPException(status_code = 401,
-                                        detail      = f'Access token {data.get("status", "invalid")}')
-                return provided_token
-            except HTTPException:
-                raise
-            except Exception:
-                raise HTTPException(status_code = 503,
-                                    detail      = 'Token validation service unavailable')
-
-        # Fallback to env-var check (no admin service configured)
-        expected_token = get_env(ENV_VAR__SGRAPH_SEND__ACCESS_TOKEN, '')
-        if not expected_token:                                                   # No token configured — allow all (local dev)
-            return provided_token or None
-        if provided_token != expected_token:
-            raise HTTPException(status_code = 401,
-                                detail      = 'Access token required')
-        return provided_token
+        return self._access_token_service().check(provided_token)
 
     def _get_vault_service(self, request: Request) -> Service__Vault__Pointer:     # Route to public bucket when X-Vault-Public: true header present
         if self.public_vault_service and request.headers.get(HEADER__SGRAPH_VAULT__PUBLIC) == 'true':
@@ -129,8 +111,18 @@ class Routes__Vault__Pointer(Fast_API__Routes):                                 
         if payload is None:
             raise HTTPException(status_code = 404,
                                 detail      = 'Vault file not found')
-        return Response(content    = payload                    ,
-                        media_type = 'application/octet-stream')
+        # Immutable objects (obj-cas-imm-*, key-rnd-imm-*) are content-addressed and never
+        # change → let the browser HTTP cache keep them forever. This is the ONLY cache tier
+        # that survives a reload in null-origin sandboxed iframes (Cache API / localStorage /
+        # IndexedDB are all unavailable there). Mutable refs/indexes must never be cached, or a
+        # reload would render a previous commit's tree from a stale ref ciphertext.
+        if '-imm-' in str(file_id):
+            cache_control = 'public, max-age=31536000, immutable'
+        else:
+            cache_control = 'no-store'
+        return Response(content    = payload                          ,
+                        media_type = 'application/octet-stream'       ,
+                        headers    = {'Cache-Control': cache_control} )
 
     @route_path('/read-base64/{vault_id}/{file_id:path}')
     def read_base64__vault_id__file_id(self, vault_id : Safe_Str__Id,           # GET /vault/{vault_id}/read-base64/{file_id:path} — JSON-safe base64 read

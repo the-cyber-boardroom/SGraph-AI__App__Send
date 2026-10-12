@@ -120,35 +120,77 @@ suite('VaultLoaderRouting.runRoot — hash with pipe deep-link', ({ test, before
 // ---------------------------------------------------------------------------
 // runLanding() / runVault() / runPeek() — strip hash everywhere else
 // ---------------------------------------------------------------------------
-suite('VaultLoaderRouting.runLanding — strips hash', ({ test, before, after }) => {
+// 2026-09-09: the landing is a hash inbox like root — `sgit` prints /en-gb/#<key> links.
+// It must still NEVER redirect without a hash (regression 353ef55, the / ↔ /en-gb/ loop).
+suite('VaultLoaderRouting.runLanding — hash inbox, same decision as root', ({ test, before, after }) => {
     let mock, origLocation, origHistory;
     before(() => {
+        clearVaultStorage();
         origLocation = global.location;
         origHistory  = global.history;
         mock = makeMockNav();
+        mock.location.pathname = '/en-gb/';
         installMock(mock);
     });
     after(() => restoreMock(origLocation, origHistory));
 
-    test('calls replaceState when hash is present', () => {
+    test('#token → key saved, redirect to /en-gb/app with no hash', () => {
         mock.location.hash = '#apple-river-1234';
-        mock.replaceStateCalls = [];
+        mock.location.replaced = null;
         VaultLoader.routing.runLanding();
-        assert.equal(mock.replaceStateCalls.length, 1, 'replaceState called once');
+        assert.equal(VaultLoader.storage.getCurrentKey(), 'apple-river-1234', 'key saved to LS');
+        assert.equal(mock.location.replaced, '/en-gb/app', 'redirected to the app surface');
     });
 
-    test('does NOT call replaceState when hash is absent', () => {
+    test('an sgit-prefixed read credential is saved verbatim (app-shell strips the prefix)', () => {
+        const cred = 'sgit_private_read_' + 'ab'.repeat(32) + ':dkeclt5r';
+        mock.location.hash = '#' + cred;
+        mock.location.replaced = null;
+        VaultLoader.routing.runLanding();
+        assert.equal(VaultLoader.storage.getCurrentKey(), cred, 'credential saved as-is');
+        assert.equal(mock.location.replaced, '/en-gb/app', 'redirected');
+    });
+
+    test('#token|app:path → deep link saved too', () => {
+        mock.location.hash = '#apple-river-1234|app:index.html';
+        mock.location.replaced = null;
+        VaultLoader.routing.runLanding();
+        assert.equal(mock.location.replaced, '/en-gb/app');
+        assert.equal(VaultLoader.routing.consumeDeepLink(), 'app:index.html', 'deep link saved');
+    });
+
+    test('no hash → render the landing: no redirect, no replaceState', () => {
         mock.location.hash = '';
+        mock.location.replaced = null;
         mock.replaceStateCalls = [];
         VaultLoader.routing.runLanding();
-        assert.equal(mock.replaceStateCalls.length, 0, 'replaceState not called');
+        assert.equal(mock.location.replaced, null, 'no redirect (loop guard)');
+        assert.equal(mock.replaceStateCalls.length, 0, 'nothing to strip');
     });
 
-    test('does NOT redirect (no location.replace call)', () => {
-        mock.location.hash    = '#apple-river-1234';
+    test('bare # → treated as no hash: no redirect', () => {
+        mock.location.hash = '#';
         mock.location.replaced = null;
         VaultLoader.routing.runLanding();
         assert.equal(mock.location.replaced, null, 'no redirect');
+    });
+
+    test('another locale keeps its locale: /pt-pt/#token → /pt-pt/app', () => {
+        mock.location.pathname = '/pt-pt/';
+        mock.location.hash = '#apple-river-1234';
+        mock.location.replaced = null;
+        VaultLoader.routing.runLanding();
+        assert.equal(mock.location.replaced, '/pt-pt/app');
+        mock.location.pathname = '/en-gb/';
+    });
+
+    test('root still goes to /en-gb/app (no locale segment on /)', () => {
+        mock.location.pathname = '/';
+        mock.location.hash = '#apple-river-1234';
+        mock.location.replaced = null;
+        VaultLoader.routing.runRoot();
+        assert.equal(mock.location.replaced, '/en-gb/app');
+        mock.location.pathname = '/en-gb/';
     });
 });
 
@@ -185,5 +227,88 @@ suite('VaultLoaderRouting.runPeek — strips hash', ({ test, before, after }) =>
         VaultLoader.routing.runPeek();
         assert.equal(mock.replaceStateCalls.length, 1, 'replaceState called once');
         assert.equal(mock.location.replaced, null, 'no redirect');
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Release pins — `@name` in the hash tail.
+//
+// The pin belongs in the LINK, not just localStorage: a pin held only in one
+// browser dies on a new laptop or cleared storage — mid-demo, which is the exact
+// failure release channels exist to prevent. These pin the grammar so that a
+// pinned link keeps working, and keeps composing with deep links.
+// ---------------------------------------------------------------------------
+suite('VaultLoaderRouting.runRoot — release pins', ({ test, before, after }) => {
+    let mock, origLocation, origHistory;
+    const PIN_KEY = 'sg-vault-release-pin';
+    before(() => {
+        clearVaultStorage();
+        origLocation = global.location;
+        origHistory  = global.history;
+        mock = makeMockNav();
+        installMock(mock);
+    });
+    after(() => {
+        restoreMock(origLocation, origHistory);
+        VaultLoader.storage.clearCurrentKey();
+        try { sessionStorage.removeItem(PIN_KEY); } catch (_) {}
+    });
+
+    const run = (hash) => {
+        clearVaultStorage();
+        try { sessionStorage.removeItem(PIN_KEY); } catch (_) {}
+        mock.location.hash = hash;
+        VaultLoader.routing.runRoot();
+    };
+    const pin  = () => { try { return sessionStorage.getItem(PIN_KEY); } catch (_) { return null; } };
+    const deep = () => VaultLoader.routing.consumeDeepLink();
+
+    test('a bare key stores no pin', () => {
+        run('#apple-river-1234');
+        assert.equal(pin(), null);
+    });
+
+    test('@name is extracted as the release pin', () => {
+        run('#apple-river-1234|@v1-2');
+        assert.equal(pin(), 'v1-2');
+        assert.equal(VaultLoader.storage.getCurrentKey(), 'apple-river-1234');
+    });
+
+    test('the pin is NOT left in the deep link', () => {
+        run('#apple-river-1234|@v1-2');
+        assert.equal(deep(), '');
+    });
+
+    test('a pin composes with an app: deep link', () => {
+        run('#apple-river-1234|@v1-2|app:index.html');
+        assert.equal(pin(), 'v1-2');
+        assert.equal(deep(), 'app:index.html');
+    });
+
+    test('order does not matter', () => {
+        run('#apple-river-1234|app:index.html|@black-hat-demo');
+        assert.equal(pin(), 'black-hat-demo');
+        assert.equal(deep(), 'app:index.html');
+    });
+
+    test('a free-text release slug survives', () => {
+        run('#apple-river-1234|@old-pilot');
+        assert.equal(pin(), 'old-pilot');
+    });
+
+    test('a plain deep link still stores no pin', () => {
+        run('#apple-river-1234|docs/README.md');
+        assert.equal(pin(), null);
+        assert.equal(deep(), 'docs/README.md');
+    });
+
+    test('a bare @ is ignored rather than pinning to nothing', () => {
+        run('#apple-river-1234|@');
+        assert.equal(pin(), null);
+    });
+
+    test('the redirect target is unchanged', () => {
+        run('#apple-river-1234|@v1-2');
+        assert.equal(mock.location.replaced, '/en-gb/app');
     });
 });

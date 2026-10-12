@@ -78,6 +78,57 @@ jobs:
           path: playwright-report/
           retention-days: 7
 
+  # ── Declared-mounts browser e2e + live sync test (~60s): the REAL API server (Python,
+  # in-memory) + Node + Playwright. Kept out of the Node-only e2e job above (there the
+  # spec skips itself, visibly); here SG_REQUIRE_API=1 makes a missing server a failure.
+  # Guide: library/guides/vault-html/DECLARED-MOUNTS-E2E.md
+  declared-mounts-e2e:
+    name: Declared mounts e2e + live sync (Python API + Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    needs: [unit, integration]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Poetry
+        run: pipx install poetry
+
+      - name: Install project (pyproject.toml deps)
+        run: poetry install --no-interaction --no-ansi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        timeout-minutes: 2
+        run: npx playwright install --with-deps chromium
+
+      - name: Live sync test (Node, real API server)
+        run: SG_PYTHON="$(poetry run which python)" npm run test:vault-live
+
+      - name: Declared mounts browser e2e
+        run: SG_PYTHON="$(poetry run which python)" SG_REQUIRE_API=1 npm run test:vault-e2e-declared-mounts
+
+      - name: Upload screenshots + report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: declared-mounts-e2e
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 7
+
   # ── Browser integration tests (~15s): Python pytest, FastAPI test-server + ─
   # Python http.server + Playwright Chromium + sgit-ai. End-to-end coverage of
   # live-vault scenarios (deep-link routing, CSS/JS resource loading, etc.) —

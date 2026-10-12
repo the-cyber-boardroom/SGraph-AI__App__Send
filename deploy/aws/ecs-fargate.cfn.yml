@@ -1,0 +1,329 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  SG/Send on ECS Fargate - ONE stack owns the entire footprint (ADR-13): VPC + subnets,
+  cluster, task definition, service, ALB, security groups, logs, optional HTTPS + DNS.
+  Stack delete removes everything (data in S3 survives; memory mode is ephemeral by design).
+
+Parameters:
+
+  ImageRef:
+    Type: String
+    Default: 'diniscruz/sg-send-vault:latest'
+    Description: Container image (Docker Hub or ECR)
+
+  Cpu:
+    Type: String
+    Default: '512'
+    AllowedValues: ['256', '512', '1024', '2048', '4096']
+    Description: Fargate task CPU units
+
+  TaskMemory:
+    Type: String
+    Default: '1024'
+    Description: Fargate task memory (MB) - must be a valid pairing with Cpu
+
+  DesiredCount:
+    Type: Number
+    Default: 1
+    MinValue: 0
+    MaxValue: 10
+    Description: 'Number of tasks. >1 requires StorageMode=s3 (memory replicas do not share state).'
+
+  StorageMode:
+    Type: String
+    Default: s3
+    AllowedValues: [s3, memory]
+    Description: s3 = durable via the SG/Send convention bucket + scoped IAM. memory = ephemeral, no storage resources.
+
+  ExistingTransfersBucket:
+    Type: String
+    Default: ''
+    Description: 'Optional: existing bucket name (s3 mode). Empty = convention name {account}--sgraph-send-transfers--{region} (bucket must exist or the app creates it).'
+
+  AccessToken:
+    Type: String
+    Default: ''
+    NoEcho: true
+    Description: >-
+      The deployment access key (licensing key) - provided at launch, never stored by the
+      stack (manage in GitHub Actions Secrets / an SG/Vault). Empty = explicitly open.
+
+  DomainName:
+    Type: String
+    Default: ''
+    Description: 'Optional custom domain (requires HostedZoneId + CertificateArn - cert in THIS region, unlike CloudFront)'
+
+  HostedZoneId:
+    Type: String
+    Default: ''
+    Description: Route53 hosted zone id for DomainName
+
+  CertificateArn:
+    Type: String
+    Default: ''
+    Description: ACM certificate ARN for DomainName (same region as this stack)
+
+Conditions:
+  IsS3Mode:        !Equals [!Ref StorageMode, s3]
+  UseNamedBucket:  !Equals [!Ref ExistingTransfersBucket, '']
+  HasAccessToken:  !Not [!Equals [!Ref AccessToken, '']]
+  HasCustomDomain: !And
+    - !Not [!Equals [!Ref DomainName, '']]
+    - !Not [!Equals [!Ref HostedZoneId, '']]
+    - !Not [!Equals [!Ref CertificateArn, '']]
+
+Resources:
+
+  # ── Networking: self-contained VPC so stack delete leaves NOTHING behind ──
+
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.83.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags: [{ Key: Project, Value: sg-send }]
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags: [{ Key: Project, Value: sg-send }]
+
+  VpcGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 10.83.0.0/20
+      AvailabilityZone: !Select [0, !GetAZs '']
+      MapPublicIpOnLaunch: true
+      Tags: [{ Key: Project, Value: sg-send }]
+
+  PublicSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 10.83.16.0/20
+      AvailabilityZone: !Select [1, !GetAZs '']
+      MapPublicIpOnLaunch: true
+      Tags: [{ Key: Project, Value: sg-send }]
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags: [{ Key: Project, Value: sg-send }]
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: VpcGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  SubnetARouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: { SubnetId: !Ref PublicSubnetA, RouteTableId: !Ref PublicRouteTable }
+
+  SubnetBRouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: { SubnetId: !Ref PublicSubnetB, RouteTableId: !Ref PublicRouteTable }
+
+  # ── Load balancer ──
+
+  AlbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: 'SG/Send ALB - HTTP/HTTPS from the internet'
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - { IpProtocol: tcp, FromPort: 80,  ToPort: 80,  CidrIp: 0.0.0.0/0 }
+        - { IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIp: 0.0.0.0/0 }
+      Tags: [{ Key: Project, Value: sg-send }]
+
+  TaskSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: 'SG/Send tasks - traffic from the ALB only'
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - { IpProtocol: tcp, FromPort: 8080, ToPort: 8080, SourceSecurityGroupId: !Ref AlbSecurityGroup }
+      Tags: [{ Key: Project, Value: sg-send }]
+
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Type: application
+      Scheme: internet-facing
+      Subnets: [!Ref PublicSubnetA, !Ref PublicSubnetB]
+      SecurityGroups: [!Ref AlbSecurityGroup]
+      Tags: [{ Key: Project, Value: sg-send }]
+
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      VpcId: !Ref Vpc
+      Port: 8080
+      Protocol: HTTP
+      TargetType: ip
+      HealthCheckPath: /api/info/health
+      HealthCheckIntervalSeconds: 15
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      TargetGroupAttributes:
+        - { Key: deregistration_delay.timeout_seconds, Value: '15' }
+      Tags: [{ Key: Project, Value: sg-send }]
+
+  HttpListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions: !If
+        - HasCustomDomain
+        - [{ Type: redirect, RedirectConfig: { Protocol: HTTPS, Port: '443', StatusCode: HTTP_301 } }]
+        - [{ Type: forward, TargetGroupArn: !Ref TargetGroup }]
+
+  HttpsListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Condition: HasCustomDomain
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 443
+      Protocol: HTTPS
+      Certificates: [{ CertificateArn: !Ref CertificateArn }]
+      SslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06
+      DefaultActions: [{ Type: forward, TargetGroupArn: !Ref TargetGroup }]
+
+  # ── ECS ──
+
+  Cluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub '${AWS::StackName}-cluster'
+      Tags: [{ Key: Project, Value: sg-send }]
+
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/ecs/${AWS::StackName}'
+      RetentionInDays: 30
+
+  TaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ecs-tasks.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ecs-tasks.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - !If
+          - IsS3Mode
+          - PolicyName: sg-send-storage
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action: [s3:GetObject, s3:PutObject, s3:DeleteObject, s3:ListBucket, s3:CreateBucket, s3:GetBucketLocation]
+                  Resource:
+                    - !Sub
+                      - 'arn:aws:s3:::${BucketName}'
+                      - BucketName: !If [UseNamedBucket, !Sub '${AWS::AccountId}--sgraph-send-transfers--${AWS::Region}', !Ref ExistingTransfersBucket]
+                    - !Sub
+                      - 'arn:aws:s3:::${BucketName}/*'
+                      - BucketName: !If [UseNamedBucket, !Sub '${AWS::AccountId}--sgraph-send-transfers--${AWS::Region}', !Ref ExistingTransfersBucket]
+          - !Ref AWS::NoValue
+
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub '${AWS::StackName}-task'
+      RequiresCompatibilities: [FARGATE]
+      NetworkMode: awsvpc
+      Cpu: !Ref Cpu
+      Memory: !Ref TaskMemory
+      ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt TaskRole.Arn
+      ContainerDefinitions:
+        - Name: sg-send
+          Image: !Ref ImageRef
+          PortMappings: [{ ContainerPort: 8080, Protocol: tcp }]
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref LogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: sg-send
+          Environment:
+            - { Name: SEND__STORAGE_MODE, Value: !Ref StorageMode }
+            - !If
+              - IsS3Mode
+              - Name: SEND__S3_BUCKET
+                Value: !If [UseNamedBucket, !Sub '${AWS::AccountId}--sgraph-send-transfers--${AWS::Region}', !Ref ExistingTransfersBucket]
+              - !Ref AWS::NoValue
+            - !If
+              - HasAccessToken
+              - { Name: SGRAPH_SEND__ACCESS_TOKEN, Value: !Ref AccessToken }
+              - !Ref AWS::NoValue
+
+  Service:
+    Type: AWS::ECS::Service
+    DependsOn: HttpListener
+    Properties:
+      ServiceName: !Sub '${AWS::StackName}-service'
+      Cluster: !Ref Cluster
+      LaunchType: FARGATE
+      DesiredCount: !Ref DesiredCount
+      TaskDefinition: !Ref TaskDefinition
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets: [!Ref PublicSubnetA, !Ref PublicSubnetB]
+          SecurityGroups: [!Ref TaskSecurityGroup]
+      LoadBalancers:
+        - ContainerName: sg-send
+          ContainerPort: 8080
+          TargetGroupArn: !Ref TargetGroup
+      Tags: [{ Key: Project, Value: sg-send }]
+
+  DnsRecord:
+    Type: AWS::Route53::RecordSet
+    Condition: HasCustomDomain
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref DomainName
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt LoadBalancer.DNSName
+        HostedZoneId: !GetAtt LoadBalancer.CanonicalHostedZoneID
+
+Outputs:
+  PublicUrl:
+    Description: The URL to use
+    Value: !If [HasCustomDomain, !Sub 'https://${DomainName}/', !Sub 'http://${LoadBalancer.DNSName}/']
+  ClusterName:
+    Value: !Ref Cluster
+  LifecycleContract:
+    Description: What stack delete removes
+    Value: 'EVERYTHING in this stack - cluster, service, ALB, VPC. S3 data (s3 mode) survives; memory mode is ephemeral by design.'

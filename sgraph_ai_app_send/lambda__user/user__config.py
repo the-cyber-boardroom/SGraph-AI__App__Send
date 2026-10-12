@@ -18,6 +18,8 @@ APP_SEND__UI__USER__LATEST__VERSION         = "v0.2.0"
 APP_SEND__UI__USER__LOCALE                  = "en-gb"
 
 ENV_VAR__SGRAPH_SEND__ACCESS_TOKEN          = 'SGRAPH_SEND__ACCESS_TOKEN'
+ENV_VAR__SGRAPH_SEND__TOKEN_CACHE_TTL       = 'SGRAPH_SEND__TOKEN_CACHE_TTL'    # Seconds a positive token validation is cached (Lambda-lifetime). Default below.
+DEFAULT__SGRAPH_SEND__TOKEN_CACHE_TTL       = 60                                # Avoids a per-write Admin-Lambda round-trip; tokens revoked out-of-band clear within TTL.
 HEADER__SGRAPH_SEND__ACCESS_TOKEN           = 'x-sgraph-access-token'
 HEADER__SGRAPH_VAULT__WRITE_KEY             = 'x-sgraph-vault-write-key'
 HEADER__SGRAPH_TRANSFER__DELETE_AUTH        = 'x-sgraph-transfer-delete-auth'

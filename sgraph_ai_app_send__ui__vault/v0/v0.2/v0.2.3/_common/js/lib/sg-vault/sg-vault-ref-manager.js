@@ -15,11 +15,21 @@
 
 class SGVaultRefManager {
 
-    constructor(sgSend, vaultId, writeKey, readKey) {
-        this._sgSend   = sgSend
-        this._vaultId  = vaultId
-        this._writeKey = writeKey
-        this._readKey  = readKey
+    constructor(sgSend, vaultId, writeKey, readKey, objectStore = null) {
+        this._sgSend      = sgSend
+        this._vaultId     = vaultId
+        this._writeKey    = writeKey
+        this._readKey     = readKey
+        this._objectStore = objectStore       // when set + batching, ref writes JOIN the commit batch
+    }
+
+    // Stage into the object store's active batch (one POST /batch) if one is open, else PUT now.
+    async _putOrStage(filePath, bytes) {
+        if (this._objectStore && this._objectStore.batching) {
+            this._objectStore._stage(filePath, bytes)
+        } else {
+            await this._sgSend.vaultWrite(this._vaultId, filePath, this._writeKey, bytes)
+        }
     }
 
     // --- Write ref: encrypt commit_id and store at bare/refs/{refFileId} --------
@@ -28,7 +38,7 @@ class SGVaultRefManager {
         const filePath  = `bare/refs/${refFileId}`
         const payload   = new TextEncoder().encode(JSON.stringify({ commit_id: commitId }))
         const encrypted = await SGSendCrypto.encrypt(payload, this._readKey)
-        await this._sgSend.vaultWrite(this._vaultId, filePath, this._writeKey, new Uint8Array(encrypted))
+        await this._putOrStage(filePath, new Uint8Array(encrypted))
     }
 
     // --- Read ref: decrypt and return commit_id ----------------------------------
@@ -36,10 +46,58 @@ class SGVaultRefManager {
     async readRef(refFileId) {
         const filePath  = `bare/refs/${refFileId}`
         const encrypted = await this._sgSend.vaultRead(this._vaultId, filePath)
+        this._rememberRaw(refFileId, encrypted)
         if (!encrypted) return null
         const decrypted = await SGSendCrypto.decrypt(encrypted, this._readKey)
         const parsed    = JSON.parse(new TextDecoder().decode(decrypted))
         return parsed.commit_id
+    }
+
+    // --- Raw ciphertext cache (for compare-and-swap) ------------------------------
+    // Refs are AES-GCM with a fresh IV per write, so two writes of the same commit_id
+    // are different bytes. The server's CAS compares raw bytes, so we keep the exact
+    // ciphertext we last READ per ref id. `null` = "we read it and it was absent".
+
+    _rememberRaw(refFileId, encrypted) {
+        if (!this._rawRefs) this._rawRefs = Object.create(null)
+        this._rawRefs[refFileId] = encrypted ? new Uint8Array(encrypted) : null
+    }
+
+    lastRawRef(refFileId) {
+        return (this._rawRefs && refFileId in this._rawRefs) ? this._rawRefs[refFileId] : undefined
+    }
+
+    // --- Write ref, compare-and-swap -------------------------------------------------
+    // Succeeds only if the server still holds the exact bytes we last read for this ref
+    // (or nothing, if we last saw it absent). On success the cache is updated to the
+    // bytes we just wrote; on conflict the cache is updated to the server's CURRENT
+    // bytes (so the next readRef→merge→retry cycle can succeed) and 'ECAS' is thrown.
+    // Throws 'ENOMATCH' if the ref was never read through this manager.
+
+    async writeRefIfMatch(refFileId, commitId) {
+        const raw = this.lastRawRef(refFileId)
+        if (raw === undefined) {
+            const e = new Error('writeRefIfMatch: ref never read: ' + refFileId); e.code = 'ENOMATCH'; throw e
+        }
+        const filePath  = `bare/refs/${refFileId}`
+        const payload   = new TextEncoder().encode(JSON.stringify({ commit_id: commitId }))
+        const encrypted = new Uint8Array(await SGSendCrypto.encrypt(payload, this._readKey))
+        const results   = await this._sgSend.vaultBatch(this._vaultId, this._writeKey, [{
+            op      : 'write-if-match',
+            file_id : filePath,
+            data    : SGSend._abToB64(encrypted),
+            match   : raw ? SGSend._abToB64(raw) : null
+        }])
+        const r = results && results[0]
+        if (r && r.status === 'ok') {
+            this._rawRefs[refFileId] = encrypted
+            return true
+        }
+        if (r && r.status === 'conflict') {
+            this._rawRefs[refFileId] = r.current ? SGSend._b64ToBytes(r.current) : null
+            const e = new Error('writeRefIfMatch: ref moved on server: ' + refFileId); e.code = 'ECAS'; throw e
+        }
+        const e = new Error('writeRefIfMatch: unexpected batch result ' + JSON.stringify(r || null)); e.code = 'EUNREACH'; throw e
     }
 
     // --- Read branch index: decrypt and return parsed index ----------------------
@@ -59,5 +117,42 @@ class SGVaultRefManager {
         if (!encrypted) return null
         const decrypted = await SGSendCrypto.decrypt(encrypted, this._readKey)
         return JSON.parse(new TextDecoder().decode(decrypted))
+    }
+
+    // --- Write a single-branch index (interop with the sgit CLI) -----------------
+    //
+    // Web-created vaults historically never wrote a CLI-format branch index, so
+    // `sgit clone <web-vault>` hard-errored with "No branch index found" (the CLI now
+    // has a fallback, but writing the index makes web vaults clonable by ANY CLI
+    // version and discoverable by agents). Written on create() and on every push()
+    // so the index always points at the current named ref. Stored at the same path
+    // the CLI reads (`bare/indexes/`), encrypted under read_key like every ref.
+    //
+    // Stable plaintext per refFileId (no timestamp); the encrypted blob still carries a
+    // fresh AES-GCM IV per write, so the index is small and cheap to re-write each push.
+    // head_ref_id points at the NAMED ref (ref-pid-muw-*) — never the clone ref — so the
+    // CLI keeps cloning the canonical published branch (see the CLI interop briefs).
+    //
+    // CLI wire contract — pinned to the sgit CLI's Schema__Branch_Index (round 2 review):
+    //   - `branch_id`  MUST match  ^branch-(named|clone)-[0-9a-f]{8,64}$  (opaque hex; NOT a label).
+    //     We derive it from `branchIndexFileId`'s hex suffix (`idx-pid-muw-{12 hex}` → 12 hex chars),
+    //     so it's deterministic per vault, opaque, and well inside the regex bounds.
+    //   - `name`       MUST be  "current"  (hardcoded in 10+ CLI workflow steps; changing the CLI
+    //     would break every CLI-created vault in the wild). Human-readable display labels belong
+    //     in a separate field (see the in-flight architect interop contract).
+    // Earlier wire ("branch-named-main" / "main") was strictly worse than no index: it tripped
+    // the CLI's `Safe_Str__Branch_Id` parse → crash, bypassing their absent-index fallback.
+    async writeBranchIndex(branchIndexFileId, refFileId) {
+        if (!branchIndexFileId || !refFileId) return
+        const filePath = `bare/indexes/${branchIndexFileId}`
+        // Derive the opaque hex id from the index file id's hex tail.
+        const hex      = (branchIndexFileId.match(/[0-9a-f]+$/) || ['00000000'])[0]
+        const branchId = 'branch-named-' + hex
+        const index    = { schema: 'branch_index_v1', branches: [
+            { branch_id: branchId, branch_type: 'named', head_ref_id: refFileId, name: 'current' }
+        ]}
+        const payload   = new TextEncoder().encode(JSON.stringify(index))
+        const encrypted = await SGSendCrypto.encrypt(payload, this._readKey)
+        await this._putOrStage(filePath, new Uint8Array(encrypted))
     }
 }

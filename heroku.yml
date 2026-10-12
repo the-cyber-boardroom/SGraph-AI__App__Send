@@ -1,0 +1,6 @@
+# Heroku container-stack build config (pairs with app.json for the Deploy button).
+# The same self-contained image that runs on Docker/Lambda/EC2/Fargate/Cloud Run;
+# serve.py honours Heroku's injected $PORT (ADR-2).
+build:
+  docker:
+    web: sgraph_ai_app_send__docker/Dockerfile

@@ -15,20 +15,52 @@
      On screen: invisible. In print: forces a page break.
 
    v0.3.1 changes over v0.3.0:
-     - @page margin set to 0 (was 2cm 2.5cm) — browser dialog controls margins
      - Screen preview padding reduced from 2cm 2.5cm → 0.8cm 1.2cm
      - Dark inline backgrounds stripped before printing (prevents dark-themed
        HTML blocks from creating dark pages in the PDF output)
      - .page-break CSS support added
+
+   v1.0.3 (2026-06-13) — print margin parity fix:
+     - The printed page used @page { margin: 1cm 1.25cm } while the on-screen
+       preview card used padding 0.8cm 1.2cm, so the PDF margins didn't match
+       what the preview showed (and 1cm top read as cramped). Both now use a
+       single symmetric 1.5cm so the preview is WYSIWYG with the printed output.
+
+   v1.0.4 (2026-06-15) — dialog "Margins: None" must actually work:
+     - The browser's print dialog Margins dropdown is the authoritative control
+       for the PRINTED page margin. CSS @page rules compete with that dropdown,
+       and in practice the override is fragile (Chrome/Edge/Firefox sometimes
+       keep the CSS margin even when "None" is selected). Result: users who
+       wanted edge-to-edge PDFs were stuck with the CSS @page 1.5cm margin —
+       Scale had no effect because the margin sits outside scaled content.
+     - Fix: set @page margin to 0 and let the dialog be the only source of
+       print margin. "Default" → browser default (~1 cm). "None" → 0 → genuinely
+       edge-to-edge. "Custom" → exactly the value typed.
+     - Preview vs print: the on-screen preview card keeps 1.5cm padding for
+       readability — it represents "what a typical printed page looks like with
+       the Default dialog setting" rather than predicting the user's specific
+       dialog choice. Layout / typography / line breaks stay WYSIWYG; only the
+       outer page margin now depends on the dialog.
+     - Belt-and-suspenders: html/body padding/margin explicitly zeroed in print
+       with !important so no UA or content-side rule can re-introduce them.
    ============================================================================= */
 
 var SgPrint = (function() {
     'use strict';
 
+    // On-screen preview card padding — a display convenience, not a print
+    // prediction. The printed PDF's outer margin is controlled exclusively by
+    // the browser's print dialog (the Margins dropdown).
+    var PREVIEW_PADDING = '1.5cm';
+
+    // Single source of truth for the version. Echoed in the popup toolbar so
+    // we can tell at a glance whether a cached older copy is being served.
+    var VERSION = '1.0.5';
+
     // ─── Print styles (A4-ready, screen preview + print media) ───────────────
     var PRINT_STYLES = [
         '*, *::before, *::after { box-sizing: border-box; }',
-        '@page { margin: 1cm 1.25cm; }',  /* Half original 2cm/2.5cm — user can override with "None" */
+        '@page { margin: 0; }',   /* the browser dialog\'s Margins dropdown is authoritative; CSS does not compete */
         'body {',
         '    font-family: "DM Sans", system-ui, -apple-system, sans-serif;',
         '    font-size: 11pt; line-height: 1.6; color: #1a1a1a; background: #fff;',
@@ -54,6 +86,11 @@ var SgPrint = (function() {
         '    }',
         '    .sg-print-toolbar .toolbar-info { color: #bbb; flex: 1; }',
         '    .sg-print-toolbar .toolbar-info strong { color: #fff; }',
+        '    .sg-print-toolbar .toolbar-ver {',
+        '        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;',
+        '        font-size: 11px; color: #888; padding: 2px 6px; border: 1px solid #444;',
+        '        border-radius: 4px;',
+        '    }',
         '    .sg-print-toolbar button {',
         '        padding: 6px 16px; border: none; border-radius: 4px;',
         '        font-size: 13px; cursor: pointer; font-weight: 500;',
@@ -68,7 +105,7 @@ var SgPrint = (function() {
         '    .sg-print-toolbar .btn-close:hover { background: #444; color: #fff; }',
         '    .sg-print-page {',
         '        max-width: 210mm; margin: 24px auto; background: #fff;',
-        '        padding: 0.8cm 1.2cm; box-shadow: 0 2px 12px rgba(0,0,0,0.15);',
+        '        padding: ' + PREVIEW_PADDING + '; box-shadow: 0 2px 12px rgba(0,0,0,0.15);',  /* screen-only readability — print uses dialog margin */
         '        border-radius: 2px; min-height: 297mm;',
         '    }',
         '    /* Page break marker: dashed line on screen so authors can see it */',
@@ -80,8 +117,12 @@ var SgPrint = (function() {
         '    .md-frontmatter { display: flex !important; }',
         '}',
         '@media print {',
+        '    /* The dialog\'s Margins dropdown is the sole source of print margins. We zero',
+        '       everything inside the document with !important so no UA default or content-side',
+        '       reset can re-introduce visible borders inside the printable area. */',
+        '    html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; }',
         '    .sg-print-toolbar { display: none !important; }',
-        '    .sg-print-page { max-width: none; margin: 0; padding: 0; box-shadow: none; border-radius: 0; min-height: auto; }',
+        '    .sg-print-page { max-width: none !important; margin: 0 !important; padding: 0 !important; box-shadow: none !important; border-radius: 0 !important; min-height: auto !important; background: #fff !important; }',
         '    /* Page break: invisible in print but forces a new page */',
         '    .page-break { display: block; page-break-after: always; break-after: page; height: 0; border: none; }',
         '    /* md-pb-marker: becomes a zero-height page-break trigger in print */',
@@ -211,6 +252,10 @@ var SgPrint = (function() {
                 '</div>' +
                 '<div class="toolbar-sep"></div>' +
                 '<div class="toolbar-info">Print preview for <strong>' + escapeHtml(displayName) + '</strong></div>' +
+                /* Version stamp — a glance at the toolbar tells you whether your browser is
+                   running the latest sg-print.js or a cached older copy. (Stale copies often
+                   explain "the fix didn\'t work" — bump the version, see if it changes.) */
+                '<span class="toolbar-ver" title="sg-print.js version (helps spot stale browser/CDN cache)">v' + VERSION + '</span>' +
                 '<button class="btn-print" onclick="window.print()">Print / Save PDF</button>' +
                 '<button class="btn-close" onclick="window.close()">Close</button>' +
             '</div>' +
@@ -267,6 +312,6 @@ var SgPrint = (function() {
         printHtml:     printHtml,
         printMarkdown: printMarkdown,
         PRINT_STYLES:  PRINT_STYLES,
-        version:       '1.0.2'
+        version:       VERSION
     };
 })();

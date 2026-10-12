@@ -89,10 +89,11 @@ class test_Container__App(TestCase):
         assert response.status_code == 200
         assert response.content == payload
 
-    def test__auth_cookie_form_available(self):
+    def test__auth_cookie_form_available(self):                                 # ADR-12: now the branded SG/Send login page (was osbot's 'Auth Cookie Editor')
         response = self.client.get('/auth/set-cookie-form')
         assert response.status_code == 200
-        assert 'Auth Cookie Editor' in response.text
+        assert 'SG/SEND'    in response.text
+        assert 'Access key' in response.text
 
     def test__openapi_docs(self):
         response = self.client.get('/api/docs')
