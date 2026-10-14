@@ -7,6 +7,31 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-10-14
+
+Processed 28 briefs + 4 day indexes from 03–07 Sep 2026 (docs 981–1012).
+Two new EXISTS items from vault commits since 09/08.
+20 new PROPOSED items across vault, ai-agents, tools, website, identity domains.
+16 key decisions extracted and added to `reality/index.md`.
+
+Files changed:
+- `reality/index.md` — Last updated → 2026-10-14; Quick Stats date updated; 20 new PROPOSED items noted; 16 new key decisions added; cumulative docs → 1012
+- `reality/changelog.md` — this entry
+
+New EXISTS:
+- `vault/` — declared mounts safe list (write receipts, fs.* through mount, app projection, relay timeout) [commit d56e296]
+- `vault/` — `/en-gb/#<key>` locale landing routing fix [commit 543a80a]
+
+New PROPOSED (20): P-LIV-001, P-LIV-002, P-OBS-001, P-OBS-002, P-CFL-001, P-CFL-002,
+P-GMR-001, P-GMR-002, P-GMS-001, P-GMS-002, P-GMS-003, P-CKS-001, P-AMP-001, P-AMP-002,
+P-VTV-001, P-VTV-002, P-VTV-003, P-NST-001, P-NST-002, P-VPR-001.
+
+Session: 32 docs processed | New EXISTS: 2 | New PROPOSED: 20 | Cumulative docs: 1012
+Master index (10/14): `team/roles/librarian/reviews/10/14/v0.33.69__master-index__briefs-03-07-sep-2026.md`
+Debrief (10/14): `team/humans/dinis_cruz/debriefs/10/14/v0.33.69__debrief__briefs-processing-03-07-sep-2026.md`
+
+---
+
 ## 2026-09-03
 
 B-015 completed: `test__sgit_key_prefixes.js` (08/25 commit `b3a9220`) counted and added to the ViV loader suite table. 28 assertions (4 suites). Test count updated ~3100+ → ~3130+; ViV suite ~1060+ → ~1090+.
