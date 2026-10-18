@@ -1,6 +1,6 @@
 # Reality — Master Index
 
-**Version:** v0.33.66 | **Last updated:** 2026-09-08 | **Maintained by:** Librarian (daily run)
+**Version:** v0.33.69 | **Last updated:** 2026-10-18 | **Maintained by:** Librarian (daily run)
 **Structure:** Domain tree — each domain has its own directory with `index.md` and `proposed/`
 
 This file is the entry point. Read it to find the right domain, then go to that domain's
@@ -31,7 +31,7 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 
 ---
 
-## Quick Stats (as of 2026-09-08)
+## Quick Stats (as of 2026-10-18)
 
 | Metric | Count |
 |--------|-------|
@@ -44,8 +44,8 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | Browser UIs | **7** (share v0.4, open v0.4, admin, workspace, vault browser, vault app /en-gb/app; user v0.3.x legacy) |
 | Active tools (tools.sgraph.ai) | 4 |
 | sgit CLI commands | 20+ |
-| Open PROPOSED items (across all domains) | ~1086+ (+13 net-new from 09/01 session: P-REG-001–005, P-CON-001–003, P-EXP-001–002, P-SITE-001–002; +6 from 08/25: P-NHI-001–006; +16 from 08/23: P-ENR-001–009, P-BRK-001–007; previously ~1051+; 09/04 and 09/08 runs: no new items — 20 Aug briefs fully catalogued 09/01) |
-| Total documents catalogued | 980 (+17 from 20 Aug v0.33.61; +1 day index; processed 08/26–08/27 and 09/01; prev: 962; 09/08 run: confirmed, no new docs; fresh architect + dev reviews produced in 09/08)
+| Open PROPOSED items (across all domains) | ~1110+ (+24 net-new from 10/18 session: P-INS-001–002, P-GMP-001–002, P-CEDAR-001, P-GAME-001–006, P-CONF-001–003, P-ASSESS-001–002, P-LTOV-001, P-VTV-001–002, P-LOG-001, P-CRED-001–002, P-SITE-003, P-VIDEO-001; previously ~1086+; see changelog for full history) |
+| Total documents catalogued | 1023 (+43 from 26 Aug – 7 Sep 2026; processed 10/18; prev: 980)
 | **Key decision** | **Risk Mandate.ai** adopted as product name (resolves OQ-company-name-1, 2026-06-25) |
 | **Key decision** | **Grounded alarm** adopted as the Risk Mandate communication strategy term (replaces FUD framing, 2026-07-05) |
 | **Key decision** | **Grant ≠ Mandate** (corrected 2026-08-20, doc 963 v0.33.61) — grant is the union of capabilities conferred at assignment; mandate is what the party is authorised and expected to do; excess authority = grant minus mandate = unaccepted blast radius; allow-list mandates are the only measurable form; the July "to grant is to mandate" identification was correct as an accounting identity (a party carries its grant's exposure) but wrong as an object collapse; the two are separate objects |
@@ -102,6 +102,15 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | **Key decision** | **Consumer register: refund is pretext, record is asset** — a subscription transparency register asks whether companies hold usage records (not how much was used); "does not hold usage data" is a valid, non-penalised response; publish the record of what was asked and answered, never a characterisation; subscription = discount for committing to regular use, not rent on something you have the right to ignore (consumer transparency register, 2026-08-20) |
 | **Key decision** | **High threat without efficacy produces denial** — a personal high-threat page must include efficacy statements or the reader produces defensive denial rather than action; a general low-threat page withholds remedies to create appetite; the two editorial rules are not alignable (user assessment brief, 2026-08-20) |
 | **Key decision** | **Levels and variants are orthogonal** — depth of detail (level) and rendering/wording (variant) must vary independently; conflating them makes an experiment undiagnosable (persona generator brief, 2026-08-20) |
+| **Key decision** | **Adopt Cedar as the policy language** — default-deny, principal/action/resource/context, evaluated outside the agent's reasoning loop; Cedar states it does not establish identity, so it composes with the registry; the mandate file (what the holder is expected to do) is the new thing to build; act before any schema is written (grant/mandate brief, 2026-08-26) |
+| **Key decision** | **Insurance premium paid in allocation from a finite pool** — correlation breaks pooling (agent draws are correlated through shared models, prompts, tooling, dependencies); experience rating lands on the team not the agent; recoverability decides insurability; the day's insurance framing was found in June architecture (insurance brief, 2026-08-26) |
+| **Key decision** | **Append lane outside the commit DAG** — a flat-put costs one operation; a committed write rewrites its folder's tree and every ancestor; this single fact decides the logging architecture; performance harness ships but has never been run (append-lane arch, 2026-09-07) |
+| **Key decision** | **Two-edge rule held by a failing test** — a layer edge that reaches a source observation fails the build; a rule in a document is a preference, a rule enforced by a build is a rule; unevidenced is a state and the default (AIUC-1 conformance layer, 2026-09-04) |
+| **Key decision** | **Grant is per tool, not per session** — a conformance claim scoped to a session is unanswerable rather than imprecise; agent conformance requires a party outside the agent for 2 of 5 requirements (D003 measurement, 2026-09-04) |
+| **Key decision** | **Adopt probe and finding vocabulary** — the vocabulary was about to be minted; it already exists in a widely-adopted project with definitions close enough to adopt; adopt before the repository is written (research brief, 2026-09-04) |
+| **Key decision** | **Adopt OSCAL and SARIF as renderings** — one internal shape emitting both standards; do not mint a third interchange schema; import matters as much as export; act before the assessment product's data model is written (assessment product brief, 2026-09-05) |
+| **Key decision** | **Broadcast is the private option** — addressing a vault requires learning who it is; reply address travels inside the first sealed message; no directory needed; a path with one writer and defined readers is an interface (vault-to-vault brief, 2026-09-07) |
+| **Key decision** | **Level carries three meanings** — altitude (document depth), audience standing (level-one problem), stage of play; one must be retired before documentation proliferates (7 Sep, urgent) |
 
 ---
 
