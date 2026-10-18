@@ -9,16 +9,81 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ## 2026-10-18
 
-43 briefs from 5 days (26 Aug, 3 Sep, 4 Sep, 5 Sep, 7 Sep 2026) processed. Nine threads: grant/mandate/insurance, AIUC-1 conformance layer, licence-to-operate vault, observation/self-report, games series (6 designs), vaults talking to vaults, assessment product, credentials/keys, new sites. 24 new PROPOSED items (P-INS-001–002, P-GMP-001–002, P-CEDAR-001, P-GAME-001–006, P-CONF-001–003, P-ASSESS-001–002, P-LTOV-001, P-VTV-001–002, P-LOG-001, P-CRED-001–002, P-SITE-003, P-VIDEO-001).
+Secondary/independent processing run of 26 Aug – 7 Sep 2026 briefs. The remote branch already held the authoritative 09/11 processing (docs 980→1023) plus supplementary runs on 09/15, 09/29, and 10/14. This 10/18 session produced independent role reviews and a master index as a separate pass, useful for cross-referencing against prior outputs.
 
 Files changed:
-- `reality/index.md` — last-updated date → 2026-10-18; cumulative docs 980 → 1023; proposed count ~1086+ → ~1110+; key decisions added for Cedar adoption, append-lane cost model, two-edge conformance rule
-- `reality/changelog.md` — this entry
+- `reality/index.md` — last-updated date → 2026-10-18; 10 additional key decisions added (Cedar, append-lane, two-edge rule, probe/finding vocabulary, OSCAL/SARIF, broadcast-is-private, level-three-meanings, grant-per-tool, licence vault, insurance economics)
+- `reality/changelog.md` — this entry (merged with remote history)
 
-Session: 43 new briefs | New EXISTS items: 0 | New PROPOSED items: 24 | Cumulative docs: 1023 | No backlog tasks
+Session: secondary pass | Authoritative cumulative docs: 1023 (09/11 count) | New PROPOSED IDs: aligned with 09/11 numbering
 Master index (10/18): `team/roles/librarian/reviews/10/18/v0.33.69__master-index__briefs-26-aug-to-07-sep-2026.md`
+Architect review (10/18): `team/roles/architect/reviews/10/18/v0.33.69__architect-review__briefs-26-aug-to-07-sep-2026.md`
+Dev review (10/18): `team/roles/dev/reviews/10/18/v0.33.69__dev-review__briefs-26-aug-to-07-sep-2026.md`
 Debrief (10/18): `team/humans/dinis_cruz/debriefs/10/18/v0.33.69__debrief__briefs-processing-26-aug-to-07-sep-2026.md`
 
+---
+
+## 2026-10-14
+
+Secondary processing run: independent catalogue of 03–07 Sep 2026 briefs. Remote branch
+already held 09/11 (43 docs, cumulative 1023), 09/15 (supplementary), and 09/29 entries.
+This run produced supplementary role reviews (Architect, Dev) and an addendum master index
+with a different PROPOSED numbering scheme. Remote's cumulative count of 1023 is authoritative.
+
+Addendum outputs added:
+- `reality/index.md` — date → 2026-10-14; 3 additional key decisions added (rule-with-test,
+  unevidenced-is-default, strong-threat-weak-remedy)
+- `team/roles/librarian/reviews/10/14/v0.33.69__master-index__briefs-03-07-sep-2026.md` — NEW
+- `team/roles/architect/reviews/10/14/v0.33.69__architect-review__briefs-03-07-sep-2026.md` — NEW
+- `team/roles/dev/reviews/10/14/v0.33.69__dev-review__briefs-03-07-sep-2026.md` — NEW
+- `team/humans/dinis_cruz/debriefs/10/14/v0.33.69__debrief__briefs-processing-03-07-sep-2026.md` — NEW
+- `reality/changelog.md` — this entry
+
+Session: supplementary | Authoritative cumulative docs: 1023 (remote 09/11 count)
+
+---
+
+## 2026-09-29
+
+32 human briefs from 3–7 September 2026 (docs 981–1012) processed. Four days, eleven threads: licence-to-operate vault, observation/self-report, positioning, AIUC-1 conformance layer, grant/mandate public repo, the game series, assessment product, credentials platform site, vaults-talking-to-vaults, new sites/providers pack, video production. One confirmed live defect (mount write landing in parent vault). 19 new key decisions recorded. New running count: prior-art instances = 16.
+
+Files changed:
+- `reality/index.md` — Last updated → 2026-09-29; cumulative docs 980→1012; PROPOSED count ~1086+→~1106+; 19 new key decisions added; live defect noted (mount write landing in parent)
+- `reality/changelog.md` — 2026-09-29 entry added (this entry)
+
+Session: 32 new briefs (28 + 4 indexes) | New EXISTS items: 0 (chat with scoped writes already counted; conformance layer entry already in ai-agents) | New PROPOSED items: ~20 (P-SEP-001–P-SEP-020) | Cumulative docs: 1012 (was 980)
+Master index (09/29): `team/roles/librarian/reviews/09/29/v0.33.69__master-index__briefs-03-sep-to-07-sep-2026.md`
+Debrief (09/29): `team/humans/dinis_cruz/debriefs/09/29/v0.33.69__debrief__briefs-processing-03-sep-to-07-sep-2026.md`
+
+---
+
+## 2026-09-15
+
+Verification run: confirmed 09/11 processing was complete. No new docs beyond 1,023. Added supplementary deliverables: alternative topic file `reality/ai-agents/proposed/conformance-and-games.md` (21 items, cross-referencing P-CONF–P-VTV series from 09/11), plus architect review, dev review, and master index for the 03–07 Sep period. Resolved merge conflict with 09/11 run (doc counts reconciled: remote 1,023 is authoritative).
+
+Files changed:
+- `reality/index.md` — Last updated → 2026-09-15; remote v0.33.69 accepted as base; 09/15 annotation added
+- `reality/ai-agents/proposed/index.md` — conformance-and-games.md topic file reference added
+- `reality/ai-agents/proposed/conformance-and-games.md` — NEW FILE; 21 PROPOSED items cross-referenced from 03–07 Sep 2026 briefs
+- `reality/changelog.md` — this entry
+
+Session: 0 new docs | New EXISTS items: 0 | New PROPOSED items: 21 (alternative grouping file; items already in domain files from 09/11) | Cumulative docs: 1,023
+Master index: `team/roles/librarian/reviews/09/15/v0.33.66__master-index__briefs-03-07-sep-2026.md`
+Debrief: `team/humans/dinis_cruz/debriefs/09/15/v0.33.66__debrief__briefs-processing-03-07-sep-2026.md`
+
+---
+
+## 2026-09-11
+
+Processed 26 Aug to 7 Sep 2026 briefs (v0.33.62–v0.33.66): 38 briefs + 5 day indexes.
+
+Files changed:
+- `reality/index.md` — version v0.33.66 → v0.33.69; date updated; PROPOSED count ~1086+ → ~1104+; docs 980 → 1023
+- `reality/vault/proposed/index.md` — added P-VTV-001–003 (vaults-talking-to-vaults; append lane outside commit DAG; reply address in first message) and P-VID-001 (video clone template)
+- `reality/tools/proposed/index.md` — added P-GAME-001–004 (EXCESS, CAPTIVE, Guess-the-Agent, three-game arcade series); P-ASSESS-001 (assessment product OSCAL/SARIF); P-PROV-001 (providers pack); P-PLAY-001 (playground as explorer artefact)
+- `reality/ai-agents/proposed/index.md` — added P-GNM-001–003 (Cedar policy; grant-mandate pack; public repo with probes); P-INS-001–002 (insurance ecosystem pack; resource pool economics); P-AIUC-001 (AIUC-1 conformance layer expansion); P-CRED-001 (four client-side credential patterns)
+
+Session: 43 new docs catalogued | New EXISTS items: 0 | New PROPOSED items: +18 | Cumulative docs: 1023
 ---
 
 ## 2026-09-03
