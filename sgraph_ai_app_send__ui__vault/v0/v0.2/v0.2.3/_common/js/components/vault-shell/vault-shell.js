@@ -565,12 +565,14 @@
         async _mountBrowse(deepLink) {
             const filesView = this.querySelector('.vs-view-files');
             if (!filesView) return;
-            filesView.innerHTML = '<div style="padding:2rem;color:var(--color-text-secondary);">Loading vault files...</div>';
+            filesView.innerHTML = '<div class="vs-loading-files" style="padding:2rem;color:var(--color-text-secondary);">Loading vault files...</div>';
 
             const rootDataSource = new VaultDataSource(this._vault, this._accessKey);
+            const loadingEl = filesView.querySelector('.vs-loading-files');
+            const onProgress = (p) => { if (loadingEl) loadingEl.textContent = `Loading vault files\u2026 ${p.folders.toLocaleString()} folders` + (p.pending ? ` (${p.pending.toLocaleString()} more)` : ''); };
 
             // Load all lazy sub-trees before building the Browse tree
-            await rootDataSource.loadAllSubTrees();
+            await rootDataSource.loadAllSubTrees({ onProgress });
 
             // Wrap so `*.link.json` sub-vaults splice in as inline, expandable folders.
             // Key comes from an ro-links record (silent), else localStorage, else the

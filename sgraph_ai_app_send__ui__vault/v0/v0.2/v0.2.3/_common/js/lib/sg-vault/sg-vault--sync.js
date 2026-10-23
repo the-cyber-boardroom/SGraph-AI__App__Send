@@ -308,6 +308,7 @@
         // --- Load all lazy sub-trees into in-memory tree ------------------------------
 
         async _loadAllSubTreesInMemory() {
+            if (typeof this.loadAllSubTrees === 'function') { await this.loadAllSubTrees(); return }
             const loadNode = async (node, path) => {
                 if (node._loaded === false && node._tree_id) {
                     await this.loadSubTreeOnDemand(path)

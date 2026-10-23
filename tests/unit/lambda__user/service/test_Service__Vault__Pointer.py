@@ -479,6 +479,31 @@ class test_Service__Vault__Pointer(TestCase):
             assert result['results'][i]['status']  == 'ok'
             assert result['results'][i]['data']    == base64.b64encode(data).decode('ascii')
 
+    def test__batch_read__many_files__parallel_keeps_order(self):
+        """batch_read reads the backend in parallel (BATCH_READ_WORKERS) but the results
+        stay in request order, one per operation, absent files included — the clients
+        (CLI batch_read, web batchLoad) match results to requests by position."""
+        from sgraph_ai_app_send.lambda__user.service.Service__Vault__Pointer import BATCH_READ_WORKERS
+        assert BATCH_READ_WORKERS > 1
+        n     = BATCH_READ_WORKERS * 3 + 7                                       # more ops than workers: several rounds
+        files = {f'bare/data/obj-cas-imm-{i:012x}': f'blob-{i}'.encode() for i in range(n)}
+        for fid, data in files.items():
+            self.service.write(self.vault_id, fid, self.write_key, data)
+        ops = [dict(op='read', file_id=fid) for fid in files]
+        ops.insert(5, dict(op='read', file_id='bare/data/obj-cas-imm-000000000000'))   # absent, mid-list
+        result = self.service.batch_read(self.vault_id, ops)
+        assert len(result['results']) == len(ops)
+        for op, r in zip(ops, result['results']):
+            assert r['file_id'] == op['file_id']
+            if op['file_id'] in files:
+                assert r['status'] == 'ok'
+                assert base64.b64decode(r['data']) == files[op['file_id']]
+            else:
+                assert r['status'] == 'not_found'
+                assert 'data' not in r
+        sequential = [self.service._batch_read(self.vault_id, op['file_id']) for op in ops]
+        assert result['results'] == sequential                                   # identical to the one-by-one answer
+
     def test__batch_read__not_found(self):
         """Reading a nonexistent file in batch_read returns not_found."""
         operations = [dict(op='read', file_id='bare/data/ghost')]

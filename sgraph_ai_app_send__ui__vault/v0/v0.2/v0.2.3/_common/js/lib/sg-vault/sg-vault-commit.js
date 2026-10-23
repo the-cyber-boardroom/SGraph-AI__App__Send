@@ -117,13 +117,16 @@ class SGVaultCommit {
 
     async loadTree(treeId) {
         const ciphertext = await this._objectStore.load(treeId)
+        return this.parseTree(ciphertext)
+    }
+
+    // Decrypt a tree object already in hand (bulk loaders fetch many at once, then parse).
+    async parseTree(ciphertext) {
         const plaintext  = await SGSendCrypto.decrypt(ciphertext, this._readKey)
         const tree       = JSON.parse(new TextDecoder().decode(plaintext))
-
         tree.entries = await Promise.all(
-            tree.entries.map(entry => this._decryptTreeEntry(entry))
+            (tree.entries || []).map(entry => this._decryptTreeEntry(entry))
         )
-
         return tree
     }
 

@@ -19,6 +19,7 @@ node tests/unit/vault_ui/loader/test__read_key_creds.js
 node tests/unit/vault_ui/loader/test__sgit_key_prefixes.js
 node tests/unit/vault_ui/loader/test__sgit_interop_vectors.js
 node tests/unit/vault_ui/loader/test__sgit_parity.js
+node tests/unit/vault_ui/loader/test__bulk_subtree_load.js
 node tests/unit/vault_ui/loader/test__vault_loader_open_readonly.js
 node tests/unit/vault_ui/loader/test__vault_settings_readonly.js
 node tests/unit/vault_ui/loader/test__vault_settings_file_listing.js

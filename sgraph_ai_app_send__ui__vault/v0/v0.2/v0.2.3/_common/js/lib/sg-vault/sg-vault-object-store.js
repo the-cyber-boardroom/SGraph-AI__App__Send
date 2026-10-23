@@ -239,11 +239,21 @@ class SGVaultObjectStore {
     }
 
     // --- Batch-load multiple objects by ID ---------------------------------------
-    //     Checks the immutable block cache first; fetches uncached IDs in one
-    //     or more batch requests (chunked at 50). Returns Map<objectId, ArrayBuffer>.
-    //     Missing objects are omitted from the map (caller must handle).
+    //     Checks the immutable block cache first; fetches uncached IDs through the batch
+    //     endpoint, 50 ids per POST (the Lambda's measured comfort zone; the server caps at
+    //     100), with up to `concurrency` POSTs in flight at once — the sgit CLI's
+    //     batch_read fans out the same way (16 workers, measured ~2x the throughput of 8 on
+    //     the live API; HTTP/2 multiplexes them on one connection). A chunk the server
+    //     refuses is split in two and
+    //     retried, down to a single GET, exactly as the CLI does on a 502.
+    //     Returns Map<objectId, ArrayBuffer>. Missing objects are omitted (caller handles).
+    //     opts.onProgress(done, total) is called after every chunk lands.
 
-    async batchLoad(objectIds) {
+    static BATCH_CHUNK       = 50
+    static BATCH_CONCURRENCY = 16
+
+    async batchLoad(objectIds, opts) {
+        opts = opts || {}
         if (!objectIds || !objectIds.length) return new Map()
 
         const unique  = [...new Set(objectIds)]
@@ -259,22 +269,49 @@ class SGVaultObjectStore {
 
         if (!toFetch.length) return result
 
-        const CHUNK = 50
-        for (let i = 0; i < toFetch.length; i += CHUNK) {
-            const chunk = toFetch.slice(i, i + CHUNK)
-            const ops   = chunk.map(({ filePath }) => ({ op: 'read', file_id: filePath }))
-            const raw   = await this._sgSend.vaultBatch(this._vaultId, null, ops)
+        const CHUNK  = opts.chunk || SGVaultObjectStore.BATCH_CHUNK
+        const chunks = []
+        for (let i = 0; i < toFetch.length; i += CHUNK) chunks.push(toFetch.slice(i, i + CHUNK))
+        let done = 0
+        const report = () => { if (opts.onProgress) { try { opts.onProgress(done, toFetch.length) } catch (_) {} } }
 
+        const fetchChunk = async (chunk) => {
+            const ops = chunk.map(({ filePath }) => ({ op: 'read', file_id: filePath }))
+            let raw
+            try {
+                raw = await this._sgSend.vaultBatch(this._vaultId, null, ops)
+            } catch (err) {
+                if (chunk.length > 1) {                                           // refused chunk: split in two (CLI rule)
+                    const mid = Math.ceil(chunk.length / 2)
+                    await fetchChunk(chunk.slice(0, mid)); await fetchChunk(chunk.slice(mid))
+                    return
+                }
+                try {                                                             // a single object: plain GET
+                    const data = await this._sgSend.vaultRead(this._vaultId, chunk[0].filePath)
+                    if (data) { result.set(chunk[0].objectId, data); await this._cachePut(chunk[0].objectId, chunk[0].filePath, data) }
+                } catch (_) {}
+                done += 1; report(); return
+            }
+            // results arrive in request order; match by file_id when the server echoes it, else by position
+            const byFile = new Map()
+            for (let j = 0; j < (raw || []).length; j++) { const r = raw[j]; if (r && r.file_id) byFile.set(r.file_id, r) }
             for (let j = 0; j < chunk.length; j++) {
-                const r                    = raw[j]
                 const { objectId, filePath } = chunk[j]
+                const r = byFile.get(filePath) || (raw && raw[j])
                 if (r && r.status === 'ok' && r.data) {
                     const bytes = SGVaultObjectStore._b64ToAb(r.data)
                     result.set(objectId, bytes)
                     await this._cachePut(objectId, filePath, bytes)
                 }
             }
+            done += chunk.length; report()
         }
+
+        // bounded pool: `concurrency` chunks in flight, each worker pulling the next chunk
+        const concurrency = Math.max(1, Math.min(opts.concurrency || SGVaultObjectStore.BATCH_CONCURRENCY, chunks.length))
+        let next = 0
+        const worker = async () => { while (next < chunks.length) { const c = chunks[next++]; await fetchChunk(c) } }
+        await Promise.all(Array.from({ length: concurrency }, worker))
 
         return result
     }

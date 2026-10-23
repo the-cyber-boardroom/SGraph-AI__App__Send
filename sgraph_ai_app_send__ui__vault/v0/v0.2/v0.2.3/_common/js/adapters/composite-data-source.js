@@ -261,7 +261,7 @@ class CompositeDataSource {
     }
 
     // ── Pass-throughs to the root ────────────────────────────────────────────
-    async loadAllSubTrees()   { return this._root.loadAllSubTrees(); }
+    async loadAllSubTrees(o)  { return this._root.loadAllSubTrees(o); }
     getOrigName()             { return this._root.getOrigName(); }
     getOrigSize()             { return this._root.getOrigSize(); }
     async saveFile(folderPath, fileName, bytes) {

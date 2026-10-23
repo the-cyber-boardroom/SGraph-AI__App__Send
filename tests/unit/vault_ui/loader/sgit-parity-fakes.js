@@ -35,6 +35,10 @@ export function loadVaultLibs() {
     return globalThis;
 }
 
+// The object store's in-memory immutable-block cache is module-level (shared by every store
+// in the process). Tests that count server reads must empty it between "devices".
+export function clearMemCache() { runInThisContext('SG_MEM_CACHE.clear(); SG_MEM_BYTES = 0;'); }
+
 // --- localStorage shim (per process; tests may reset it) -------------------------------
 export function installLocalStorage() {
     const m = new Map();

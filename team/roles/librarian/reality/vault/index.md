@@ -352,6 +352,15 @@ Round-1 and Round-2 review findings addressed after the initial surface landed:
 
 ---
 
+### Bulk sub-tree loading (2026-10-23)
+
+| Item | Status | Evidence |
+|---|---|---|
+| **`SGVault.loadAllSubTrees()`** — streaming tree walk: up to 16 batch POSTs in flight, 50 tree ids each, decrypt in parallel, children queued as they arrive; shared tree ids fetched once; progress per chunk. `VaultDataSource.loadAllSubTrees` and merge's full expansion delegate to it. Measured on a 9,682-folder / 24,866-file vault: 204 POSTs, 24 s, against 7,843 GETs and ~650 s before | **EXISTS** | `sg-vault--folder-ops.js`; `test__bulk_subtree_load.js` (14); changelog `team/comms/changelog/10/23/` |
+| **`SGVaultObjectStore.batchLoad`** — bounded fan-out (16), refused chunk split in two down to a single GET, results matched by `file_id` | **EXISTS** | `sg-vault-object-store.js` |
+| Server `batch_read` reads the backend in parallel (16 workers), request order preserved | **EXISTS** | `Service__Vault__Pointer.py`; `test__batch_read__many_files__parallel_keeps_order` |
+| Progressive rendering of the Browse view while the walk runs | PROPOSED | — |
+
 ### sgit-ai 0.21.0 parity — format gate, shared index, signed commits, rewinds, deterministic trees (2026-10-12)
 
 Verified against the REAL sgit-ai 0.21.0 on this repo's in-memory server (`tests/integration/vault_ui/cli/test__sgit_cli_parity.py`): `sgit check verify` reports every web commit **verified**, `fsck` is OK, the gate / tags / CLI entries survive web pushes, and a CLI-written folder re-encrypted by the web gets the identical tree id.

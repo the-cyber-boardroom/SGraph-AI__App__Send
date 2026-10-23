@@ -8,6 +8,7 @@ import base64
 import hashlib
 import json
 import re
+from   concurrent.futures                                                        import ThreadPoolExecutor
 from   osbot_utils.type_safe.primitives.domains.identifiers.safe_int.Timestamp_Now import Timestamp_Now
 from   memory_fs.storage_fs.Storage_FS                                           import Storage_FS
 from   memory_fs.storage_fs.providers.Storage_FS__Memory                         import Storage_FS__Memory
@@ -19,6 +20,7 @@ from   sgraph_ai_app_send.lambda__user.storage.Storage__Paths                   
                                                                                          path__vault_tombstone        )
 
 VAULT_ID_PATTERN = re.compile(r'^[a-z0-9]{8,24}$')                              # Opaque lowercase alphanumeric, 8–24 chars, no hyphens/uppercase
+BATCH_READ_WORKERS = 16                                                          # parallel backend reads per batch_read (a 50-object batch: ~1.6 s sequential on S3, a few hundred ms in parallel)
 
 
 class Service__Vault__Pointer(Type_Safe):                                        # Opaque blob storage with write-key auth
@@ -245,10 +247,12 @@ class Service__Vault__Pointer(Type_Safe):                                       
         self.storage_fs.file__save(path, json.dumps(public_vault, indent=2).encode())
 
     def batch_read(self, vault_id, operations):                                  # Read-only batch (no auth required — data is encrypted)
-        results = []
-        for op in operations:
-            file_id = op.get('file_id', '')
-            results.append(self._batch_read(vault_id, file_id))
+        file_ids = [op.get('file_id', '') for op in operations]
+        if len(file_ids) <= 1:                                                   # one object: no pool
+            results = [self._batch_read(vault_id, file_id) for file_id in file_ids]
+        else:                                                                    # many objects: read the backend in parallel, keep request order
+            with ThreadPoolExecutor(max_workers=min(BATCH_READ_WORKERS, len(file_ids))) as pool:   # the per-object S3 round trip (~30 ms) was the
+                results = list(pool.map(lambda file_id: self._batch_read(vault_id, file_id), file_ids))  # floor of every clone and tree walk; reads are independent
         return dict(vault_id = vault_id ,
                     results  = results  )
 

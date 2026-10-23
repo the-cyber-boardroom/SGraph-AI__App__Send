@@ -55,7 +55,10 @@ class VaultDataSource {
     }
 
     // Load all lazy sub-trees recursively (call before getTree for full tree)
-    async loadAllSubTrees() {
+    // opts.onProgress — see SGVault.loadAllSubTrees. The recursive walk stays as the fallback
+    // for vault objects without the bulk loader (test fakes).
+    async loadAllSubTrees(opts) {
+        if (this._vault && typeof this._vault.loadAllSubTrees === 'function') return this._vault.loadAllSubTrees(opts);
         await this._loadSubTreesRecursive(this._vault._tree['/'], '/');
     }
 
