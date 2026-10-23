@@ -19,7 +19,7 @@ on:
         default: 'lambda'
         options: [lambda, lambda+fargate, lambda+fargate+ec2]
   schedule:
-    - cron: '0 3 * * *'        # nightly — catches teardown rot early
+    - cron: '0 3 */4 * *'    #  1, 5, 9, 13, 17, 21, 25, 29 of each month, and then it resets on the 1st.
 
 env:
   AWS_REGION: eu-west-2
