@@ -572,7 +572,10 @@
             const onProgress = (p) => { if (loadingEl) loadingEl.textContent = `Loading vault files\u2026 ${p.folders.toLocaleString()} folders` + (p.pending ? ` (${p.pending.toLocaleString()} more)` : ''); };
 
             // Load all lazy sub-trees before building the Browse tree
-            await rootDataSource.loadAllSubTrees({ onProgress });
+            const loaded = await rootDataSource.loadAllSubTrees({ onProgress });
+            if (loaded && loaded.failed && loaded.failed.length) {
+                window.sgraphVault.messages.warn(`${loaded.failed.length} folder(s) could not be loaded and are shown empty \u2014 reload to retry (${loaded.failed[0].reason})`);
+            }
 
             // Wrap so `*.link.json` sub-vaults splice in as inline, expandable folders.
             // Key comes from an ro-links record (silent), else localStorage, else the

@@ -91,5 +91,25 @@ const enc = new TextEncoder();
     ok('all folders loaded with small chunks', r4.folders === expected.folders);
     ok('more than one POST in flight at a time (workers do not die while a peer is parsing)', max4 >= 4, max4);
 
+    console.log('\n[suite] failures are reported, not swallowed');
+    clearMemCache();
+    const sg5 = makeFakeSgSend(server); const orig5b = sg5.vaultBatch, orig5r = sg5.vaultRead;
+    const E = await SGVault.open(sg5, A.getVaultKey(), { signer: null, adoptLegacyClone: false });
+    const victim = Object.values(E._tree['/'].children).find(c => c.type === 'folder')._tree_id;      // one top-level folder's tree
+    sg5.vaultBatch = async (v, w, ops) => { if (ops.some(o => o.file_id.endsWith(victim))) throw new Error('502'); return orig5b(v, w, ops); };
+    sg5.vaultRead  = async (v, f) => { if (f.endsWith(victim)) throw new Error('network down'); return orig5r(v, f); };
+    const r5 = await E.loadAllSubTrees({ chunk: 10 });
+    ok('the unreachable folder is reported with its reason', r5.failed.length === 1 && r5.failed[0].tree_id === victim && /network down/.test(r5.failed[0].reason), JSON.stringify(r5.failed));
+    ok('…and stays lazy (never rendered as loaded)', Object.values(E._tree['/'].children).some(c => c._tree_id === victim && c._loaded === false));
+    ok('every other folder loaded', r5.folders === expected.folders - 1 - 8 - 40, r5.folders);   // the victim's own subtree (1 + 8 + 40 folders) is unreachable
+
+    console.log('\n[suite] concurrent calls share one walk');
+    clearMemCache();
+    const sg6 = makeFakeSgSend(server); let posts6 = 0; const orig6 = sg6.vaultBatch; sg6.vaultBatch = async (v, w, ops) => { posts6++; return orig6(v, w, ops); };
+    const F = await SGVault.open(sg6, A.getVaultKey(), { signer: null, adoptLegacyClone: false });
+    const [ra, rb] = await Promise.all([F.loadAllSubTrees(), F.loadAllSubTrees()]);
+    ok('both callers get the same result object', ra === rb && ra.folders === expected.folders);
+    ok('no duplicate requests', posts6 === ra.requests, `${posts6} vs ${ra.requests}`);
+
     console.log(`\n[result] ${pass} passed, ${fail} failed`); process.exit(fail ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });

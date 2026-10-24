@@ -504,6 +504,26 @@ class test_Service__Vault__Pointer(TestCase):
         sequential = [self.service._batch_read(self.vault_id, op['file_id']) for op in ops]
         assert result['results'] == sequential                                   # identical to the one-by-one answer
 
+    def test__batch_read__backend_error_fails_only_that_object(self):
+        """A backend exception while reading one object (S3 SlowDown, a timeout) yields
+        status 'error' for that operation; the others in the batch still succeed."""
+        from memory_fs.storage_fs.providers.Storage_FS__Memory import Storage_FS__Memory
+        class Flaky_FS(Storage_FS__Memory):
+            def file__bytes(self, path):
+                if 'obj-bad' in str(path):
+                    raise RuntimeError('SlowDown')
+                return super().file__bytes(path)
+        service = Service__Vault__Pointer(storage_fs=Flaky_FS())
+        service.write(self.vault_id, 'bare/data/obj-good', self.write_key, b'ok')
+        service.write(self.vault_id, 'bare/data/obj-bad',  self.write_key, b'never read')
+        result = service.batch_read(self.vault_id, [dict(op='read', file_id='bare/data/obj-good'),
+                                                    dict(op='read', file_id='bare/data/obj-bad'),
+                                                    dict(op='read', file_id='bare/data/obj-absent')])
+        statuses = [r['status'] for r in result['results']]
+        assert statuses == ['ok', 'error', 'not_found']
+        assert result['results'][1]['detail'] == 'RuntimeError'
+        assert 'data' not in result['results'][1]
+
     def test__batch_read__not_found(self):
         """Reading a nonexistent file in batch_read returns not_found."""
         operations = [dict(op='read', file_id='bare/data/ghost')]

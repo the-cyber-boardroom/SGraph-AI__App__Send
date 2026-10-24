@@ -247,7 +247,13 @@ class SGVaultObjectStore {
     //     refuses is split in two and
     //     retried, down to a single GET, exactly as the CLI does on a 502.
     //     Returns Map<objectId, ArrayBuffer>. Missing objects are omitted (caller handles).
+    //     opts.failures (a Map) records WHY an id is missing — 'not_found' (the server says so),
+    //     'error' (the server answered but could not read it), or the message of the request
+    //     that failed — so a caller can tell an absent object from a network problem (the CLI's
+    //     batch_read does the same with its `failures` dict). Without it a failure is silent.
     //     opts.onProgress(done, total) is called after every chunk lands.
+    //     Cache writes are not awaited: the in-memory tier is filled synchronously, the Cache API
+    //     tier in the background (one awaited put per object was ~2 ms × 10,000 on a big vault).
 
     static BATCH_CHUNK       = 50
     static BATCH_CONCURRENCY = 16
@@ -269,8 +275,9 @@ class SGVaultObjectStore {
 
         if (!toFetch.length) return result
 
-        const CHUNK  = opts.chunk || SGVaultObjectStore.BATCH_CHUNK
-        const chunks = []
+        const CHUNK    = opts.chunk || SGVaultObjectStore.BATCH_CHUNK
+        const failures = opts.failures instanceof Map ? opts.failures : null
+        const chunks   = []
         for (let i = 0; i < toFetch.length; i += CHUNK) chunks.push(toFetch.slice(i, i + CHUNK))
         let done = 0
         const report = () => { if (opts.onProgress) { try { opts.onProgress(done, toFetch.length) } catch (_) {} } }
@@ -288,8 +295,9 @@ class SGVaultObjectStore {
                 }
                 try {                                                             // a single object: plain GET
                     const data = await this._sgSend.vaultRead(this._vaultId, chunk[0].filePath)
-                    if (data) { result.set(chunk[0].objectId, data); await this._cachePut(chunk[0].objectId, chunk[0].filePath, data) }
-                } catch (_) {}
+                    if (data) { result.set(chunk[0].objectId, data); this._cachePut(chunk[0].objectId, chunk[0].filePath, data) }
+                    else if (failures) failures.set(chunk[0].objectId, 'not_found')
+                } catch (e) { if (failures) failures.set(chunk[0].objectId, (e && e.message) || 'request failed') }
                 done += 1; report(); return
             }
             // results arrive in request order; match by file_id when the server echoes it, else by position
@@ -301,7 +309,9 @@ class SGVaultObjectStore {
                 if (r && r.status === 'ok' && r.data) {
                     const bytes = SGVaultObjectStore._b64ToAb(r.data)
                     result.set(objectId, bytes)
-                    await this._cachePut(objectId, filePath, bytes)
+                    this._cachePut(objectId, filePath, bytes)                      // not awaited: see above
+                } else if (failures) {
+                    failures.set(objectId, (r && r.status) || 'no result')
                 }
             }
             done += chunk.length; report()

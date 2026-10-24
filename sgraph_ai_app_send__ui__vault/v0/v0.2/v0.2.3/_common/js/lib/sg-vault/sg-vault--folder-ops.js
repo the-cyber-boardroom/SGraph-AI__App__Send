@@ -135,10 +135,19 @@
         // A tree id shared by several folders is fetched once. Immutable objects land in the
         // block cache, so a second open of the same vault reads them locally.
         //   opts.onProgress({ folders, pending }) after every chunk; opts.chunk / opts.concurrency
-        // Returns { folders, requests } — folders = trees loaded by this call.
+        // Returns { folders, requests, failed } — folders = trees loaded by this call; failed =
+        // [{ tree_id, reason }] for folders that could NOT be loaded and stay lazy (they render
+        // empty until a reload). The walk never throws for a missing tree: a vault that is 99 %
+        // loaded is better shown than not shown, but the caller must surface `failed`.
+        // Concurrent calls share one walk (the shells and the app page both call this on open).
 
         async loadAllSubTrees(opts) {
-            opts = opts || {}
+            if (this._bulkLoad) return this._bulkLoad
+            this._bulkLoad = this._loadAllSubTreesNow(opts || {}).finally(() => { this._bulkLoad = null })
+            return this._bulkLoad
+        },
+
+        async _loadAllSubTreesNow(opts) {
             const CHUNK = opts.chunk       || SGVaultObjectStore.BATCH_CHUNK
             const CONC  = opts.concurrency || SGVaultObjectStore.BATCH_CONCURRENCY
 
@@ -158,7 +167,8 @@
             collect(this._tree['/'])
 
             let folders = 0, requests = 0, inFlight = 0, active = 0
-            const report = () => { if (opts.onProgress) { try { opts.onProgress({ folders, pending: pending.length + inFlight }) } catch (_) {} } }
+            const failures = new Map()
+            const report = () => { if (opts.onProgress) { try { opts.onProgress({ folders, pending: pending.length + inFlight, failed: failures.size }) } catch (_) {} } }
 
             const take = () => pending.splice(0, CHUNK)
             // `active` counts RUNNING tasks (fetch + parse + enqueue), not ids: a worker must not
@@ -167,13 +177,13 @@
             const run  = async (ids) => {
               active++; inFlight += ids.length; requests++
               try {
-                const ciphers = await this._objectStore.batchLoad(ids, { chunk: CHUNK, concurrency: 1 })
+                const ciphers = await this._objectStore.batchLoad(ids, { chunk: CHUNK, concurrency: 1, failures })
                 inFlight -= ids.length
                 await Promise.all(ids.map(async (id) => {
                     const ct = ciphers.get(id)
-                    if (!ct) return                                                  // missing / refused: stays lazy
+                    if (!ct) { if (!failures.has(id)) failures.set(id, 'missing'); return }   // stays lazy
                     let tree
-                    try { tree = await this._commitManager.parseTree(ct) } catch (_) { return }
+                    try { tree = await this._commitManager.parseTree(ct) } catch (e) { failures.set(id, 'undecryptable: ' + (e && e.message)); return }
                     for (const node of byId.get(id) || []) {
                         if (node._loaded !== false) continue
                         this._applySubTree(node, tree)
@@ -200,7 +210,9 @@
                 }
             }
             await Promise.all(Array.from({ length: Math.max(1, CONC) }, worker))
-            return { folders, requests }
+            const failed = Array.from(failures, ([tree_id, reason]) => ({ tree_id, reason }))
+            if (failed.length) console.warn(`[sg-vault] loadAllSubTrees: ${failed.length} folder(s) could not be loaded and stay empty`, failed.slice(0, 5))
+            return { folders, requests, failed }
         },
 
         needsLoading(folderPath) {
