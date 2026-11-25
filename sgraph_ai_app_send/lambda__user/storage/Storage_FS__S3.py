@@ -267,6 +267,52 @@ class Storage_FS__S3(Storage_FS):                                               
                 return False
             raise
 
+    # --- append blobs (v2 Phase 3) -------------------------------------------------------
+
+    def folder__files__sizes(self, parent_folder, up_to: int) -> list:          # [(name relative to the folder, size)] for up to up_to keys, in key order
+        client = self._s3().s3()
+        prefix = self._folder_prefix(parent_folder)
+        params = dict(Bucket=self.s3_bucket, Prefix=prefix)
+        items  = []
+        while len(items) < up_to:
+            params['MaxKeys'] = min(1000, up_to - len(items))
+            response = client.list_objects_v2(**params)
+            items.extend((item['Key'][len(prefix):], item.get('Size', 0)) for item in response.get('Contents', []))
+            if not response.get('IsTruncated'):
+                break
+            params['ContinuationToken'] = response['NextContinuationToken']
+        return items[:up_to]
+
+    def file__save__tagged(self, path, data: bytes, tags: dict) -> bool:         # PutObject with object tags (reservations carry a 1-day retention tag)
+        from urllib.parse import urlencode
+        self._s3().s3().put_object(Bucket=self.s3_bucket, Key=self.s3_key(path), Body=data, Tagging=urlencode(tags or {}))
+        return True
+
+    def presigned__put(self, path, size: int, checksum_sha256_b64: str, tags: dict, expires_in: int) -> dict:
+        from urllib.parse import urlencode                                       # every condition is a signed header (AS-9): size, hash, create-only, type, tags
+        headers = {'Content-Length'        : str(size)                 ,
+                   'Content-Type'          : 'application/octet-stream',
+                   'If-None-Match'         : '*'                       ,
+                   'x-amz-checksum-sha256' : checksum_sha256_b64       }
+        params  = dict(Bucket        = self.s3_bucket            ,
+                       Key           = self.s3_key(path)         ,
+                       ContentLength = size                      ,
+                       ContentType   = 'application/octet-stream',
+                       IfNoneMatch   = '*'                       ,
+                       ChecksumSHA256= checksum_sha256_b64       )
+        if tags:
+            params ['Tagging']       = urlencode(tags)
+            headers['x-amz-tagging'] = params['Tagging']
+        url = self._s3().s3().generate_presigned_url('put_object', Params=params, ExpiresIn=expires_in)
+        return dict(url=url, headers=headers)
+
+    def presigned__get(self, path, expires_in: int) -> str:                      # served as an opaque download: a token writer can upload any bytes, HTML included (I-3)
+        params = dict(Bucket                     = self.s3_bucket            ,
+                      Key                        = self.s3_key(path)         ,
+                      ResponseContentType        = 'application/octet-stream',
+                      ResponseContentDisposition = 'attachment'              )
+        return self._s3().s3().generate_presigned_url('get_object', Params=params, ExpiresIn=expires_in)
+
     def files__paths(self) -> List[Safe_Str__File__Path]:                       # List all file paths in bucket
         prefix  = self.s3_prefix if self.s3_prefix else ''
         s3_keys = self._s3().find_files(bucket=self.s3_bucket, prefix=prefix)

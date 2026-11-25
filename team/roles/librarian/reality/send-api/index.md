@@ -57,7 +57,7 @@ Read-base64 response size limited to 3.75MB (Lambda response limit).
 Destroy without `purge` writes a tombstone at `vault/{id[:2]}/{id}/deleted.json` to block vault_id reuse.
 Destroy with `purge: true` skips the tombstone — vault_id is fully reusable afterwards.
 
-### Vault Append (`/vault/append/*`) — 9 endpoints
+### Vault Append (`/vault/append/*`) — 12 endpoints
 
 Generic append-only, gate-controlled storage primitive. Not messaging-specific — same infrastructure
 serves logs, signals, control messages, state flows, and email-style workflows.
@@ -80,7 +80,10 @@ without requiring both parties to have SGraph accounts.
 | POST | `/vault/append/mark-processed/{vault_id}` | Move entries pending → processed (copy+delete, idempotent). Since v2 Phase 2: on S3, a lane with `retention_days` tags the copy `sg-retention=<N>d` | enum_key (header) | Yes |
 | POST | `/vault/append/unmark/{vault_id}` | **v2 Phase 2.** Move entries processed → pending; hard limit applies (`refused`); clears object tags; unknown lane mode → 401 `lane_mode_unsupported`; bad key → **401** | enum_key (header) | Yes |
 | POST | `/vault/append/stats/{vault_id}` | **v2 Phase 2.** One lane (`{inbox}`): pending count/bytes/oldest/newest, processed (capped 10,000), soft/hard/bytes limits, `over_soft`, `retention_days`; cached 30 s per instance; bad key → **401** | enum_key (header) | Yes |
-| POST | `/vault/append/purge/{vault_id}` | Delete entries from pending or processed (batched, max 100) | write_key (header) | Yes |
+| POST | `/vault/append/blob-upload/{vault_id}` | **v2 Phase 3.** `{append_token, size, sha256}` → one presigned, create-only S3 PUT (300 s) with size, hash, type and tag signed; reserves budget first (fixed-condition 507); 400 `blobs_disabled`, 413 `blob_too_large`, 401 auth / `lane_mode_unsupported`, **501 `presigned_not_available`** off S3 | append_token (body) | Yes |
+| POST | `/vault/append/blob-url/{vault_id}` | **v2 Phase 3.** `{inbox, blob_ids}` (≤ 100) → presigned GETs (300 s, `application/octet-stream`, `attachment`) + `missing`; 501 off S3; bad key → 401 | enum_key (header) | Yes |
+| POST | `/vault/append/blob-delete/{vault_id}` | **v2 Phase 3.** Delete named blobs (a keeper's orphan cleanup) → `{deleted, missing}`; bad key → 401 | enum_key (header) | Yes |
+| POST | `/vault/append/purge/{vault_id}` | Delete entries from pending or processed (batched, max 100). Since v2 Phase 3: `folder: "blobs"` (named blob ids, or the lane's blobs and reservations) | write_key (header) | Yes |
 
 **Edge rewrites API 403 → static `404.html` — measured 7 Sep 2026, NOT an API defect.** The
 CDN in front of `send.sgraph.ai` applies the static site's `403 → /404.html` custom error
@@ -120,13 +123,17 @@ token and hashes it). Breaking change for existing lanes — needs migration.
 **Storage model:** Files stored inside `bare/append/` under the vault tree (managed-but-unversioned by sgit):
 - Pending: `{_ROOT}/vault/{vault_id[:2]}/{vault_id}/bare/append/{token}/pending/{timestamp}_{random}.enc`
 - Processed: `{_ROOT}/vault/{vault_id[:2]}/{vault_id}/bare/append/{token}/processed/{filename}`
+- Blobs (v2 Phase 3): `{_ROOT}/vault/{vault_id[:2]}/{vault_id}/bare/append/blobs/{sha256(token)}/{sha256(ciphertext)}`; reservations alongside at `…/blobs/{sha256(token)}/.reserved/{expires_ms}_{size}_{blob_id}` (empty objects, tag `sg-retention=1d`). `blobs` is not hex, so lane discovery skips it. Vault delete removes them with everything else under the vault prefix; `list_files` never returns them (only `/payload` keys)
 - Config: `{_ROOT}/vault/{vault_id[:2]}/{vault_id}/bare/append/config.json` — keys `append_anchors`, `enum_key_hash` (legacy, scope `*`), `enum_keys` (scoped), `lane_defaults`, `lanes` (v2 Phase 2; older code ignores the new keys)
 
 **LocalStack S3 integration tests — EXIST since v2 Phase 1/2 (2026-11-25):**
-`tests/unit/lambda__user/storage/test_Storage_FS__S3__LocalStack.py` (11; skipped when LocalStack is not
+`tests/unit/lambda__user/storage/test_Storage_FS__S3__LocalStack.py` (14; skipped when LocalStack is not
 reachable — the CI workflow does not start it, so these run locally only): early-stop count, `StartAfter`
 paging across 1,000 keys, delimiter discovery, `CopyObject`, usage, tags set/cleared on copy,
-`If-None-Match`, `If-Match` (skips on LocalStack 3, which ignores it), and the append service end to end.
+`If-None-Match`, `If-Match` (skips on LocalStack 3, which ignores it), the append service end to end, and
+(Phase 3) a real presigned blob PUT/GET round trip, a wrong hash refused by S3, and 50 URLs issued before any
+upload staying inside the budget. The signed-header list is pinned offline in
+`test_Storage_FS__S3__Presign.py` (3, runs in CI).
 
 ### Vault Zip (`/vault/zip/*`) — 1 endpoint
 

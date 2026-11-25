@@ -10,12 +10,14 @@ import hashlib
 import json
 import os
 import random
+import urllib.error
 import urllib.request
 from   unittest                                                                    import TestCase, SkipTest
 from   sgraph_ai_app_send.lambda__user.service.Service__Vault__Append              import Service__Vault__Append
 from   sgraph_ai_app_send.lambda__user.storage.Storage_FS__S3                      import Storage_FS__S3
 from   sgraph_ai_app_send.lambda__user.storage.Storage__Append__Listing            import Storage__Append__Listing
 from   sgraph_ai_app_send.lambda__user.storage.Storage__Paths                      import (path__vault_manifest       ,
+                                                                                          path__vault_append_blob    ,
                                                                                           path__vault_append_pending ,
                                                                                           path__vault_append_processed)
 
@@ -169,3 +171,58 @@ class test_Storage_FS__S3__LocalStack(TestCase):
         assert self.storage.file__tags(path__vault_append_pending(vault_id, token, ids[0])) == {}
         stats = service.stats(vault_id, enum_key, token)
         assert (stats['pending'], stats['pending_bytes'], stats['processed'], stats['hard_pending'], stats['retention_days']) == (2, 6, 1, 50, 30)
+
+    # --- v2 Phase 3: blobs ---------------------------------------------------------------------
+
+    def _blob_lane(self, vault_id, seed, **lane):
+        write_key, enum_key = f'ls-write-{seed}', hashlib.sha256(f'ls-enum-{seed}'.encode()).hexdigest()
+        token   = hashlib.sha256(f'ls-lane-{seed}'.encode()).hexdigest()
+        service = Service__Vault__Append(storage_fs=self.storage)
+        assert service.configure(vault_id, write_key, append_anchors=[hashlib.sha256(token.encode()).hexdigest()],
+                                 enum_key_hash=hashlib.sha256(enum_key.encode()).hexdigest())['status'] == 'configured'
+        lane = dict(dict(blobs=True, blob_retention_days=7), **lane)
+        assert service.configure(vault_id, write_key, lanes={hashlib.sha256(token.encode()).hexdigest(): lane})['status'] == 'configured'
+        return service, token, enum_key, write_key
+
+    @staticmethod
+    def _http(method, url, body=None, headers=None):                            # (status, body bytes, response headers)
+        request = urllib.request.Request(url, data=body, method=method,
+                                         headers={k: v for k, v in (headers or {}).items() if k.lower() != 'content-length'})  # urllib sets it from the body
+        try:
+            with urllib.request.urlopen(request, timeout=10) as response:
+                return response.status, response.read(), dict(response.headers)
+        except urllib.error.HTTPError as error:
+            return error.code, error.read(), dict(error.headers)
+
+    def test__phase3__blob_put_get_round_trip(self):
+        service, token, enum_key, write_key = self._blob_lane('lsvault0003', 'p3')
+        ciphertext = os.urandom(300_000)
+        blob_id    = hashlib.sha256(ciphertext).hexdigest()
+        upload     = service.blob_upload('lsvault0003', token, len(ciphertext), blob_id)
+        assert upload['status'] == 'ok' and upload['expires_in'] == 300
+        assert self._http('PUT', upload['upload_url'], ciphertext, upload['headers'])[0] == 200
+        assert self._http('PUT', upload['upload_url'], ciphertext, upload['headers'])[0] == 412     # create-only: the same blob again is "already there"
+        lane_hash = hashlib.sha256(token.encode()).hexdigest()
+        assert self.storage.file__tags(path__vault_append_blob('lsvault0003', lane_hash, blob_id)) == {'sg-retention': '7d'}
+        urls = service.blob_url('lsvault0003', enum_key, token, [blob_id, 'f' * 64])
+        assert urls['missing'] == ['f' * 64] and urls['urls'][0]['size'] == len(ciphertext)
+        status, body, headers = self._http('GET', urls['urls'][0]['url'])
+        assert status == 200 and body == ciphertext
+        assert headers.get('Content-Type') == 'application/octet-stream' and headers.get('Content-Disposition') == 'attachment'
+        assert service.blob_delete('lsvault0003', enum_key, token, [blob_id])['deleted'] == [blob_id]
+        assert service.blob_url('lsvault0003', enum_key, token, [blob_id])['missing'] == [blob_id]
+
+    def test__phase3__a_wrong_hash_is_refused_by_s3(self):
+        service, token, _, _ = self._blob_lane('lsvault0004', 'p3-hash')
+        ciphertext = os.urandom(1000)
+        upload     = service.blob_upload('lsvault0004', token, len(ciphertext), hashlib.sha256(b'something else').hexdigest())
+        status     = self._http('PUT', upload['upload_url'], ciphertext, upload['headers'])[0]
+        if status == 200:
+            self.skipTest('this S3 backend does not verify x-amz-checksum-sha256 on a presigned PUT; AWS S3 answers 400 BadDigest')
+        assert status == 400
+
+    def test__phase3__fifty_urls_before_any_upload_cannot_exceed_the_budget(self):   # AS-2, security test 2
+        service, token, _, _ = self._blob_lane('lsvault0005', 'p3-budget', max_pending_bytes=10 * 1024 * 1024, max_blob_bytes=4 * 1024 * 1024)
+        statuses = [service.blob_upload('lsvault0005', token, 1024 * 1024, hashlib.sha256(f'b{i}'.encode()).hexdigest())['status'] for i in range(50)]
+        assert statuses.count('ok') == 7 and set(statuses[7:]) == {'at_capacity'}      # 6 MiB reserved + 4 MiB max blob = the 10 MiB budget
+        assert service.blob_upload('lsvault0005', token, 1, hashlib.sha256(b'tiny').hexdigest())['status'] == 'at_capacity'   # size never changes the answer

@@ -7,7 +7,8 @@
 #   append_anchors : [sha256(token), …]
 #   enum_key_hash  : sha256(enum_key)                       — legacy read key, scope "*"
 #   enum_keys      : {sha256(key): {"lanes": [sha256(token), …] | "*"}}
-#   lane_defaults  : {soft_pending, hard_pending, max_pending_bytes, retention_days}
+#   lane_defaults  : {soft_pending, hard_pending, max_pending_bytes, retention_days,
+#                     blobs, max_blob_bytes, blob_retention_days}
 #   lanes          : {sha256(token): {same fields}}
 # ===============================================================================
 
@@ -21,6 +22,8 @@ TOKEN_LANE_HARD_CEILING     = 5_000                                             
 TOKEN_LANE_BYTES_CEILING    = 1024 ** 3                                          # 1 GiB
 LANE_BYTES_FLOOR            = 10 * 1024 * 1024                                   # a budget must hold at least two maximum payloads
 APPEND_RETENTION_CLASSES    = (1, 3, 7, 30, 90, 365)                             # days; absent = kept until purged
+BLOB_RETENTION_CHOICES      = (0,) + APPEND_RETENTION_CLASSES                    # blobs: an explicit choice is required; 0 = kept until purged (AS-8, plan 3.2)
+TOKEN_LANE_BLOB_CEILING     = 25 * 1024 * 1024                                   # decision 2: 25 MiB per blob on token lanes (signed lanes: Phase 4)
 MAX_ANCHORS                 = 256
 MAX_LANES                   = 64
 MAX_ENUM_KEYS               = 16
@@ -29,7 +32,8 @@ CONFIGURE_MAX_BODY          = 64 * 1024
 HEX64                       = re.compile(r'^[0-9a-f]{64}\Z')
 CONFIGURE_FIELDS            = ('append_anchors', 'enum_key_hash', 'legacy_enum_key', 'remove_legacy_enum_key',
                                'add_enum_keys', 'remove_enum_keys', 'lane_defaults', 'lanes')
-LANE_FIELDS                 = ('soft_pending', 'hard_pending', 'max_pending_bytes', 'retention_days')
+LANE_FIELDS                 = ('soft_pending', 'hard_pending', 'max_pending_bytes', 'retention_days',
+                               'blobs', 'max_blob_bytes', 'blob_retention_days')
 
 
 class Vault__Append__Config__Error(Exception):
@@ -39,18 +43,27 @@ class Vault__Append__Config__Error(Exception):
 class Vault__Append__Config(Type_Safe):
     hard_ceiling  : int = TOKEN_LANE_HARD_CEILING
     bytes_ceiling : int = TOKEN_LANE_BYTES_CEILING
+    blob_ceiling  : int = TOKEN_LANE_BLOB_CEILING
 
     # --- reading ------------------------------------------------------------------------
 
     def lane_settings(self, config, lane_hash):                                  # effective settings for one lane: defaults < lane_defaults < lanes[h]
-        settings = dict(soft_pending=None, hard_pending=APPEND_DEFAULT_HARD_PENDING, max_pending_bytes=None, retention_days=None, mode=None)
+        settings = dict(soft_pending=None, hard_pending=APPEND_DEFAULT_HARD_PENDING, max_pending_bytes=None, retention_days=None,
+                        blobs=False, max_blob_bytes=None, blob_retention_days=None, mode=None)
         for layer in ((config or {}).get('lane_defaults') or {}, ((config or {}).get('lanes') or {}).get(lane_hash) or {}):
             for key, value in layer.items():
                 if key in settings:
                     settings[key] = value
         if settings['soft_pending'] is None:
             settings['soft_pending'] = settings['hard_pending']
+        if settings['max_blob_bytes'] is None:
+            settings['max_blob_bytes'] = self.blob_ceiling
         return settings
+
+    def lane_budget(self, settings):                                             # bytes the lane may hold; a blob lane always has one (public tokens must not fill storage)
+        if settings.get('max_pending_bytes'):
+            return settings['max_pending_bytes']
+        return self.bytes_ceiling if settings.get('blobs') else None
 
     @staticmethod
     def enum_scope(config, key_hash):                                            # "*" (every lane), a set of lane hashes, or None (not a read key of this vault)
@@ -101,7 +114,9 @@ class Vault__Append__Config(Type_Safe):
             if lane_hash not in (new.get('append_anchors') or []):
                 raise Vault__Append__Config__Error('lane settings must name one of the append_anchors')
             self._check_soft_hard(self.lane_settings(new, lane_hash), f'lanes[{lane_hash[:8]}…]')
+            self._check_blobs    (self.lane_settings(new, lane_hash), f'lanes[{lane_hash[:8]}…]')
         self._check_soft_hard(self.lane_settings(new, None), 'lane_defaults')
+        self._check_blobs    (self.lane_settings(new, None), 'lane_defaults')
         return new, ignored
 
     def _merge_enum_keys(self, new, request, ignored):
@@ -205,6 +220,18 @@ class Vault__Append__Config(Type_Safe):
             raise Vault__Append__Config__Error(f'{label}: max_pending_bytes must be between {LANE_BYTES_FLOOR} and {self.bytes_ceiling}')
         if key == 'retention_days' and value not in APPEND_RETENTION_CLASSES:
             raise Vault__Append__Config__Error(f'{label}: retention_days must be one of {APPEND_RETENTION_CLASSES} (or null for none)')
+        if key == 'max_blob_bytes' and not 1 <= value <= self.blob_ceiling:
+            raise Vault__Append__Config__Error(f'{label}: max_blob_bytes must be between 1 and {self.blob_ceiling}')
+        if key == 'blob_retention_days' and value not in BLOB_RETENTION_CHOICES:
+            raise Vault__Append__Config__Error(f'{label}: blob_retention_days must be one of {BLOB_RETENTION_CHOICES} (0 = kept until purged)')
+
+    def _check_blobs(self, settings, label):                                     # cross-field rules for a lane with blobs on
+        if not settings.get('blobs'):
+            return
+        if settings.get('blob_retention_days') is None:
+            raise Vault__Append__Config__Error(f'{label}: blobs need an explicit blob_retention_days (one of {BLOB_RETENTION_CHOICES}; 0 = kept until purged)')
+        if settings['max_blob_bytes'] > self.lane_budget(settings):
+            raise Vault__Append__Config__Error(f'{label}: max_blob_bytes cannot exceed the lane byte budget (max_pending_bytes)')
 
     @staticmethod
     def _check_soft_hard(settings, label):

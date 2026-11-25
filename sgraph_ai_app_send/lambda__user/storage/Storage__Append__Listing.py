@@ -64,6 +64,32 @@ class Storage__Append__Listing(Type_Safe):
         self.storage_fs.file__save(target_path, file_bytes)                      # memory/disk have no object tags: retention is swept on access instead
         return True
 
+    # --- blobs (v2 Phase 3) ---------------------------------------------------------------
+
+    def sizes(self, folder, up_to):                                              # [(name relative to folder, size)] in key order, at most up_to
+        if self._has('folder__files__sizes'):
+            return self.storage_fs.folder__files__sizes(folder, up_to)
+        prefix = str(folder).rstrip('/') + '/'
+        items  = []
+        for path in sorted(str(path) for path in self.storage_fs.folder__files__all(folder)):
+            if path.startswith(prefix):
+                items.append((path[len(prefix):], len(self.storage_fs.file__bytes(path) or b'')))
+        return items[:up_to]
+
+    def save_tagged(self, path, data, tags):                                     # tags only exist on S3; elsewhere the service sweeps expired reservations itself
+        if self._has('file__save__tagged'):
+            return self.storage_fs.file__save__tagged(path, data, tags)
+        return self.storage_fs.file__save(path, data)
+
+    def can_presign(self):                                                       # presigned URLs need S3 (memory/disk answer 501 presigned_not_available)
+        return self._has('presigned__put')
+
+    def presign_put(self, path, size, checksum_sha256_b64, tags, expires_in):
+        return self.storage_fs.presigned__put(path, size, checksum_sha256_b64, tags, expires_in)
+
+    def presign_get(self, path, expires_in):
+        return self.storage_fs.presigned__get(path, expires_in)
+
     # --- conditional writes (config.json) -----------------------------------------------
 
     def read_versioned(self, path):                                              # (bytes, version) — version is the S3 etag, or a content hash elsewhere

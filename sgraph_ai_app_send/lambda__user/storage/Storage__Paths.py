@@ -62,3 +62,14 @@ def path__vault_append_processed(vault_id: str, token: str, file_name: str) -> s
 
 def path__vault_append_processed_prefix(vault_id: str, token: str) -> str:
     return f'{_ROOT}/vault/{vault_id[:2]}/{vault_id}/bare/append/{token}/processed/'
+
+# Append blobs (v2 Phase 3): keyed by sha256(token), never the raw token (I-4), under a folder whose
+# name ("blobs") is not hex, so lane discovery never mistakes it for a lane.
+def path__vault_append_blobs_prefix(vault_id: str, lane_hash: str) -> str:
+    return f'{_ROOT}/vault/{vault_id[:2]}/{vault_id}/bare/append/blobs/{lane_hash}/'
+
+def path__vault_append_blob(vault_id: str, lane_hash: str, blob_id: str) -> str:
+    return f'{_ROOT}/vault/{vault_id[:2]}/{vault_id}/bare/append/blobs/{lane_hash}/{blob_id}'
+
+def path__vault_append_blob_reservation(vault_id: str, lane_hash: str, name: str) -> str:
+    return f'{_ROOT}/vault/{vault_id[:2]}/{vault_id}/bare/append/blobs/{lane_hash}/.reserved/{name}'

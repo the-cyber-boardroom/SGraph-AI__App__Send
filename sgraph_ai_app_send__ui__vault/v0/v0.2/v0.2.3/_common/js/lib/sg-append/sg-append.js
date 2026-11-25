@@ -24,6 +24,11 @@
      | markProcessed  | POST /mark-processed/{vid}   | x-sgraph-vault-enum-key                      |
      | unmark         | POST /unmark/{vault_id}      | x-sgraph-vault-enum-key (v2: processed → pending) |
      | stats          | POST /stats/{vault_id}       | x-sgraph-vault-enum-key (v2: one lane's counts)   |
+     | configureLanes | POST /configure/{vault_id}   | owner headers (v2: lane limits, blobs, read keys — never anchors) |
+     | blobUpload     | POST /blob-upload/{vid}      | (none — append_token in the body; v2 Phase 3, cross-vault like write) |
+     | putBlob        | PUT <presigned S3 URL>       | the exact headers blobUpload returned (no API call)  |
+     | blobUrl        | POST /blob-url/{vault_id}    | x-sgraph-vault-enum-key (v2 Phase 3: presigned GETs) |
+     | blobDelete     | POST /blob-delete/{vid}      | x-sgraph-vault-enum-key (v2 Phase 3)              |
      | purge          | POST /purge/{vault_id}       | x-sgraph-vault-write-key + x-sgraph-access-token |
 
    enum_key derivation (Q1, recommended form — locked here):
@@ -86,6 +91,64 @@ class SGAppend {
         if (append_anchors !== undefined) body.append_anchors = append_anchors
         if (this.enumKey) body.enum_key_hash = await SGAppend.deriveEnumKeyHash(this.enumKey)
         return this._post(this._vaultPath('configure'), body, this._ownerHeaders())
+    }
+
+    async configureLanes(settings = {}) {                                       // v2 owner settings; never touches append_anchors or the legacy enum_key_hash
+        const body = {}
+        for (const key of SGAppend.LANE_CONFIG_FIELDS) {
+            if (settings[key] !== undefined) body[key] = settings[key]
+        }
+        if (!Object.keys(body).length) throw SGAppend._err('EINVAL', `configureLanes: pass at least one of ${SGAppend.LANE_CONFIG_FIELDS.join(', ')}`)
+        return this._post(this._vaultPath('configure'), body, this._ownerHeaders())
+    }
+
+    async blobUpload({ vault_id, append_token, size, sha256 } = {}) {          // v2 Phase 3: ask for one presigned PUT on a REMOTE vault's lane (append token gate)
+        if (!vault_id)     throw SGAppend._err('EINVAL', 'vault_id (target) required')
+        SGAppend._assertVaultId(vault_id, 'blobUpload')
+        if (!append_token) throw SGAppend._err('EINVAL', 'append_token required')
+        if (!Number.isInteger(size) || size < 1) throw SGAppend._err('EINVAL', 'size must be a positive integer (the ciphertext length)')
+        SGAppend._assertBlobIds([sha256])
+        return this._post(`/blob-upload/${vault_id}`, { append_token, size, sha256 }, {})
+    }
+
+    async putBlob(upload, bytes) {                                              // PUT the ciphertext to S3 with the signed headers; 412 = already there (success)
+        if (!upload || !upload.upload_url || !upload.headers) throw SGAppend._err('EINVAL', 'putBlob needs the object blobUpload returned')
+        const headers = {}
+        for (const [name, value] of Object.entries(upload.headers)) {
+            if (name.toLowerCase() !== 'content-length') headers[name] = value  // forbidden in browsers; set from the body, and signed, so it must match
+        }
+        let res
+        try {
+            res = await this._fetch(upload.upload_url, { method: 'PUT', mode: 'cors', headers, body: bytes })
+        } catch (e) {
+            throw SGAppend._err('EUNREACH', 'network (blob PUT; bucket CORS?): ' + String((e && e.message) || e))
+        }
+        if (res.status === 412) return { blob_id: upload.blob_id, stored: false, exists: true }
+        if (!res.ok) throw SGAppend._err(res.status === 400 ? 'EINVAL' : 'EHTTP', `blob PUT ${res.status} (size or sha256 did not match, or the URL expired)`, res.status)
+        return { blob_id: upload.blob_id, stored: true, exists: false }
+    }
+
+    async blobUrl({ inbox, blob_ids } = {}) {                                   // v2 Phase 3: presigned GETs (5 min) for blobs of a lane; unknown ids come back in `missing`
+        if (!inbox) throw SGAppend._err('EINVAL', 'inbox required')
+        SGAppend._assertBlobIds(blob_ids)
+        return this._post(this._vaultPath('blob-url'), { inbox, blob_ids }, this._enumHeaders())
+    }
+
+    async blobDelete({ inbox, blob_ids } = {}) {                                // v2 Phase 3: a keeper removes the blobs of entries it has processed
+        if (!inbox) throw SGAppend._err('EINVAL', 'inbox required')
+        SGAppend._assertBlobIds(blob_ids)
+        return this._post(this._vaultPath('blob-delete'), { inbox, blob_ids }, this._enumHeaders())
+    }
+
+    static async sha256Hex(bytes) {                                             // a blob's id: SHA-256 of its ciphertext
+        const buf = await crypto.subtle.digest('SHA-256', bytes)
+        return SGAppend._hex(new Uint8Array(buf))
+    }
+
+    static _assertBlobIds(ids) {
+        if (!Array.isArray(ids) || ids.length === 0 || ids.length > 100 || !ids.every(id => typeof id === 'string' && /^[0-9a-f]{64}$/.test(id))) {
+            throw SGAppend._err('EINVAL', 'blob ids: 1..100 lowercase sha256 hex strings')
+        }
     }
 
     async write({ vault_id, append_token, payload } = {}) {                     // outbound: deliver to a REMOTE vault's append lane (POST /write/)
@@ -242,6 +305,7 @@ class SGAppend {
         if (s === 401) return 'EPERM'                                           // v2 endpoints answer 401 for a gate failure (403 is rewritten by the CDN)
         if (s === 403) return 'EPERM'                                           // gate failed (token/key mismatch)
         if (s === 413) return 'E2BIG'                                           // payload / content too large
+        if (s === 501) return 'ENOTSUP'                                         // v2: presigned blobs need S3 (memory/disk servers answer 501)
         if (s === 507) return 'ENOSPC'                                          // append lane at capacity
         return 'EHTTP'
     }
@@ -279,5 +343,8 @@ class SGAppend {
         return btoa(bin)
     }
 }
+
+SGAppend.LANE_CONFIG_FIELDS = Object.freeze(['lane_defaults', 'lanes', 'add_enum_keys', 'remove_enum_keys',
+                                             'remove_legacy_enum_key', 'legacy_enum_key'])              // configureLanes: owner-only v2 fields
 
 if (typeof globalThis !== 'undefined') globalThis.SGAppend = SGAppend

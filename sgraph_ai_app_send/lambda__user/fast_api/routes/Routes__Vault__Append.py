@@ -20,6 +20,9 @@ ROUTES_PATHS__VAULT_APPEND = [f'/{TAG__ROUTES_VAULT_APPEND}/limits'             
                               f'/{TAG__ROUTES_VAULT_APPEND}/mark-processed/{{vault_id}}'  ,
                               f'/{TAG__ROUTES_VAULT_APPEND}/unmark/{{vault_id}}'          ,
                               f'/{TAG__ROUTES_VAULT_APPEND}/stats/{{vault_id}}'           ,
+                              f'/{TAG__ROUTES_VAULT_APPEND}/blob-upload/{{vault_id}}'     ,
+                              f'/{TAG__ROUTES_VAULT_APPEND}/blob-url/{{vault_id}}'        ,
+                              f'/{TAG__ROUTES_VAULT_APPEND}/blob-delete/{{vault_id}}'     ,
                               f'/{TAG__ROUTES_VAULT_APPEND}/purge/{{vault_id}}'           ,
                               f'/{TAG__ROUTES_VAULT_APPEND}/configure/{{vault_id}}'       ]
 
@@ -179,8 +182,8 @@ class Routes__Vault__Append(Fast_API__Routes):
         file_ids = body.get('file_ids')
         if not inbox:
             raise HTTPException(status_code = 400, detail = 'Missing inbox')
-        if folder not in ('pending', 'processed'):
-            raise HTTPException(status_code = 400, detail = 'folder must be "pending" or "processed"')
+        if folder not in ('pending', 'processed', 'blobs'):
+            raise HTTPException(status_code = 400, detail = 'folder must be "pending", "processed" or "blobs"')
         result = self.append_service.purge(vault_id      = str(vault_id),
                                            write_key_hex = write_key   ,
                                            folder        = folder      ,
@@ -250,6 +253,57 @@ class Routes__Vault__Append(Fast_API__Routes):
             raise HTTPException(status_code = 401, detail = 'Unauthorized')
         return result
 
+    @staticmethod
+    def _raise_for_blob_status(result):                                          # new endpoints: 401 for auth, JSON error codes the CDN passes through
+        status = result.get('status')
+        if status == 'invalid_input':
+            raise HTTPException(status_code = 400, detail = dict(error='invalid_input'))
+        if status == 'unauthorized':
+            raise HTTPException(status_code = 401, detail = 'Unauthorized')
+        if status == 'lane_mode_unsupported':
+            raise HTTPException(status_code = 401, detail = dict(error='lane_mode_unsupported'))
+        if status == 'blobs_disabled':
+            raise HTTPException(status_code = 400, detail = dict(error='blobs_disabled'))
+        if status == 'blob_too_large':
+            raise HTTPException(status_code = 413, detail = dict(error='blob_too_large', limit=result['limit'], received=result['received']))
+        if status == 'presigned_not_available':
+            raise HTTPException(status_code = 501, detail = dict(error='presigned_not_available'))
+        if status == 'at_capacity':
+            raise HTTPException(status_code = 507, detail = dict(error='at_capacity'))
+        return result
+
+    async def blob_upload__vault_id(self, vault_id: Safe_Str__Id,                # append token (body) -> one presigned PUT; the bytes never pass through Lambda
+                                          request : Request      ) -> dict:
+        self._validate_vault_id(vault_id)
+        body   = await _json_body(request)
+        result = self.append_service.blob_upload(vault_id     = str(vault_id)            ,
+                                                 append_token = body.get('append_token') ,
+                                                 size         = body.get('size')         ,
+                                                 sha256       = body.get('sha256')       )
+        return self._raise_for_blob_status(result)
+
+    async def blob_url__vault_id(self, vault_id: Safe_Str__Id,                   # enum key -> presigned GETs for named blobs
+                                       request : Request      ) -> dict:
+        self._validate_vault_id(vault_id)
+        enum_key = self._enum_key(request)
+        body     = await _json_body(request)
+        result   = self.append_service.blob_url(vault_id = str(vault_id)          ,
+                                                enum_key = enum_key               ,
+                                                inbox    = body.get('inbox')      ,
+                                                blob_ids = body.get('blob_ids')   )
+        return self._raise_for_blob_status(result)
+
+    async def blob_delete__vault_id(self, vault_id: Safe_Str__Id,                # enum key -> delete named blobs (a keeper cleaning up after processing)
+                                          request : Request      ) -> dict:
+        self._validate_vault_id(vault_id)
+        enum_key = self._enum_key(request)
+        body     = await _json_body(request)
+        result   = self.append_service.blob_delete(vault_id = str(vault_id)        ,
+                                                   enum_key = enum_key             ,
+                                                   inbox    = body.get('inbox')    ,
+                                                   blob_ids = body.get('blob_ids') )
+        return self._raise_for_blob_status(result)
+
     def limits(self):                                                            # public: server limits, server time and feature flags (no vault or lane input)
         return JSONResponse(content = self.append_service.limits(),
                             headers = {'cache-control': 'no-store'})            # now_ms must never come from a cache
@@ -262,6 +316,9 @@ class Routes__Vault__Append(Fast_API__Routes):
         self.add_route_post(self.mark_processed__vault_id )
         self.add_route_post(self.unmark__vault_id         )
         self.add_route_post(self.stats__vault_id          )
+        self.add_route_post(self.blob_upload__vault_id    )
+        self.add_route_post(self.blob_url__vault_id       )
+        self.add_route_post(self.blob_delete__vault_id    )
         self.add_route_post(self.purge__vault_id          )
         self.add_route_post(self.configure__vault_id      )
         return self

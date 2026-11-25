@@ -6,12 +6,14 @@
 import hashlib
 from   unittest                                                                    import TestCase
 from   sgraph_ai_app_send.lambda__user.service.Vault__Append__Config               import (Vault__Append__Config, Vault__Append__Config__Error,
-                                                                                          APPEND_DEFAULT_HARD_PENDING, LANE_BYTES_FLOOR, TOKEN_LANE_HARD_CEILING)
+                                                                                          APPEND_DEFAULT_HARD_PENDING, LANE_BYTES_FLOOR, TOKEN_LANE_HARD_CEILING,
+                                                                                          TOKEN_LANE_BLOB_CEILING, TOKEN_LANE_BYTES_CEILING)
 
 def _h(value):
     return hashlib.sha256(value.encode()).hexdigest()
 
 LANE_A, LANE_B = _h('token-a'), _h('token-b')
+NO_BLOBS       = dict(blobs=False, max_blob_bytes=TOKEN_LANE_BLOB_CEILING, blob_retention_days=None)
 BASE           = dict(append_anchors=[LANE_A, LANE_B], enum_key_hash=_h('legacy-enum'))
 
 
@@ -32,13 +34,13 @@ class test_Vault__Append__Config(TestCase):
     def test__a_lane_with_no_settings_behaves_as_before(self):
         settings = self.rules.lane_settings(BASE, LANE_A)
         assert settings == dict(soft_pending=APPEND_DEFAULT_HARD_PENDING, hard_pending=APPEND_DEFAULT_HARD_PENDING,
-                                max_pending_bytes=None, retention_days=None, mode=None)
+                                max_pending_bytes=None, retention_days=None, mode=None, **NO_BLOBS)
 
     def test__layering__lane_overrides_defaults(self):
         config, _ = self._merge(dict(lane_defaults=dict(hard_pending=3000, retention_days=30),
                                      lanes={LANE_A: dict(hard_pending=4000, soft_pending=1000)}))
-        assert self.rules.lane_settings(config, LANE_A) == dict(soft_pending=1000, hard_pending=4000, max_pending_bytes=None, retention_days=30, mode=None)
-        assert self.rules.lane_settings(config, LANE_B) == dict(soft_pending=3000, hard_pending=3000, max_pending_bytes=None, retention_days=30, mode=None)
+        assert self.rules.lane_settings(config, LANE_A) == dict(soft_pending=1000, hard_pending=4000, max_pending_bytes=None, retention_days=30, mode=None, **NO_BLOBS)
+        assert self.rules.lane_settings(config, LANE_B) == dict(soft_pending=3000, hard_pending=3000, max_pending_bytes=None, retention_days=30, mode=None, **NO_BLOBS)
 
     # --- 2.7: typed, bounded ---------------------------------------------------------------
 
@@ -122,3 +124,36 @@ class test_Vault__Append__Config(TestCase):
         self.rules.merge({}, dict(lanes={LANE_A: dict(soft_pending=2000)}), cross_checks=False)   # needs the stored default hard: checked later
         with self.assertRaises(Vault__Append__Config__Error):
             self.rules.merge({}, dict(lanes={LANE_A: dict(soft_pending=True)}), cross_checks=False)
+
+    # --- v2 Phase 3: blob settings ---------------------------------------------------------
+
+    def test__blobs_need_an_explicit_retention_choice(self):                    # plan 3.2 + AS-8: required, and 0 (kept until purged) is a valid choice
+        self._refused(dict(lanes={LANE_A: dict(blobs=True)}))
+        for days in (0, 1, 30, 365):
+            config, _ = self._merge(dict(lanes={LANE_A: dict(blobs=True, blob_retention_days=days)}))
+            assert self.rules.lane_settings(config, LANE_A)['blob_retention_days'] == days
+        self._refused(dict(lanes={LANE_A: dict(blobs=True, blob_retention_days=2)}))
+
+    def test__blob_types_and_ranges(self):
+        for value in (1, 0, 'true', [True]):
+            self._refused(dict(lanes={LANE_A: dict(blobs=value, blob_retention_days=0)}))        # blobs is a real boolean
+        self._refused(dict(lanes={LANE_A: dict(blobs=True, blob_retention_days=0, max_blob_bytes=TOKEN_LANE_BLOB_CEILING + 1)}))
+        self._refused(dict(lanes={LANE_A: dict(blobs=True, blob_retention_days=0, max_blob_bytes=0)}))
+        self._refused(dict(lanes={LANE_A: dict(blobs=True, blob_retention_days=True)}))
+
+    def test__blob_lanes_always_have_a_budget(self):                             # AS-2: a public token must never fill storage without limit
+        config, _ = self._merge(dict(lanes={LANE_A: dict(blobs=True, blob_retention_days=7)}))
+        settings  = self.rules.lane_settings(config, LANE_A)
+        assert settings['max_blob_bytes'] == TOKEN_LANE_BLOB_CEILING
+        assert self.rules.lane_budget(settings) == TOKEN_LANE_BYTES_CEILING
+        assert self.rules.lane_budget(self.rules.lane_settings(config, LANE_B)) is None      # a lane without blobs keeps Phase 2 behaviour
+
+    def test__max_blob_bytes_cannot_exceed_the_budget(self):
+        self._refused(dict(lanes={LANE_A: dict(blobs=True, blob_retention_days=0, max_pending_bytes=LANE_BYTES_FLOOR,
+                                               max_blob_bytes=LANE_BYTES_FLOOR + 1)}))
+        self._merge(dict(lanes={LANE_A: dict(blobs=True, blob_retention_days=0, max_pending_bytes=LANE_BYTES_FLOOR, max_blob_bytes=LANE_BYTES_FLOOR)}))
+
+    def test__blobs_on_lane_defaults(self):
+        self._refused(dict(lane_defaults=dict(blobs=True)))
+        config, _ = self._merge(dict(lane_defaults=dict(blobs=True, blob_retention_days=30)))
+        assert self.rules.lane_settings(config, LANE_B)['blobs'] is True

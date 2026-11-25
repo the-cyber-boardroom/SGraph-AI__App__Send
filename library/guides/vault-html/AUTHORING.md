@@ -947,10 +947,14 @@ come back in `deferred` — fetch those in the next call. `inbox` is the lane's 
 list `processed` entries, `unmark` them back to pending, read one lane's `stats`,
 set per-lane limits (`hard_pending` up to 5000, `soft_pending`, a byte budget) and a retention
 class for processed entries (1, 3, 7, 30, 90 or 365 days), and issue **scoped read keys** that
-see only named lanes. `sg.append.configure` from an app still sends only `append_anchors` (and
-the derived enum-key hash); `configure` now refuses unknown fields with 400, and removing an
-anchor drops that lane's settings. None of these powers are granted to apps yet: `sg.append.*`
-keeps its six verbs. Reference: `team/comms/changelog/11/25/v0.33.69__changelog__append-lanes-v2-phase-2.md`.
+see only named lanes. Since Phase 3 a lane can also accept **blobs**: attachments up to 25 MiB
+uploaded straight to S3 by presigned URL (owner opt-in, off by default; the server answers 501
+`presigned_not_available` when it does not run on S3). `sg.append.configure` from an app still
+sends only `append_anchors` (and the derived enum-key hash); `configure` now refuses unknown
+fields with 400, and removing an anchor drops that lane's settings. None of these powers are
+granted to apps yet: `sg.append.*` keeps its six verbs, and a browser blob upload also needs
+the bucket's CORS rules (not configured yet). Reference:
+`team/comms/changelog/11/25/v0.33.69__changelog__append-lanes-v2-phase-2.md` and `…-phase-3.md`.
 
 ### Draining the lanes of your **declared** sub-vaults — NEW 2026-09-07
 

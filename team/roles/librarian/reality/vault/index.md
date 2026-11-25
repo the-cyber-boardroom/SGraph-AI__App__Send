@@ -133,7 +133,7 @@ encrypted ciphertext and checks capability gates (`H(key) == stored_hash`). All 
 - Client (sgit CLI / vault web): `enum_key` derivation, `append_token = H(pubkey)`, X25519 keygen,
   seal/open — all client-side. **Not SG/API work.**
 
-See `send-api/index.md` for the 9 HTTP endpoints.
+See `send-api/index.md` for the 12 HTTP endpoints.
 
 **Limits and known defects (code-verified 2026-11-25, `dev` @ `da293d4f`):**
 
@@ -153,7 +153,9 @@ See `send-api/index.md` for the 9 HTTP endpoints.
 | Server-initiated outbound calls (webhook) | **DOES NOT EXIST and dropped** (25 Nov, Dinis): the server makes no outbound calls |
 | Processed listing, `unmark`, per-lane limits + byte budget, scoped read keys, retention (S3 tag + lifecycle; memory/disk sweep on access), lane `stats`, fail-closed lane `mode` | **EXISTS (v2 Phase 2, 2026-11-25)** — `test_Vault__Append__Config.py` (15), `test_Service__Vault__Append__v2_Phase2.py` (19), `test_Routes__Vault__Append__v2_Phase2.py` (7), LocalStack (+5). Retention on S3 deletes nothing until DevOps adds the six tag-filtered lifecycle rules and `s3:PutObjectTagging` (see the Phase 2 changelog). On memory/disk the retention clock is the **write** time (file id epoch); on S3 it is the **mark** time (the processed copy's creation) |
 | `sg-append.js` `unmark` / `stats` / `list({folder})`, 401 → `EPERM` | **EXISTS** (transport only) — `test__sg_append_client.js`. **Not on the `sg.append.*` app bridge** (AS-10) |
-| Burst ceiling, blobs (presigned), signed lanes (lane keys + grants) | **PROPOSED** (Phases 3–4) — `team/roles/dev/reviews/11/25/v0.33.69__dev-plan__append-lanes-v2-implementation.md` (plan, revised after review); AppSec review `team/roles/appsec/reviews/11/25/v0.33.69__appsec-review__append-lanes-v2-plan.md` |
+| Blobs by hash (v2 Phase 3): presigned create-only PUT straight to S3 with size/hash/type/tag signed, presigned GET as an opaque download, reservations counted in one lane budget (fixed-condition refusal), `blob_retention_days` required when on (0 = kept until purged), enum-key `blob-delete`, `purge folder:"blobs"`, 25 MiB per blob on token lanes | **EXISTS (2026-11-25)** — `test_Service__Vault__Append__v2_Phase3.py` (18), `test_Storage_FS__S3__Presign.py` (3), `test_Routes__Vault__Append__v2_Phase3.py` (6), LocalStack (+3). **Browser uploads need S3 CORS (DevOps) — not configured; memory/disk servers answer 501.** Not on the app bridge |
+| `sg-append.js` `blobUpload` / `putBlob` / `blobUrl` / `blobDelete` / `configureLanes`, 501 → `ENOTSUP` | **EXISTS** (transport only) — `test__sg_append_client.js`. **Not on the `sg.append.*` app bridge** |
+| Burst ceiling beyond 5,000 / 1 GiB (signed lanes), blobs on signed lanes (256 MiB), signed lanes (lane keys + grants), the two-hash `lane.entry/2` envelope | **PROPOSED** (Phase 4; envelope owned by crm.ios + Email Cell) — `team/roles/dev/reviews/11/25/v0.33.69__dev-plan__append-lanes-v2-implementation.md` (plan, revised after review); AppSec review `team/roles/appsec/reviews/11/25/v0.33.69__appsec-review__append-lanes-v2-plan.md` |
 
 ### Vault-App Vault Management — `sg.vault.*` create/manage (v0.33.5, 2026-06-08)
 

@@ -11,8 +11,9 @@ from   osbot_utils.type_safe.primitives.domains.identifiers.safe_int.Timestamp_N
 from   sgraph_ai_app_send.lambda__user.schemas.Safe_Str__Vault__Append_Token     import Safe_Str__Vault__Append_Token
 from   sgraph_ai_app_send.lambda__user.schemas.Safe_Str__Vault__Append__File_Id  import Safe_Str__Vault__Append__File_Id, TYPE_SAFE_STR__VAULT__APPEND__FILE_ID__REGEX
 from   sgraph_ai_app_send.lambda__user.schemas.Safe_Str__Vault__Append_Token     import TYPE_SAFE_STR__VAULT__APPEND_TOKEN__REGEX
+from   sgraph_ai_app_send.lambda__user.schemas.Safe_Str__Vault__Append__Blob_Id  import Safe_Str__Vault__Append__Blob_Id, TYPE_SAFE_STR__VAULT__APPEND__BLOB_ID__REGEX
 from   sgraph_ai_app_send.lambda__user.service.Vault__Append__Config             import (Vault__Append__Config, Vault__Append__Config__Error,
-                                                                                         APPEND_RETENTION_CLASSES, TOKEN_LANE_HARD_CEILING, TOKEN_LANE_BYTES_CEILING)
+                                                                                         APPEND_RETENTION_CLASSES, BLOB_RETENTION_CHOICES)
 from   sgraph_ai_app_send.lambda__user.storage.Storage__Append__Listing          import Storage__Append__Listing
 from   sgraph_ai_app_send.lambda__user.storage.Storage__Paths                    import (path__vault_manifest               ,
                                                                                          path__vault_tombstone              ,
@@ -21,7 +22,10 @@ from   sgraph_ai_app_send.lambda__user.storage.Storage__Paths                   
                                                                                          path__vault_append_pending         ,
                                                                                          path__vault_append_pending_prefix  ,
                                                                                          path__vault_append_processed       ,
-                                                                                         path__vault_append_processed_prefix)
+                                                                                         path__vault_append_processed_prefix,
+                                                                                         path__vault_append_blob            ,
+                                                                                         path__vault_append_blobs_prefix    ,
+                                                                                         path__vault_append_blob_reservation)
 
 APPEND_MAX_FILES          = 1000                                                # default hard limit (a lane with no settings behaves as before)
 APPEND_MAX_PAYLOAD        = 5  * 1024 * 1024
@@ -39,7 +43,16 @@ PROCESSED_COUNT_CAP       = 10_000
 RETENTION_SWEEP_MAX       = 100                                                 # memory/disk: expired processed entries removed per access
 CONFIGURE_CAS_ATTEMPTS    = 3
 APPEND_FEATURES           = ('limits', 'fetch-deferred', 'configure-creates-vault', 'list-processed', 'unmark',
-                             'stats', 'lane-limits', 'scoped-read-keys', 'retention', 'configure-merge')
+                             'stats', 'lane-limits', 'scoped-read-keys', 'retention', 'configure-merge', 'blobs')
+BLOB_PUT_EXPIRY           = 300                                                 # seconds a presigned PUT is valid (AS-2)
+BLOB_GET_EXPIRY           = 300
+BLOB_RESERVATION_TTL_MS   = (BLOB_PUT_EXPIRY + 60) * 1000                       # a reservation outlives its URL by a minute of clock skew
+BLOB_RESERVATION_TAGS     = {'sg-retention': '1d'}                              # S3 backstop for reservations nobody lists again
+MAX_BLOBS_PER_LANE        = 5_000
+MAX_BLOB_RESERVATIONS     = 100                                                 # outstanding upload URLs per lane
+BLOB_EXPIRED_SWEEP_MAX    = 20                                                  # expired reservations removed per listing
+RESERVED_PREFIX           = '.reserved/'
+RESERVATION_NAME_REGEX    = re.compile(r'^([0-9]{13})_([0-9]{1,12})_([0-9a-f]{64})\Z')
 AFTER_FILE_ID_REGEX       = re.compile(r'^[0-9]{1,13}(_[0-9a-f]{0,24}(\.enc)?)?\Z') # a file id or a prefix of one: anything else never reaches a storage cursor
 FOLDERS                   = {'pending'  : (path__vault_append_pending  , path__vault_append_pending_prefix  ),
                              'processed': (path__vault_append_processed, path__vault_append_processed_prefix)}
@@ -229,7 +242,7 @@ class Service__Vault__Append(Type_Safe):
 
     def _lane_has_room(self, vault_id, token, settings, payload_size):          # exact near the limit, cached (5 s) far from it; the byte check reveals one bit
         hard   = settings['hard_pending']
-        budget = settings.get('max_pending_bytes')
+        budget = self.config_rules.lane_budget(settings)                         # None for a lane with no budget and no blobs (Phase 2 behaviour)
         margin = max(100, hard // 10)
         key    = (vault_id, str(token))
         entry  = self._count_cache.get(key)
@@ -244,6 +257,9 @@ class Service__Vault__Append(Type_Safe):
             else:
                 usage = self.listing.usage(prefix, hard)
                 entry = dict(count=usage['count'], bytes=usage['bytes'])
+                if settings.get('blobs'):                                        # one budget for the lane: entries, blobs and outstanding reservations
+                    blobs = self._blob_usage(vault_id, self._hash(str(token)))
+                    entry['bytes'] += blobs['blob_bytes'] + blobs['reserved_bytes']
             entry.update(at=now, accepted=0, accepted_bytes=0)
             self._count_cache[key] = entry
         if entry['count'] + entry['accepted'] >= hard:
@@ -286,6 +302,11 @@ class Service__Vault__Append(Type_Safe):
                     token_lane_hard_ceiling  = self.config_rules.hard_ceiling ,
                     token_lane_bytes_ceiling = self.config_rules.bytes_ceiling,
                     retention_classes        = list(APPEND_RETENTION_CLASSES) ,
+                    token_lane_blob_ceiling  = self.config_rules.blob_ceiling ,
+                    blob_retention_choices   = list(BLOB_RETENTION_CHOICES)   ,
+                    blob_put_expiry          = BLOB_PUT_EXPIRY                ,
+                    blob_get_expiry          = BLOB_GET_EXPIRY                ,
+                    presigned_blobs          = self.listing.can_presign()     ,      # False on memory/disk: blob-upload and blob-url answer 501
                     config_ttl_seconds       = self.cache_ttl_seconds         ,
                     now_ms                   = int(time.time() * 1000)        ,
                     features                 = list(APPEND_FEATURES)          )
@@ -551,7 +572,16 @@ class Service__Vault__Append(Type_Safe):
                          max_pending_bytes = settings.get('max_pending_bytes')      ,
                          over_soft         = pending['count'] > settings['soft_pending'],
                          retention_days    = settings.get('retention_days')         ,
-                         retention_none    = settings.get('retention_days') is None )
+                         retention_none    = settings.get('retention_days') is None ,
+                         budget            = self.config_rules.lane_budget(settings),
+                         blobs             = bool(settings.get('blobs'))            )
+        if settings.get('blobs'):
+            blob_usage = self._blob_usage(vault_id, self._hash(token))
+            result.update(blob_count          = blob_usage['blob_count']           ,
+                          blob_bytes          = blob_usage['blob_bytes']           ,
+                          reserved_bytes      = blob_usage['reserved_bytes']       ,
+                          max_blob_bytes      = settings['max_blob_bytes']         ,
+                          blob_retention_days = settings.get('blob_retention_days'))
         self._stats_cache[key] = (result, time.monotonic())
         return result
 
@@ -562,7 +592,7 @@ class Service__Vault__Append(Type_Safe):
     def purge(self, vault_id, write_key_hex, folder, inbox, file_ids=None):
         if not self._check_write_key(vault_id, write_key_hex):
             return dict(status='gate_failed')
-        if folder not in ('pending', 'processed'):
+        if folder not in ('pending', 'processed', 'blobs'):
             return dict(status='invalid_input')
         try:
             token = str(self._safe_token(inbox))
@@ -571,6 +601,8 @@ class Service__Vault__Append(Type_Safe):
         if file_ids is not None and not isinstance(file_ids, list):
             return dict(status='invalid_input')
         self._forget_counts(vault_id, token)
+        if folder == 'blobs':
+            return self._purge_blobs(vault_id, token, file_ids)
         purged  = []
         missing = []
         if folder == 'processed' and not file_ids:
@@ -601,6 +633,170 @@ class Service__Vault__Append(Type_Safe):
             else:
                 missing.append(file_id)
         return dict(status='ok', purged=purged, missing=missing)
+
+    # --- blobs (v2 Phase 3) -------------------------------------------------------------
+    # Ciphertext attachments go straight to S3 by presigned PUT; the entry that references a blob
+    # is appended afterwards, as today, with the blob id inside its sealed envelope. Blob ids are
+    # the SHA-256 of the ciphertext, under bare/append/blobs/<sha256(token)>/ (never the raw token).
+
+    @staticmethod
+    def _parse_reservation(name):                                                # "<expires_ms>_<size>_<blob_id>" -> (expires_ms, size, blob_id) or None
+        match = RESERVATION_NAME_REGEX.match(name)                               # ASCII digits only: str.isdigit() would let '²' through to int()
+        if match is None:
+            return None
+        return int(match.group(1)), int(match.group(2)), match.group(3)
+
+    def _blob_usage(self, vault_id, lane_hash, now_ms=None):                     # one bounded listing: blobs, live reservations; expired ones are swept
+        now_ms   = now_ms or int(time.time() * 1000)
+        prefix   = path__vault_append_blobs_prefix(vault_id, lane_hash)
+        cap      = MAX_BLOBS_PER_LANE + MAX_BLOB_RESERVATIONS + 1
+        items    = self.listing.sizes(prefix, cap)
+        blobs    = {}
+        reserved = []
+        expired  = []
+        for name, size in items:
+            if TYPE_SAFE_STR__VAULT__APPEND__BLOB_ID__REGEX.match(name):
+                blobs[name] = size
+            elif name.startswith(RESERVED_PREFIX):
+                parsed = self._parse_reservation(name[len(RESERVED_PREFIX):])
+                if parsed is None:
+                    continue
+                (expired if parsed[0] < now_ms else reserved).append((name, parsed))
+        for name, _ in expired[:BLOB_EXPIRED_SWEEP_MAX]:
+            self.storage_fs.file__delete(prefix + name)
+        reserved_bytes = sum(size for _, (_, size, blob_id) in reserved if blob_id not in blobs)    # an uploaded blob counts once, by its real size
+        return dict(blob_count     = len(blobs)            ,
+                    blob_bytes     = sum(blobs.values())   ,
+                    blob_ids       = blobs                 ,
+                    reservations   = len(reserved)         ,
+                    reserved_bytes = reserved_bytes        ,
+                    truncated      = len(items) >= cap     )
+
+    def blob_upload(self, vault_id, append_token, size, sha256):                 # append token -> one presigned, create-only PUT pinned to size, hash, type and tag
+        try:
+            token = str(self._safe_token(append_token))
+        except (ValueError, Exception):
+            return dict(status='invalid_input')
+        if not isinstance(size, int) or isinstance(size, bool) or size < 1:
+            return dict(status='invalid_input')
+        blob_id = self._safe_blob_id(sha256)
+        if blob_id is None:
+            return dict(status='invalid_input')
+        if not self._check_append_token(vault_id, token):
+            return dict(status='unauthorized')
+        settings = self._lane_settings(vault_id, token)
+        if not self._mode_supported(settings):
+            return dict(status='lane_mode_unsupported')
+        if not settings.get('blobs'):
+            return dict(status='blobs_disabled')
+        if size > settings['max_blob_bytes']:
+            return dict(status='blob_too_large', limit=settings['max_blob_bytes'], received=size)
+        lane_hash = self._hash(token)
+        now_ms    = int(time.time() * 1000)
+        pending   = self.listing.usage(path__vault_append_pending_prefix(vault_id, token), settings['hard_pending'])
+        blobs     = self._blob_usage(vault_id, lane_hash, now_ms)
+        used      = pending['bytes'] + blobs['blob_bytes'] + blobs['reserved_bytes']
+        if (blobs['truncated'] or blobs['blob_count'] >= MAX_BLOBS_PER_LANE or blobs['reservations'] >= MAX_BLOB_RESERVATIONS
+                or used + settings['max_blob_bytes'] > self.config_rules.lane_budget(settings)):     # fixed condition: never depends on this request's size (AS-2)
+            return dict(status='at_capacity')
+        if not self.listing.can_presign():                                       # after the budget, so the same one bit is testable on every backend
+            return dict(status='presigned_not_available')
+        reservation = f'{now_ms + BLOB_RESERVATION_TTL_MS:013d}_{size}_{blob_id}'
+        self.listing.save_tagged(path__vault_append_blob_reservation(vault_id, lane_hash, reservation), b'', BLOB_RESERVATION_TAGS)
+        days    = settings.get('blob_retention_days')
+        tags    = {'sg-retention': f'{days}d'} if days else None                 # 0 = kept until purged: no tag
+        upload  = self.listing.presign_put(path__vault_append_blob(vault_id, lane_hash, blob_id), size,
+                                           base64.b64encode(bytes.fromhex(blob_id)).decode('ascii'), tags, BLOB_PUT_EXPIRY)
+        self._forget_counts(vault_id, token)
+        return dict(status     = 'ok'             ,
+                    blob_id    = blob_id          ,
+                    method     = 'PUT'            ,
+                    upload_url = upload['url']    ,
+                    headers    = upload['headers'],
+                    expires_in = BLOB_PUT_EXPIRY  )
+
+    def blob_url(self, vault_id, enum_key, inbox, blob_ids):                     # enum key -> presigned GETs (5 min) for the blobs that exist
+        valid = self._blob_gate(vault_id, enum_key, inbox, blob_ids)
+        if 'status' in valid:
+            return valid
+        if not self.listing.can_presign():
+            return dict(status='presigned_not_available')
+        present = self._blob_usage(vault_id, valid['lane_hash'])['blob_ids']
+        urls    = []
+        missing = []
+        for blob_id in valid['blob_ids']:
+            if blob_id in present:
+                urls.append(dict(blob_id = blob_id,
+                                 size    = present[blob_id],
+                                 url     = self.listing.presign_get(path__vault_append_blob(vault_id, valid['lane_hash'], blob_id), BLOB_GET_EXPIRY)))
+            else:
+                missing.append(blob_id)
+        return dict(status='ok', urls=urls, missing=missing, expires_in=BLOB_GET_EXPIRY)
+
+    def blob_delete(self, vault_id, enum_key, inbox, blob_ids):                  # enum key: a keeper removes the blobs of entries it has processed (orphans, plan 3.2)
+        valid = self._blob_gate(vault_id, enum_key, inbox, blob_ids)
+        if 'status' in valid:
+            return valid
+        deleted, missing = self._delete_blobs(vault_id, valid['lane_hash'], valid['blob_ids'])
+        self._forget_counts(vault_id, valid['token'])
+        return dict(status='ok', deleted=deleted, missing=missing)
+
+    def _blob_gate(self, vault_id, enum_key, inbox, blob_ids):
+        scope = self._enum_scope(vault_id, enum_key)
+        if scope is None:
+            return dict(status='unauthorized')
+        if not isinstance(blob_ids, list) or not blob_ids or len(blob_ids) > APPEND_BATCH_MAX_FILE_IDS:
+            return dict(status='invalid_input')
+        try:
+            token = str(self._safe_token(inbox))
+        except (ValueError, Exception):
+            return dict(status='invalid_input')
+        safe_ids = [self._safe_blob_id(blob_id) for blob_id in blob_ids]
+        if None in safe_ids:
+            return dict(status='invalid_input')
+        if not self._lane_in_scope(scope, token):
+            return dict(status='unauthorized')
+        return dict(token=token, lane_hash=self._hash(token), blob_ids=list(dict.fromkeys(safe_ids)))
+
+    @staticmethod
+    def _safe_blob_id(value):
+        if not isinstance(value, str):
+            return None
+        try:
+            return str(Safe_Str__Vault__Append__Blob_Id(value))
+        except (ValueError, Exception):
+            return None
+
+    def _delete_blobs(self, vault_id, lane_hash, blob_ids):
+        deleted = []
+        missing = []
+        for blob_id in blob_ids:
+            path = path__vault_append_blob(vault_id, lane_hash, blob_id)
+            if self.storage_fs.file__exists(path):
+                self.storage_fs.file__delete(path)
+                deleted.append(blob_id)
+            else:
+                missing.append(blob_id)
+        return deleted, missing
+
+    def _purge_blobs(self, vault_id, token, file_ids):                           # write key: named blob ids, or every blob and reservation of the lane
+        lane_hash = self._hash(token)
+        if file_ids:
+            if len(file_ids) > APPEND_BATCH_MAX_FILE_IDS:
+                return dict(status='invalid_input')
+            safe_ids = [self._safe_blob_id(blob_id) for blob_id in file_ids]
+            if None in safe_ids:
+                return dict(status='invalid_input')
+            purged, missing = self._delete_blobs(vault_id, lane_hash, safe_ids)
+            return dict(status='ok', purged=purged, missing=missing)
+        prefix = path__vault_append_blobs_prefix(vault_id, lane_hash)
+        purged = []
+        for path in self.storage_fs.folder__files__all(prefix):
+            name = str(path)[len(prefix):] if str(path).startswith(prefix) else str(path).rsplit('/', 1)[-1]
+            self.storage_fs.file__delete(str(path))
+            if TYPE_SAFE_STR__VAULT__APPEND__BLOB_ID__REGEX.match(name):
+                purged.append(name)
+        return dict(status='ok', purged=purged, missing=[])
 
     def _validate_batch(self, inbox, file_ids):
         if not isinstance(file_ids, list) or not file_ids or len(file_ids) > APPEND_BATCH_MAX_FILE_IDS:

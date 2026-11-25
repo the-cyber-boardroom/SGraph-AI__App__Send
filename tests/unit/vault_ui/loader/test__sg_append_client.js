@@ -286,6 +286,60 @@ async function main() {
         ok('401 maps to EPERM', threw && threw.code === 'EPERM');
     }
 
+    console.log('\n[suite] SGAppend — v2 Phase 3 verbs (blobs, configureLanes)');
+    {
+        const sha = 'a'.repeat(64);
+        const c = client();
+        await c.blobUpload({ vault_id: 'target123', append_token: 't1', size: 10, sha256: sha });
+        ok('blobUpload posts to the TARGET vault with no gate headers', c._fetch.calls[0].url.endsWith('/api/vault/append/blob-upload/target123')
+                                                                 && !('x-sgraph-vault-enum-key' in c._fetch.calls[0].headers)
+                                                                 && c._fetch.calls[0].body.size === 10 && c._fetch.calls[0].body.sha256 === sha);
+        for (const [label, args] of [['bad sha', { sha256: 'A'.repeat(64) }], ['63 chars', { sha256: 'a'.repeat(63) }],
+                                     ['size 0', { size: 0 }], ['size float', { size: 1.5 }], ['size string', { size: '10' }]]) {
+            let threw = null;
+            try { await c.blobUpload({ vault_id: 'target123', append_token: 't1', size: 10, sha256: sha, ...args }); } catch (e) { threw = e; }
+            ok(`blobUpload refuses ${label} before sending (EINVAL)`, threw && threw.code === 'EINVAL');
+        }
+
+        await c.blobUrl({ inbox: 'h1', blob_ids: [sha] });
+        ok('blobUrl posts with the enum-key header', c._fetch.calls[1].url.endsWith('/blob-url/vault1234') && c._fetch.calls[1].headers['x-sgraph-vault-enum-key']);
+        await c.blobDelete({ inbox: 'h1', blob_ids: [sha] });
+        ok('blobDelete posts to /blob-delete', c._fetch.calls[2].url.endsWith('/blob-delete/vault1234'));
+        let threw = null;
+        try { await c.blobUrl({ inbox: 'h1', blob_ids: ['../x'] }); } catch (e) { threw = e; }
+        ok('blobUrl refuses a path-like id (EINVAL)', threw && threw.code === 'EINVAL');
+
+        await c.configureLanes({ lanes: { [sha]: { hard_pending: 2000 } }, append_anchors: ['ignored'] });
+        const cfg = c._fetch.calls[3];
+        ok('configureLanes sends lane settings with owner headers', cfg.url.endsWith('/configure/vault1234') && cfg.headers['x-sgraph-vault-write-key']
+                                                              && cfg.body.lanes[sha].hard_pending === 2000);
+        ok('configureLanes never sends anchors or the legacy enum key hash', !('append_anchors' in cfg.body) && !('enum_key_hash' in cfg.body));
+        threw = null;
+        try { await c.configureLanes({}); } catch (e) { threw = e; }
+        ok('configureLanes with nothing to set is EINVAL', threw && threw.code === 'EINVAL');
+
+        const puts = [];
+        const s3 = (status) => async (url, init) => { puts.push({ url, init }); return { ok: status < 300, status, headers: { get: () => '' }, text: async () => '' }; };
+        const upload = { blob_id: sha, upload_url: 'https://s3.example/k?X-Amz-Signature=x', headers: { 'Content-Length': '3', 'If-None-Match': '*', 'x-amz-checksum-sha256': 'abc' } };
+        const stored = await client({ fetchImpl: s3(200) }).putBlob(upload, new Uint8Array([1, 2, 3]));
+        ok('putBlob PUTs to the presigned URL with the signed headers, minus Content-Length', puts[0].init.method === 'PUT' && puts[0].url === upload.upload_url
+                                                                                       && puts[0].init.headers['If-None-Match'] === '*' && !('Content-Length' in puts[0].init.headers));
+        ok('putBlob 200 → stored', stored.stored === true);
+        const exists = await client({ fetchImpl: s3(412) }).putBlob(upload, new Uint8Array([1, 2, 3]));
+        ok('putBlob 412 → already there (success)', exists.stored === false && exists.exists === true);
+        threw = null;
+        try { await client({ fetchImpl: s3(400) }).putBlob(upload, new Uint8Array([9])); } catch (e) { threw = e; }
+        ok('putBlob 400 (bad digest / size) → EINVAL', threw && threw.code === 'EINVAL');
+
+        const res501 = { ok: false, status: 501, headers: { get: () => 'application/json' }, text: async () => JSON.stringify({ detail: { error: 'presigned_not_available' } }) };
+        threw = null;
+        try { await client({ fetchImpl: makeFetch(res501) }).blobUrl({ inbox: 'h1', blob_ids: [sha] }); } catch (e) { threw = e; }
+        ok('501 maps to ENOTSUP', threw && threw.code === 'ENOTSUP');
+
+        const id = await SGAppend.sha256Hex(new TextEncoder().encode('abc'));
+        ok('sha256Hex matches the known vector', id === 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
+    }
+
     console.log(`\n  ${pass} pass, ${fail} fail`);
     if (fail) process.exitCode = 1;
 }
