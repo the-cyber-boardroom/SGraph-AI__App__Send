@@ -17,6 +17,8 @@ Files changed:
 
 Design: `team/roles/architect/reviews/11/25/v0.33.69__architect-review__append-lanes-v2-capacity-large-payloads-signed-lanes.md`
 
+Later the same day: five more append defects reproduced from the lane users' and AppSec reviews (configure before first commit → 403/HTML 404; `list` with no body → 500; `inbox` is the raw token; `configure` stores `NaN` and unknown plaintext fields; append token / file-id types accept a trailing newline). Webhook recorded as dropped. Plan + AppSec review: `team/roles/dev/reviews/11/25/`, `team/roles/appsec/reviews/11/25/`.
+
 ---
 
 ## 2026-09-03

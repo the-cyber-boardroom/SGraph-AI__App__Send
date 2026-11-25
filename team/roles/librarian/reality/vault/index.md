@@ -145,7 +145,13 @@ See `send-api/index.md` for the 6 HTTP endpoints.
 | `list` without `inbox` | walks every key under `bare/append/` (incl. `processed/`) to find lane folders; every page re-lists and sorts the whole lane |
 | `mark_processed` | bytes read into Lambda and written back (no server-side copy) |
 | Config / manifest cache | per Lambda instance, **never expires** → revoking a token (or rotating the enum key) does not reach other warm instances (defect, reproduced with two service instances on one store) |
-| Per-lane limits, burst ceiling, large (presigned) appends, signed lanes (P-256, pki.sgit.ai fingerprints), lane stats, batch write | **PROPOSED** — `team/roles/architect/reviews/11/25/v0.33.69__architect-review__append-lanes-v2-capacity-large-payloads-signed-lanes.md` |
+| `configure` before the vault's first commit | returns 403 "Write key mismatch" (no manifest yet), which the CDN shows as an HTML 404 (defect, reproduced) |
+| `list` with no request body | unhandled JSON error → 500 (defect, reproduced) |
+| `list` → `inbox` | the raw append token (the lane folder name), not a hash (reproduced) |
+| `configure` input | stores any JSON, including `NaN` values and unknown plaintext fields such as a label (defect, reproduced) |
+| `Safe_Str__Vault__Append_Token` / `__File_Id` | accept a trailing newline (`$` with `re.match`); the file id also accepts non-ASCII digits (defect, reproduced) |
+| Server-initiated outbound calls (webhook) | **DOES NOT EXIST and dropped** (25 Nov, Dinis): the server makes no outbound calls |
+| Per-lane limits, burst ceiling, blobs (presigned), signed lanes (lane keys + grants), scoped read keys, retention, lane stats | **PROPOSED** — `team/roles/dev/reviews/11/25/v0.33.69__dev-plan__append-lanes-v2-implementation.md` (plan, revised after review); AppSec review `team/roles/appsec/reviews/11/25/v0.33.69__appsec-review__append-lanes-v2-plan.md` |
 
 ### Vault-App Vault Management — `sg.vault.*` create/manage (v0.33.5, 2026-06-08)
 
