@@ -2,7 +2,7 @@ import re
 from osbot_utils.type_safe.primitives.core.Safe_Str                          import Safe_Str
 from osbot_utils.type_safe.primitives.core.enums.Enum__Safe_Str__Regex_Mode import Enum__Safe_Str__Regex_Mode
 
-TYPE_SAFE_STR__VAULT__APPEND__FILE_ID__REGEX = re.compile(r'^\d{13}_[0-9a-f]{24}\.enc$')
+TYPE_SAFE_STR__VAULT__APPEND__FILE_ID__REGEX = re.compile(r'^[0-9]{13}_[0-9a-f]{24}\.enc\Z')   # \Z, not $ (which lets a trailing newline through); [0-9], not \d (which matches non-ASCII digits)
 
 
 class Safe_Str__Vault__Append__File_Id(Safe_Str):

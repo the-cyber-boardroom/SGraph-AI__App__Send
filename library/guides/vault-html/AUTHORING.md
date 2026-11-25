@@ -935,8 +935,13 @@ sg.on('append.error',        (evt) => { /* {code, message, http?, trigger} */ })
 ```
 
 `payload` may be a `Uint8Array` (it is base64-encoded for you) or a base64 string you built
-yourself. Ceiling is **5 MB per message**, **1000 pending files per lane**, and **100 `file_ids`
-per batch** for `fetch`/`markProcessed`/`purge`.
+yourself. Ceilings: **about 4.4 MB per message on the hosted API** (the payload travels as base64
+inside JSON, under Lambda's 6 MB request limit; 5 MiB on other hosts), **1000 pending files per
+lane**, and **100 `file_ids` per batch** for `fetch`/`markProcessed`/`purge`.
+`GET /api/vault/append/limits` (public, no input) returns the live values, the server's `now_ms`
+and a `features` list. A `fetch` stops at a 5.5 MB encoded response: the ids it did not return
+come back in `deferred` — fetch those in the next call. `inbox` is the lane's raw append token
+(its folder name), not a hash. Use random append tokens, never ones derived from a public key.
 
 ### Draining the lanes of your **declared** sub-vaults — NEW 2026-09-07
 

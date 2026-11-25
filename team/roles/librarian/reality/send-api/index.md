@@ -57,7 +57,7 @@ Read-base64 response size limited to 3.75MB (Lambda response limit).
 Destroy without `purge` writes a tombstone at `vault/{id[:2]}/{id}/deleted.json` to block vault_id reuse.
 Destroy with `purge: true` skips the tombstone — vault_id is fully reusable afterwards.
 
-### Vault Append (`/vault/append/*`) — 6 endpoints
+### Vault Append (`/vault/append/*`) — 7 endpoints
 
 Generic append-only, gate-controlled storage primitive. Not messaging-specific — same infrastructure
 serves logs, signals, control messages, state flows, and email-style workflows.
@@ -72,10 +72,11 @@ without requiring both parties to have SGraph accounts.
 
 | Method | Path | What It Does | Auth | Tested |
 |--------|------|-------------|------|--------|
-| POST | `/vault/append/configure/{vault_id}` | Store append config (enum_key_hash, append_token hashes) | write_key | Yes |
+| GET | `/vault/append/limits` | Public server limits, `now_ms`, `config_ttl_seconds`, `features` (`Cache-Control: no-store`; no vault input) — v2 Phase 1, 2026-11-25 | none | Yes |
+| POST | `/vault/append/configure/{vault_id}` | Store append config (enum_key_hash, append_token hashes). Since v2 Phase 1: on a vault with no commit yet it creates the manifest (first-write rule; a tombstone still refuses); badly typed fields → 400 | write_key | Yes |
 | POST | `/vault/append/write/{vault_id}` | Append encrypted payload (blind — no id/count returned) | append_token (body) | Yes |
 | POST | `/vault/append/list/{vault_id}` | List pending entries (metadata or with content, paginated) | enum_key (header) | Yes |
-| POST | `/vault/append/fetch/{vault_id}` | Fetch content for specific file_ids (batched, max 100) | enum_key (header) | Yes |
+| POST | `/vault/append/fetch/{vault_id}` | Fetch content for specific file_ids (batched, max 100). Since v2 Phase 1: entries past a 5.5 MB encoded response ceiling come back in `deferred` (never read); the first entry is always returned | enum_key (header) | Yes |
 | POST | `/vault/append/mark-processed/{vault_id}` | Move entries pending → processed (copy+delete, idempotent) | enum_key (header) | Yes |
 | POST | `/vault/append/purge/{vault_id}` | Delete entries from pending or processed (batched, max 100) | write_key (header) | Yes |
 

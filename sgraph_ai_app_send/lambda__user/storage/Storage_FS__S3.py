@@ -142,6 +142,77 @@ class Storage_FS__S3(Storage_FS):                                               
                 subfolders.add(Safe_Str__File__Path(first))
         return sorted(subfolders)
 
+    # --- bounded listing fast paths (append lanes v2, Phase 1) -------------------
+    # These stop early or page server-side, so a lane's cost tracks the page or limit
+    # asked for, not the lane's total size. Storage__Append__Listing uses them when the
+    # backend is S3 and falls back to the generic Storage_FS methods otherwise.
+
+    def _relative(self, s3_key: str) -> str:                                     # strip the optional s3_prefix, giving the application-relative key
+        if self.s3_prefix:
+            pfx = self.s3_prefix if self.s3_prefix.endswith('/') else f"{self.s3_prefix}/"
+            if s3_key.startswith(pfx):
+                return s3_key[len(pfx):]
+        return s3_key
+
+    def _folder_prefix(self, parent_folder) -> str:
+        s3_prefix = self.s3_key(parent_folder)
+        return s3_prefix if s3_prefix.endswith('/') else s3_prefix + '/'
+
+    def folder__files__count(self, parent_folder, up_to: int) -> int:            # count keys under a prefix, stopping once up_to is reached
+        client = self._s3().s3()
+        params = dict(Bucket=self.s3_bucket, Prefix=self._folder_prefix(parent_folder))
+        count  = 0
+        while count < up_to:
+            params['MaxKeys'] = min(1000, up_to - count)
+            response = client.list_objects_v2(**params)
+            count   += response.get('KeyCount', len(response.get('Contents', [])))
+            if not response.get('IsTruncated'):
+                break
+            params['ContinuationToken'] = response['NextContinuationToken']
+        return min(count, up_to)
+
+    def folder__files__page(self, parent_folder, start_after: str = None,        # file names under a prefix, in key order, strictly after start_after
+                                  max_keys: int = 1000) -> List[str]:
+        client = self._s3().s3()
+        prefix = self._folder_prefix(parent_folder)
+        params = dict(Bucket=self.s3_bucket, Prefix=prefix)
+        if start_after:
+            params['StartAfter'] = prefix + start_after
+        names  = []
+        while len(names) < max_keys:
+            params['MaxKeys'] = min(1000, max_keys - len(names))
+            response = client.list_objects_v2(**params)
+            for item in response.get('Contents', []):
+                names.append(item['Key'][len(prefix):])
+            if not response.get('IsTruncated'):
+                break
+            params['ContinuationToken'] = response['NextContinuationToken']
+            params.pop('StartAfter', None)                                       # the continuation token carries the position from here on
+        return names[:max_keys]
+
+    def folder__subfolder_names(self, parent_folder) -> List[str]:              # immediate subfolder names via Delimiter: one call per 1,000 folders, not per key
+        client = self._s3().s3()
+        prefix = self._folder_prefix(parent_folder)
+        params = dict(Bucket=self.s3_bucket, Prefix=prefix, Delimiter='/')
+        names  = []
+        while True:
+            response = client.list_objects_v2(**params)
+            for common in response.get('CommonPrefixes', []):
+                name = common['Prefix'][len(prefix):].rstrip('/')
+                if name:
+                    names.append(name)
+            if not response.get('IsTruncated'):
+                break
+            params['ContinuationToken'] = response['NextContinuationToken']
+        return sorted(names)
+
+    def file__copy(self, source_path, target_path) -> bool:                     # server-side CopyObject: the bytes never pass through Lambda
+        self._s3().file_copy(bucket_source      = self.s3_bucket            ,
+                             key_source         = self.s3_key(source_path)  ,
+                             bucket_destination = self.s3_bucket            ,
+                             key_destination    = self.s3_key(target_path)  )
+        return True
+
     def files__paths(self) -> List[Safe_Str__File__Path]:                       # List all file paths in bucket
         prefix  = self.s3_prefix if self.s3_prefix else ''
         s3_keys = self._s3().find_files(bucket=self.s3_bucket, prefix=prefix)

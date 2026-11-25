@@ -140,16 +140,16 @@ See `send-api/index.md` for the 6 HTTP endpoints.
 | Item | State |
 |---|---|
 | Entry limit | 1,000 **pending** per lane (`APPEND_MAX_FILES`); `processed/` unlimited; 507 when full. Counted by listing the whole pending prefix on every append |
-| Payload limit | `APPEND_MAX_PAYLOAD` = 5 MiB, but base64-in-JSON over Lambda's 6 MB request cap → real max ≈ 4.4 MB |
-| `fetch` response | no ceiling — several MB-sized entries in one fetch exceed Lambda's 6 MB response (defect) |
-| `list` without `inbox` | walks every key under `bare/append/` (incl. `processed/`) to find lane folders; every page re-lists and sorts the whole lane |
-| `mark_processed` | bytes read into Lambda and written back (no server-side copy) |
-| Config / manifest cache | per Lambda instance, **never expires** → revoking a token (or rotating the enum key) does not reach other warm instances (defect, reproduced with two service instances on one store) |
-| `configure` before the vault's first commit | returns 403 "Write key mismatch" (no manifest yet), which the CDN shows as an HTML 404 (defect, reproduced) |
-| `list` with no request body | unhandled JSON error → 500 (defect, reproduced) |
+| Payload limit | `APPEND_MAX_PAYLOAD` = 5 MiB, but base64-in-JSON over Lambda's 6 MB request cap → real max ≈ 4.4 MB; now reported by `GET /limits` (v2 Phase 1) |
+| `fetch` response | **FIXED (v2 Phase 1):** 5.5 MB encoded ceiling, the rest in `deferred` |
+| `list` without `inbox` | **FIXED (v2 Phase 1):** lanes found with `Delimiter='/'`; each lane read from the cursor (`StartAfter`, limit+1); legacy path behind `SGRAPH_SEND__APPEND_FAST_LISTING=false` |
+| `mark_processed` | **FIXED (v2 Phase 1):** S3 `CopyObject` (memory/disk read-and-write) |
+| Config / manifest cache | **FIXED (v2 Phase 1):** 30 s TTL (`SGRAPH_SEND__APPEND_CONFIG_TTL`, clamped 0–300), tombstones included. Before: per Lambda instance, **never expired** → revoking a token (or rotating the enum key) does not reach other warm instances (defect, reproduced with two service instances on one store) |
+| `configure` before the vault's first commit | **FIXED (v2 Phase 1):** creates the manifest (first-write rule; tombstone refuses). Before: 403 "Write key mismatch", shown as an HTML 404 by the CDN |
+| Request bodies | **FIXED (v2 Phase 1):** every append route parses with one helper — empty body = `{}`; non-object, malformed, `NaN`/`Infinity` → 400; badly typed fields → 400. Before: `list` with no body → 500 |
 | `list` → `inbox` | the raw append token (the lane folder name), not a hash (reproduced) |
-| `configure` input | stores any JSON, including `NaN` values and unknown plaintext fields such as a label (defect, reproduced) |
-| `Safe_Str__Vault__Append_Token` / `__File_Id` | accept a trailing newline (`$` with `re.match`); the file id also accepts non-ASCII digits (defect, reproduced) |
+| `configure` input | stores `append_anchors` / `enum_key_hash` as given (no schema beyond Phase 1's type checks; unknown top-level fields are ignored, not stored). Full typed schema = v2 Phase 2 (2.7) |
+| `Safe_Str__Vault__Append_Token` / `__File_Id` | **FIXED (v2 Phase 1):** `\Z` and `[0-9]`. Before: accepted a trailing newline; the file id also non-ASCII digits |
 | Server-initiated outbound calls (webhook) | **DOES NOT EXIST and dropped** (25 Nov, Dinis): the server makes no outbound calls |
 | Per-lane limits, burst ceiling, blobs (presigned), signed lanes (lane keys + grants), scoped read keys, retention, lane stats | **PROPOSED** — `team/roles/dev/reviews/11/25/v0.33.69__dev-plan__append-lanes-v2-implementation.md` (plan, revised after review); AppSec review `team/roles/appsec/reviews/11/25/v0.33.69__appsec-review__append-lanes-v2-plan.md` |
 

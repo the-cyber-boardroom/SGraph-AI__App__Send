@@ -89,7 +89,19 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
                 n8n_webhook_secret = get_env(ENV_VAR__N8N_WEBHOOK_SECRET, ''))
 
         if self.append_service is None:                                           # Auto-create vault append service (shares storage backend)
-            self.append_service = Service__Vault__Append(storage_fs=storage_fs)
+            from osbot_utils.utils.Env import get_env
+            from sgraph_ai_app_send.lambda__user.user__config import (ENV_VAR__SGRAPH_SEND__APPEND_CONFIG_TTL   ,
+                                                                      DEFAULT__SGRAPH_SEND__APPEND_CONFIG_TTL   ,
+                                                                      ENV_VAR__SGRAPH_SEND__APPEND_FAST_LISTING )
+            try:
+                append_ttl = int(get_env(ENV_VAR__SGRAPH_SEND__APPEND_CONFIG_TTL, DEFAULT__SGRAPH_SEND__APPEND_CONFIG_TTL))
+            except (TypeError, ValueError):
+                append_ttl = DEFAULT__SGRAPH_SEND__APPEND_CONFIG_TTL
+            fast_listing = str(get_env(ENV_VAR__SGRAPH_SEND__APPEND_FAST_LISTING, 'true')).strip().lower() not in ('false', '0', 'off', 'no')
+            self.append_service = Service__Vault__Append(storage_fs        = storage_fs                         ,
+                                                         cache_ttl_seconds = append_ttl                         ,
+                                                         fast_listing      = fast_listing                       ,
+                                                         on_lambda         = bool(get_env('AWS_LAMBDA_FUNCTION_NAME')))
 
         if self.vault_service is None:                                           # Auto-create vault pointer service (shares storage backend)
             self.vault_service = Service__Vault__Pointer(storage_fs=storage_fs)

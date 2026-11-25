@@ -1,5 +1,7 @@
 import base64
+import json
 from   fastapi                                                                     import HTTPException, Request
+from   fastapi.responses                                                           import JSONResponse
 from   osbot_fast_api.api.routes.Fast_API__Routes                                  import Fast_API__Routes
 from   osbot_utils.type_safe.primitives.domains.identifiers.safe_str.Safe_Str__Id  import Safe_Str__Id
 from   sgraph_ai_app_send.lambda__user.service.Service__Vault__Append              import Service__Vault__Append
@@ -10,12 +12,30 @@ from   sgraph_ai_app_send.lambda__user.user__config                             
 
 TAG__ROUTES_VAULT_APPEND = 'api/vault/append'
 
-ROUTES_PATHS__VAULT_APPEND = [f'/{TAG__ROUTES_VAULT_APPEND}/write/{{vault_id}}'           ,
+ROUTES_PATHS__VAULT_APPEND = [f'/{TAG__ROUTES_VAULT_APPEND}/limits'                       ,
+                              f'/{TAG__ROUTES_VAULT_APPEND}/write/{{vault_id}}'           ,
                               f'/{TAG__ROUTES_VAULT_APPEND}/list/{{vault_id}}'            ,
                               f'/{TAG__ROUTES_VAULT_APPEND}/fetch/{{vault_id}}'           ,
                               f'/{TAG__ROUTES_VAULT_APPEND}/mark-processed/{{vault_id}}'  ,
                               f'/{TAG__ROUTES_VAULT_APPEND}/purge/{{vault_id}}'           ,
                               f'/{TAG__ROUTES_VAULT_APPEND}/configure/{{vault_id}}'       ]
+
+
+def _reject_json_constant(name):                                                # NaN / Infinity are not JSON; json.loads would accept them
+    raise ValueError(f'invalid JSON constant: {name}')
+
+
+async def _json_body(request: Request) -> dict:                                  # every append body: empty = {}, anything but a JSON object = 400 (never a 500)
+    raw = await request.body()
+    if not raw or not raw.strip():
+        return {}
+    try:
+        body = json.loads(raw, parse_constant=_reject_json_constant)
+    except (ValueError, UnicodeDecodeError):
+        raise HTTPException(status_code = 400, detail = 'Request body must be a JSON object')
+    if not isinstance(body, dict):
+        raise HTTPException(status_code = 400, detail = 'Request body must be a JSON object')
+    return body
 
 
 class Routes__Vault__Append(Fast_API__Routes):
@@ -48,13 +68,15 @@ class Routes__Vault__Append(Fast_API__Routes):
     async def write__vault_id(self, vault_id: Safe_Str__Id,
                                     request : Request      ) -> dict:
         self._validate_vault_id(vault_id)
-        body = await request.json()
+        body = await _json_body(request)
         append_token = body.get('append_token', '')
         if not append_token:
             raise HTTPException(status_code = 400, detail = 'Missing append_token')
         payload_b64 = body.get('payload', '')
         if not payload_b64:
             raise HTTPException(status_code = 400, detail = 'Missing payload')
+        if not isinstance(append_token, str) or not isinstance(payload_b64, str):
+            raise HTTPException(status_code = 400, detail = 'append_token and payload must be strings')
         try:
             payload_bytes = base64.b64decode(payload_b64)
         except Exception:
@@ -67,7 +89,9 @@ class Routes__Vault__Append(Fast_API__Routes):
         if result['status'] == 'gate_failed':
             raise HTTPException(status_code = 403, detail = 'Forbidden')
         if result['status'] == 'payload_too_large':
-            raise HTTPException(status_code = 413, detail = 'Payload too large')
+            raise HTTPException(status_code = 413, detail = dict(error    = 'payload_too_large' ,
+                                                                  limit    = result['limit']     ,
+                                                                  received = result['received']  ))
         if result['status'] == 'at_capacity':
             raise HTTPException(status_code = 507, detail = 'Insufficient Storage')
         return dict(ok=True)
@@ -78,7 +102,7 @@ class Routes__Vault__Append(Fast_API__Routes):
         enum_key = request.headers.get(HEADER__SGRAPH_VAULT__ENUM_KEY, '')
         if not enum_key:
             raise HTTPException(status_code = 403, detail = 'Forbidden')
-        body = await request.json()
+        body = await _json_body(request)
         result = self.append_service.list_entries(
             vault_id        = str(vault_id)                     ,
             enum_key        = enum_key                          ,
@@ -87,7 +111,7 @@ class Routes__Vault__Append(Fast_API__Routes):
             limit           = body.get('limit')                 ,
             include_content = body.get('include_content', False))
         if result['status'] == 'invalid_input':
-            raise HTTPException(status_code = 400, detail = 'Invalid inbox or limit')
+            raise HTTPException(status_code = 400, detail = 'Invalid inbox, after_file_id, limit or include_content')
         if result['status'] == 'gate_failed':
             raise HTTPException(status_code = 403, detail = 'Forbidden')
         if result['status'] == 'content_too_large':
@@ -100,7 +124,7 @@ class Routes__Vault__Append(Fast_API__Routes):
         enum_key = request.headers.get(HEADER__SGRAPH_VAULT__ENUM_KEY, '')
         if not enum_key:
             raise HTTPException(status_code = 403, detail = 'Forbidden')
-        body = await request.json()
+        body = await _json_body(request)
         inbox    = body.get('inbox', '')
         file_ids = body.get('file_ids', [])
         if not inbox or not file_ids:
@@ -121,7 +145,7 @@ class Routes__Vault__Append(Fast_API__Routes):
         enum_key = request.headers.get(HEADER__SGRAPH_VAULT__ENUM_KEY, '')
         if not enum_key:
             raise HTTPException(status_code = 403, detail = 'Forbidden')
-        body = await request.json()
+        body = await _json_body(request)
         inbox    = body.get('inbox', '')
         file_ids = body.get('file_ids', [])
         if not inbox or not file_ids:
@@ -143,7 +167,7 @@ class Routes__Vault__Append(Fast_API__Routes):
         write_key = request.headers.get(HEADER__SGRAPH_VAULT__WRITE_KEY, '')
         if not write_key:
             raise HTTPException(status_code = 400, detail = 'Missing write key')
-        body = await request.json()
+        body = await _json_body(request)
         folder   = body.get('folder', 'processed')
         inbox    = body.get('inbox', '')
         file_ids = body.get('file_ids')
@@ -169,7 +193,7 @@ class Routes__Vault__Append(Fast_API__Routes):
         write_key = request.headers.get(HEADER__SGRAPH_VAULT__WRITE_KEY, '')
         if not write_key:
             raise HTTPException(status_code = 400, detail = 'Missing write key')
-        body = await request.json()
+        body = await _json_body(request)
         result = self.append_service.configure(
             vault_id       = str(vault_id)                ,
             write_key_hex  = write_key                    ,
@@ -177,9 +201,16 @@ class Routes__Vault__Append(Fast_API__Routes):
             enum_key_hash  = body.get('enum_key_hash')    )
         if result is None:
             raise HTTPException(status_code = 403, detail = 'Write key mismatch')
+        if result.get('status') == 'invalid_input':
+            raise HTTPException(status_code = 400, detail = 'append_anchors must be a list of strings and enum_key_hash a string')
         return result
 
+    def limits(self):                                                            # public: server limits, server time and feature flags (no vault or lane input)
+        return JSONResponse(content = self.append_service.limits(),
+                            headers = {'cache-control': 'no-store'})            # now_ms must never come from a cache
+
     def setup_routes(self):
+        self.add_route_get (self.limits                   )
         self.add_route_post(self.write__vault_id          )
         self.add_route_post(self.list__vault_id           )
         self.add_route_post(self.fetch__vault_id          )

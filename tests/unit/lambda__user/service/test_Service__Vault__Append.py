@@ -81,10 +81,20 @@ class test_Service__Vault__Append(TestCase):
                                          append_anchors=[_hash('token')])
         assert result is None
 
-    def test__configure__nonexistent_vault(self):
+    def test__configure__nonexistent_vault(self):                               # v2 Phase 1 (1.7): configure before the first commit claims the vault, like the first vault write
         result = self.service.configure('nonexistent00001', WRITE_KEY,
                                          append_anchors=[_hash('token')])
-        assert result is None
+        assert result == dict(vault_id='nonexistent00001', status='configured')
+        manifest = self.service.storage_fs.file__json(path__vault_manifest('nonexistent00001'))
+        assert manifest['write_key_hash'] == _hash(WRITE_KEY)
+        assert self.service.configure('nonexistent00001', 'other-write-key', append_anchors=[]) is None   # the claim holds: a different write key is refused
+
+    def test__configure__tombstoned_vault_is_never_recreated(self):
+        from sgraph_ai_app_send.lambda__user.storage.Storage__Paths import path__vault_tombstone
+        self.service.storage_fs.file__save(path__vault_tombstone('deletedvault01'),
+                                           json.dumps(dict(vault_id='deletedvault01', status='deleted')).encode())
+        assert self.service.configure('deletedvault01', WRITE_KEY, append_anchors=[_hash('token')]) is None
+        assert self.service.storage_fs.file__exists(path__vault_manifest('deletedvault01')) is False
 
     def test__configure__partial_update_preserves_existing(self):
         result = self.service.configure(VAULT_ID, WRITE_KEY,
