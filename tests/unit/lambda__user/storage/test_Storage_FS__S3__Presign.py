@@ -66,3 +66,14 @@ class test_Storage_FS__S3__Presign(TestCase):
     def test__get__is_served_as_an_opaque_download(self):                       # I-3: a token writer can upload any bytes, HTML included
         query = self._query(self.storage.presigned__get('k/' + BLOB_ID, 300))
         assert (query['response-content-type'], query['response-content-disposition'], query['X-Amz-Expires']) == ('application/octet-stream', 'attachment', '300')
+
+    def test__conditional_headers_never_leak_to_other_requests(self):           # the hook is on the shared client; only the call that set the header sees it
+        self.storage.presigned__put('k/' + BLOB_ID, 10, CHECKSUM, None, 300)
+        client = self.storage._s3().s3()
+        plain  = client.generate_presigned_url('put_object', Params=dict(Bucket='sg-presign-test', Key='other'), ExpiresIn=60)
+        assert self._query(plain)['X-Amz-SignedHeaders'] == 'host'
+
+    def test__works_without_IfNoneMatch_in_the_botocore_model(self):            # CI and older Lambda runtimes ship botocore 1.34.x (no IfNoneMatch/IfMatch params)
+        import botocore
+        upload = self.storage.presigned__put('k/' + BLOB_ID, 10, CHECKSUM, None, 300)
+        assert 'if-none-match' in self._query(upload['url'])['X-Amz-SignedHeaders'], botocore.__version__

@@ -3,6 +3,7 @@
 # Storage_FS implementation backed by AWS S3 via osbot-aws
 # ===============================================================================
 
+import contextvars
 from typing                                                                     import List
 from botocore.exceptions                                                        import ClientError
 from osbot_aws.AWS_Config                                                       import aws_config
@@ -13,6 +14,26 @@ from osbot_utils.type_safe.primitives.domains.files.safe_str.Safe_Str__File__Pat
 from osbot_utils.type_safe.type_safe_core.decorators.type_safe                  import type_safe
 from osbot_utils.utils.Json                                                     import bytes_to_json
 from memory_fs.storage_fs.Storage_FS                                            import Storage_FS
+
+
+# --- S3 conditional headers, independent of the botocore version -------------------------
+# `IfNoneMatch` / `IfMatch` on PutObject only exist in botocore >= ~1.35.70 (late 2024). The
+# Lambda uses the boto3 the AWS runtime ships (the dependency zip strips it), and CI uses the
+# OS one (1.34.46), so passing them as API parameters fails with ParamValidationError on
+# older models. Instead the headers are added to the HTTP request in botocore's 'before-sign'
+# hook, which every botocore emits for normal calls AND for presigned URLs (so they are signed).
+# A context variable scopes them to the call that set them: other threads' writes never see them.
+_S3_CONDITIONAL_HEADERS = contextvars.ContextVar('sg_send__s3_conditional_headers', default=None)
+_S3_HEADER_HOOK_ID      = 'sg-send--s3-conditional-headers'
+
+
+def _add_conditional_headers(request, **kwargs):                                  # botocore event handler: 'before-sign.s3.PutObject'
+    headers = _S3_CONDITIONAL_HEADERS.get()
+    if headers:
+        for name, value in headers.items():
+            if name in request.headers:
+                del request.headers[name]                                        # botocore's HTTPHeaders appends on set: replace, never duplicate
+            request.headers[name] = value
 
 
 class Storage_FS__S3(Storage_FS):                                               # S3-backed Storage_FS implementation
@@ -253,14 +274,24 @@ class Storage_FS__S3(Storage_FS):                                               
                 return None, None
             raise
 
-    def file__save__if_version(self, path, data: bytes, version) -> bool:       # conditional write: If-Match the etag read, or If-None-Match '*' when it was absent
-        kwargs = dict(Bucket=self.s3_bucket, Key=self.s3_key(path), Body=data)
-        if version is None:
-            kwargs['IfNoneMatch'] = '*'
-        else:
-            kwargs['IfMatch'] = version
+    def _s3_client__conditional(self):                                          # the cached client, with the header hook registered once (unique_id makes it idempotent)
+        client = self._s3().s3()
+        client.meta.events.register('before-sign.s3.PutObject', _add_conditional_headers, unique_id=_S3_HEADER_HOOK_ID)
+        return client
+
+    @staticmethod
+    def _with_conditional_headers(headers: dict, call):
+        token = _S3_CONDITIONAL_HEADERS.set(headers)
         try:
-            self._s3().s3().put_object(**kwargs)
+            return call()
+        finally:
+            _S3_CONDITIONAL_HEADERS.reset(token)
+
+    def file__save__if_version(self, path, data: bytes, version) -> bool:       # conditional write: If-Match the etag read, or If-None-Match '*' when it was absent
+        client  = self._s3_client__conditional()
+        headers = {'If-None-Match': '*'} if version is None else {'If-Match': version}
+        try:
+            self._with_conditional_headers(headers, lambda: client.put_object(Bucket=self.s3_bucket, Key=self.s3_key(path), Body=data))
             return True
         except ClientError as error:
             if error.response.get('Error', {}).get('Code') in ('PreconditionFailed', 'ConditionalRequestConflict', '412', '409'):
@@ -298,12 +329,13 @@ class Storage_FS__S3(Storage_FS):                                               
                        Key           = self.s3_key(path)         ,
                        ContentLength = size                      ,
                        ContentType   = 'application/octet-stream',
-                       IfNoneMatch   = '*'                       ,
-                       ChecksumSHA256= checksum_sha256_b64       )
+                       ChecksumSHA256= checksum_sha256_b64       )               # If-None-Match comes from the hook: older botocore models have no IfNoneMatch
         if tags:
             params ['Tagging']       = urlencode(tags)
             headers['x-amz-tagging'] = params['Tagging']
-        url = self._s3().s3().generate_presigned_url('put_object', Params=params, ExpiresIn=expires_in)
+        client = self._s3_client__conditional()
+        url    = self._with_conditional_headers({'If-None-Match': '*'},
+                                                lambda: client.generate_presigned_url('put_object', Params=params, ExpiresIn=expires_in))
         return dict(url=url, headers=headers)
 
     def presigned__get(self, path, expires_in: int) -> str:                      # served as an opaque download: a token writer can upload any bytes, HTML included (I-3)
