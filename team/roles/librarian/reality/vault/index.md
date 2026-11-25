@@ -352,6 +352,16 @@ Round-1 and Round-2 review findings addressed after the initial surface landed:
 
 ---
 
+### Final review fixes before dev (2026-11-25)
+
+| Item | Status | Evidence |
+|---|---|---|
+| sgit-ai pack-mode vaults (`packs`, `blob-deflate`, 0.24.0+) refused by name on open (`EFORMAT`, names `sgit pack export`) | **EXISTS** | `SGVaultBranchIndex.checkFormat`; `test__sgit_parity.js` |
+| Web commit messages capped at 740 UTF-8 bytes (sgit < 0.26.4 limit) | **EXISTS** | `SGVaultCommit.capMessage`; `test__sgit_parity.js` |
+| Signing key created insert-if-absent: concurrent first opens in two tabs share one key | **EXISTS** | `SGVaultSigner.forVault` (`idbAdd`) |
+| Server `batch_read` reads the first object on the request thread before fanning out (cold-Lambda boto3 client creation) | **EXISTS** | `Service__Vault__Pointer.batch_read`; `test__batch_read__first_read_on_calling_thread` |
+| Compatibility re-verified against sgit-ai 0.27.0 (`user_signature` is outside the signing bytes) | **VERIFIED** | `tests/integration/vault_ui/cli/test__sgit_cli_parity.py`; changelog `team/comms/changelog/11/25/` |
+
 ### Bulk sub-tree loading (2026-10-23)
 
 | Item | Status | Evidence |

@@ -43,8 +43,10 @@ class SGVaultCommit {
     //   its branch id and key id. Without one the commit is unsigned (signature null).
 
     async createCommit({ parentIds = [], treeId, message = '', branchId = null, signer = null, timestampMs = null }) {
-        // Encrypt commit message (random IV, as the CLI's encrypt_metadata)
-        const msgPlain  = new TextEncoder().encode(message)
+        // Encrypt commit message (random IV, as the CLI's encrypt_metadata). Capped at 740
+        // UTF-8 bytes: sgit-ai before 0.26.4 cannot read a longer message (the CLI raises the
+        // vault's gate with feature 'long-messages' when it writes one; the web never needs to).
+        const msgPlain  = SGVaultCommit.capMessage(message)
         const msgCipher = await SGSendCrypto.encrypt(msgPlain, this._readKey)
         const msgEnc    = SGVaultCommit._arrayBufferToBase64(msgCipher)
 
@@ -73,6 +75,25 @@ class SGVaultCommit {
         const plaintext  = new TextEncoder().encode(JSON.stringify(commit))
         const ciphertext = await SGSendCrypto.encrypt(plaintext, this._readKey)
         return this._objectStore.store(ciphertext)
+    }
+
+    // UTF-8 bytes of `message`, cut on a code-point boundary to at most `max` bytes, with an
+    // ellipsis when cut. Web messages are generated (file names, merge notes, mount trailers),
+    // so only an upload of several very long names ever reaches the cap.
+    static capMessage(message, max) {
+        max = max || ((typeof SGVaultBranchIndex !== 'undefined' && SGVaultBranchIndex.COMMIT_MESSAGE_MAX_BYTES) || 740)
+        const enc   = new TextEncoder()
+        const bytes = enc.encode(String(message == null ? '' : message))
+        if (bytes.length <= max) return bytes
+        const tail  = enc.encode('\u2026')
+        let   out   = ''
+        let   used  = 0
+        for (const ch of String(message)) {
+            const n = enc.encode(ch).length
+            if (used + n + tail.length > max) break
+            out += ch; used += n
+        }
+        return enc.encode(out + '\u2026')
     }
 
     // --- Load and decrypt a commit object ----------------------------------------

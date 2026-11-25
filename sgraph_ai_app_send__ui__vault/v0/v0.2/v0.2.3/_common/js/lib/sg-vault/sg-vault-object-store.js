@@ -266,9 +266,13 @@ class SGVaultObjectStore {
         const result  = new Map()
         const toFetch = []
 
-        for (const objectId of unique) {
+        // Cache lookups in parallel: the Cache API tier is async per object (open + match), and
+        // a sequential loop over a 50-id chunk sat in front of every batch request.
+        const lookups = await Promise.all(unique.map(async (objectId) => {
             const filePath = `bare/data/${objectId}`
-            const cached   = await this._cacheGet(objectId, filePath)
+            return { objectId, filePath, cached: await this._cacheGet(objectId, filePath) }
+        }))
+        for (const { objectId, filePath, cached } of lookups) {
             if (cached) result.set(objectId, cached)
             else        toFetch.push({ objectId, filePath })
         }

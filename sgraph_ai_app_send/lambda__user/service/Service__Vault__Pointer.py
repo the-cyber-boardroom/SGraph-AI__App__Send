@@ -248,11 +248,15 @@ class Service__Vault__Pointer(Type_Safe):                                       
 
     def batch_read(self, vault_id, operations):                                  # Read-only batch (no auth required — data is encrypted)
         file_ids = [op.get('file_id', '') for op in operations]
-        if len(file_ids) <= 1:                                                   # one object: no pool
-            results = [self._batch_read(vault_id, file_id) for file_id in file_ids]
-        else:                                                                    # many objects: read the backend in parallel, keep request order
-            with ThreadPoolExecutor(max_workers=min(BATCH_READ_WORKERS, len(file_ids))) as pool:   # the per-object S3 round trip (~30 ms) was the
-                results = list(pool.map(lambda file_id: self._batch_read(vault_id, file_id), file_ids))  # floor of every clone and tree walk; reads are independent
+        if not file_ids:
+            return dict(vault_id = vault_id, results = [])
+        results = [self._batch_read(vault_id, file_ids[0])]                      # first read on THIS thread: a lazily-built backend client (the boto3 S3
+        rest    = file_ids[1:]                                                   # client is created on first use, unlocked) is created once, never by 16 threads
+        if len(rest) == 1:                                                       # at once on a cold Lambda (boto3 client creation is not thread-safe)
+            results.append(self._batch_read(vault_id, rest[0]))
+        elif rest:                                                               # many objects: read the backend in parallel, keep request order
+            with ThreadPoolExecutor(max_workers=min(BATCH_READ_WORKERS, len(rest))) as pool:   # the per-object S3 round trip (~30 ms) was the
+                results.extend(pool.map(lambda file_id: self._batch_read(vault_id, file_id), rest))   # floor of every clone and tree walk; reads are independent
         return dict(vault_id = vault_id ,
                     results  = results  )
 

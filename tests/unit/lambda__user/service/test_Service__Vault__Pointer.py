@@ -524,6 +524,29 @@ class test_Service__Vault__Pointer(TestCase):
         assert result['results'][1]['detail'] == 'RuntimeError'
         assert 'data' not in result['results'][1]
 
+    def test__batch_read__first_read_on_calling_thread(self):
+        """The first operation is read on the request thread before the pool starts, so a
+        backend that builds its client lazily (Storage_FS__S3 → boto3) builds it once,
+        not concurrently from BATCH_READ_WORKERS threads on a cold Lambda."""
+        import threading
+        from memory_fs.storage_fs.providers.Storage_FS__Memory import Storage_FS__Memory
+        calls = []
+        class Recording_FS(Storage_FS__Memory):
+            def file__bytes(self, path):
+                calls.append((str(path), threading.current_thread() is threading.main_thread()))
+                return super().file__bytes(path)
+        service = Service__Vault__Pointer(storage_fs=Recording_FS())
+        fids    = [f'bare/data/obj-cas-imm-{i:012x}' for i in range(20)]
+        for fid in fids:
+            service.write(self.vault_id, fid, self.write_key, fid.encode())
+        calls.clear()
+        result = service.batch_read(self.vault_id, [dict(op='read', file_id=f) for f in fids])
+        assert [r['file_id'] for r in result['results']] == fids                 # order kept
+        assert all(r['status'] == 'ok' for r in result['results'])
+        assert calls[0][1] is True                                               # the first read ran on the calling thread
+        assert fids[0] in calls[0][0]
+        assert service.batch_read(self.vault_id, [])['results'] == []            # no ops: no reads, no pool
+
     def test__batch_read__not_found(self):
         """Reading a nonexistent file in batch_read returns not_found."""
         operations = [dict(op='read', file_id='bare/data/ghost')]

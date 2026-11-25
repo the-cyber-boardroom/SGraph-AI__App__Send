@@ -246,10 +246,17 @@
             req.onsuccess = () => resolve(req.result || null); req.onerror = () => reject(req.error);
         });
     }
-    function idbPut(db, key, value) {
+    // Insert only if absent: resolves true when this call stored `value`, false when another tab
+    // stored a record first (ConstraintError, swallowed so the transaction still completes).
+    function idbAdd(db, key, value) {
         return new Promise((resolve, reject) => {
-            const tx = db.transaction(DB_STORE, 'readwrite'); tx.objectStore(DB_STORE).put(value, key);
-            tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error);
+            let exists = false;
+            const tx  = db.transaction(DB_STORE, 'readwrite');
+            const req = tx.objectStore(DB_STORE).add(value, key);
+            req.onerror = (e) => { if (req.error && req.error.name === 'ConstraintError') { exists = true; e.preventDefault(); e.stopPropagation(); } };
+            tx.oncomplete = () => resolve(!exists);
+            tx.onerror    = () => { if (!exists) reject(tx.error); };
+            tx.onabort    = () => { if (exists) resolve(false); else reject(tx.error || new Error('indexedDB transaction aborted')); };
         });
     }
 
@@ -284,8 +291,13 @@
                 try {
                     let rec = await idbGet(db, vaultId);
                     if (!rec || !rec.privateKey || !rec.keyId) {
-                        rec = await SGVaultSigner.generateRecord();
-                        await idbPut(db, vaultId, rec);
+                        // Two tabs opening a vault for the first time race here. `add` lets exactly
+                        // one record win; the loser adopts it, so both tabs sign with one key and
+                        // commit to one clone ref (a `put` let the last writer win, and the other
+                        // tab's clone ref was never reopened).
+                        const fresh = await SGVaultSigner.generateRecord();
+                        rec = (await idbAdd(db, vaultId, fresh)) ? fresh : await idbGet(db, vaultId);
+                        if (!rec || !rec.privateKey) return null;
                     }
                     return new SGVaultSigner(rec);
                 } finally { db.close(); }
@@ -317,9 +329,12 @@
     const FEATURE_SIG_REQUIRED = 'signatures-required';
     const SIG_SINCE_PREFIX     = 'signed-since-';
     const TAG_CLOCK_SKEW_MS    = 24 * 60 * 60 * 1000;      // Vault__Index_Reader.TAG_CLOCK_SKEW_MS: a day
+    const UNSUPPORTED_FEATURES = ['packs', 'blob-deflate'];   // sgit-ai 0.24.0 pack mode: no loose objects, deflate envelope
+    const COMMIT_MESSAGE_MAX_BYTES = 740;                     // sgit-ai < 0.26.4 cannot read a longer message (feature 'long-messages')
 
     const SGVaultBranchIndex = {
         FORMAT_1, FORMAT_2, FEATURE_IDS_128, FEATURE_SIG_REQUIRED, SIG_SINCE_PREFIX,
+        UNSUPPORTED_FEATURES, COMMIT_MESSAGE_MAX_BYTES,
 
         formatOf(index) {
             const v = index && index.format != null ? Number(index.format) : FORMAT_1;
@@ -353,6 +368,15 @@
             if (!ID_HEX_LEN[raw]) {
                 const e = new Error(`this vault uses format ${raw}, which this version of SG/Vault does not know: reload to get the latest version, then try again`);
                 e.code = 'EFORMAT'; throw e;
+            }
+            // sgit-ai 0.24+ pack mode: objects live in zips under bare/packs/ (never bare/data/)
+            // and blobs may use the deflate envelope (\x00sgz1 + iv + AES-GCM(deflate)). The web
+            // cannot read either, and writing loose objects into a pack vault would put commits
+            // where pack clients do not look. Refuse by name, as the CLI's pack spec asks of the web.
+            const unreadable = this.features(index).filter(f => UNSUPPORTED_FEATURES.includes(f));
+            if (unreadable.length) {
+                const e = new Error(`this vault uses sgit pack mode (${unreadable.join(', ')}), which SG/Vault cannot open yet: use sgit-ai 0.24.0 or newer, or ask the owner for a browsable copy (sgit pack export)`);
+                e.code = 'EFORMAT'; e.features = unreadable; throw e;
             }
         },
 

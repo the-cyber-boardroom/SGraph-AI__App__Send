@@ -90,7 +90,10 @@ class SGVaultRefManager {
     // (or nothing, if we last saw it absent). On success the cache is updated to the
     // bytes we just wrote; on conflict the cache is updated to the server's CURRENT
     // bytes (so the next readRef→merge→retry cycle can succeed) and 'ECAS' is thrown.
-    // Throws 'ENOMATCH' if the ref was never read through this manager.
+    // Throws 'ENOMATCH' if the ref was never read OR written through this manager: a ref this
+    // manager wrote is a known baseline too (the server holds exactly the bytes written; a third
+    // party's later write still shows as a conflict). Since 2026-10-12 a freshly created vault can
+    // therefore push with compare-and-swap without reading its own named ref first.
 
     async writeRefIfMatch(refFileId, commitId) {
         const raw = this.lastRawRef(refFileId)

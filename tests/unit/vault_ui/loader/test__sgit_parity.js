@@ -214,6 +214,36 @@ const hex  = (u8) => Array.from(new Uint8Array(u8)).map(b => b.toString(16).padS
         ok('legacy-signed CLI commit verifies through branch → public_key_id (legacy bytes)', await v.verifyCommit('x', legacy) === 'verified');
     }
 
+    // ---------------------------------------------------------------- sgit-ai 0.24+ pack mode / 0.26.4 long messages
+    console.log('\n[suite] pack-mode vaults are refused by name; messages capped for older CLIs');
+    {
+        const server3 = new FakeServer(); const sgP = makeFakeSgSend(server3);
+        const P = await SGVault.create(sgP, PASS, { name: 'pack', signer: null });
+        const { raw, index } = await P._refManager.readBranchIndexRaw(P._branchIndexFileId);
+        await P._refManager.writeBranchIndexIfMatch(P._branchIndexFileId, Object.assign({}, index, { min_client: '0.24.0', features: ['blob-deflate', 'packs'] }), raw);
+        let err = null; try { await SGVault.open(makeFakeSgSend(server3), P.getVaultKey(), { signer: null }); } catch (e) { err = e; }
+        ok('opening a pack vault fails with EFORMAT', err && err.code === 'EFORMAT', err && (err.code || err.message));
+        ok('…naming pack mode and the way out', err && /pack mode/.test(err.message) && /sgit pack export/.test(err.message));
+        // the advisory and long-message features open normally
+        const again = await P._refManager.readBranchIndexRaw(P._branchIndexFileId);
+        await P._refManager.writeBranchIndexIfMatch(P._branchIndexFileId, Object.assign({}, again.index, { min_client: '0.26.4', features: ['long-messages', 'pack-indexes'] }), again.raw);
+        ok('long-messages / pack-indexes vaults open', await SGVault.open(makeFakeSgSend(server3), P.getVaultKey(), { signer: null }).then(() => true, e => e.message));
+
+        const short = SGVaultCommit.capMessage('Add a.txt');
+        ok('a short message is untouched', new TextDecoder().decode(short) === 'Add a.txt');
+        const long  = 'Add 3 files: ' + 'é'.repeat(400) + ', ' + 'x'.repeat(400);
+        const capped = SGVaultCommit.capMessage(long);
+        ok('a long message is cut to at most 740 bytes', capped.length <= 740, capped.length);
+        const text = new TextDecoder('utf-8', { fatal: true }).decode(capped);   // throws on a split code point
+        ok('…on a code-point boundary, ending with an ellipsis', text.endsWith('\u2026') && long.startsWith(text.slice(0, -1)));
+        await P._refManager.writeBranchIndexIfMatch(P._branchIndexFileId, Object.assign({}, (await P._refManager.readBranchIndexRaw(P._branchIndexFileId)).index, { features: [] }), (await P._refManager.readBranchIndexRaw(P._branchIndexFileId)).raw);
+        const P2 = await SGVault.open(makeFakeSgSend(server3), P.getVaultKey(), { signer: null, cloneBranch: 'web-ui:longmsg' });
+        await P2.addFiles([1, 2, 3].map(i => ({ folderPath: '/', fileName: `${i}-` + 'n'.repeat(240) + '.txt', fileData: enc.encode(String(i)) })));
+        const stored = await readJson(P2, 'bare/data/' + P2._headCommitId);
+        const plain  = await SGSendCrypto.decrypt(SGVaultCommit._base64ToArrayBuffer(stored.message_enc), P2._readKey);
+        ok('a real upload of three long names commits a ≤ 740-byte message', plain.byteLength <= 740, plain.byteLength);
+    }
+
     // ---------------------------------------------------------------- legacy shared clone ref
     console.log('\n[suite] migration: unpublished work on the old shared clone ref is adopted by a signed device');
     {
