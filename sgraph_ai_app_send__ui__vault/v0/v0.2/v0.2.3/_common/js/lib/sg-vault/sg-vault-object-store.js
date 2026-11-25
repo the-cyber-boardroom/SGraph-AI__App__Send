@@ -3,7 +3,8 @@
    v0.3.0 — Encrypted blob storage with self-describing content-addressed IDs
 
    Objects are stored as encrypted ciphertext. The object ID follows the
-   four-segment format: "obj-cas-imm-" + hex(SHA256(ciphertext))[:12].
+   four-segment format: "obj-cas-imm-" + hex(SHA256(ciphertext))[:12] on a format-1 vault
+   and [:32] on a format-2 vault (sgit-ai 0.19 gate; see setFormat).
      - obj: data object (blob, tree, or commit)
      - cas: content-addressed (SHA256 of ciphertext)
      - imm: immutable (written once, never changes)
@@ -64,6 +65,20 @@ class SGVaultObjectStore {
         this._vaultId = vaultId
         this._writeKey = writeKey
         this._batch   = null                                                     // write-buffer (array) when a batch scope is open
+        this._idHexLen = 12                                                      // vault format 1; setFormat(2) → 32 (sgit-ai 0.19+)
+    }
+
+    // --- Vault format (sgit-ai 0.19 format gate) -----------------------------------
+    // Format 1: 'obj-cas-imm-' + sha256[:12] (48-bit ids). Format 2: sha256[:32] (128-bit) for
+    // every NEW object; existing objects keep their ids, so a raised vault mixes both widths
+    // and every reader takes ids as opaque. The format is read from the branch index by
+    // SGVault.open() and re-applied whenever the index is refreshed.
+    get idHexLen() { return this._idHexLen }
+    setFormat(format) {
+        const f = Number(format) || 1
+        this._idHexLen = (typeof SGVaultBranchIndex !== 'undefined')
+            ? SGVaultBranchIndex.idHexLen({ format: f })
+            : (f >= 2 ? 32 : 12)
     }
 
     // --- Write-batch scope (collapse a commit's PUTs into one POST /batch) --------
@@ -220,46 +235,107 @@ class SGVaultObjectStore {
         const hex   = Array.from(new Uint8Array(hash))
             .map(b => b.toString(16).padStart(2, '0'))
             .join('')
-        return 'obj-cas-imm-' + hex.slice(0, 12)
+        return 'obj-cas-imm-' + hex.slice(0, this._idHexLen)
     }
 
     // --- Batch-load multiple objects by ID ---------------------------------------
-    //     Checks the immutable block cache first; fetches uncached IDs in one
-    //     or more batch requests (chunked at 50). Returns Map<objectId, ArrayBuffer>.
-    //     Missing objects are omitted from the map (caller must handle).
+    //     Checks the immutable block cache first; fetches uncached IDs through the batch
+    //     endpoint, 50 ids per POST (the Lambda's measured comfort zone; the server caps at
+    //     100), with up to `concurrency` POSTs in flight at once — the sgit CLI's
+    //     batch_read fans out the same way (16 workers, measured ~2x the throughput of 8 on
+    //     the live API; HTTP/2 multiplexes them on one connection). A chunk the server
+    //     refuses is split in two and
+    //     retried, down to a single GET, exactly as the CLI does on a 502.
+    //     Returns Map<objectId, ArrayBuffer>. Missing objects are omitted (caller handles).
+    //     opts.failures (a Map) records WHY an id is missing — 'not_found' (the server says so),
+    //     'error' (the server answered but could not read it), or the message of the request
+    //     that failed — so a caller can tell an absent object from a network problem (the CLI's
+    //     batch_read does the same with its `failures` dict). Without it a failure is silent.
+    //     opts.onProgress(done, total) is called after every chunk lands.
+    //     Cache writes are not awaited: the in-memory tier is filled synchronously, the Cache API
+    //     tier in the background (one awaited put per object was ~2 ms × 10,000 on a big vault).
 
-    async batchLoad(objectIds) {
+    static BATCH_CHUNK       = 50
+    static BATCH_CONCURRENCY = 16
+
+    async batchLoad(objectIds, opts) {
+        opts = opts || {}
         if (!objectIds || !objectIds.length) return new Map()
 
         const unique  = [...new Set(objectIds)]
         const result  = new Map()
         const toFetch = []
 
-        for (const objectId of unique) {
+        // Cache lookups in parallel: the Cache API tier is async per object (open + match), and
+        // a sequential loop over a 50-id chunk sat in front of every batch request.
+        const lookups = await Promise.all(unique.map(async (objectId) => {
             const filePath = `bare/data/${objectId}`
-            const cached   = await this._cacheGet(objectId, filePath)
+            return { objectId, filePath, cached: await this._cacheGet(objectId, filePath) }
+        }))
+        for (const { objectId, filePath, cached } of lookups) {
             if (cached) result.set(objectId, cached)
             else        toFetch.push({ objectId, filePath })
         }
 
         if (!toFetch.length) return result
 
-        const CHUNK = 50
-        for (let i = 0; i < toFetch.length; i += CHUNK) {
-            const chunk = toFetch.slice(i, i + CHUNK)
-            const ops   = chunk.map(({ filePath }) => ({ op: 'read', file_id: filePath }))
-            const raw   = await this._sgSend.vaultBatch(this._vaultId, null, ops)
+        const CHUNK    = opts.chunk || SGVaultObjectStore.BATCH_CHUNK
+        const failures = opts.failures instanceof Map ? opts.failures : null
+        const chunks   = []
+        for (let i = 0; i < toFetch.length; i += CHUNK) chunks.push(toFetch.slice(i, i + CHUNK))
+        let done = 0
+        const report = () => { if (opts.onProgress) { try { opts.onProgress(done, toFetch.length) } catch (_) {} } }
 
+        const fetchChunk = async (chunk) => {
+            const ops = chunk.map(({ filePath }) => ({ op: 'read', file_id: filePath }))
+            let raw
+            try {
+                raw = await this._sgSend.vaultBatch(this._vaultId, null, ops)
+            } catch (err) {
+                if (chunk.length > 1) {                                           // refused chunk: split in two (CLI rule)
+                    const mid = Math.ceil(chunk.length / 2)
+                    await fetchChunk(chunk.slice(0, mid)); await fetchChunk(chunk.slice(mid))
+                    return
+                }
+                try {                                                             // a single object: plain GET
+                    const data = await this._sgSend.vaultRead(this._vaultId, chunk[0].filePath)
+                    if (data) { result.set(chunk[0].objectId, data); this._cachePut(chunk[0].objectId, chunk[0].filePath, data) }
+                    else if (failures) failures.set(chunk[0].objectId, 'not_found')
+                } catch (e) { if (failures) failures.set(chunk[0].objectId, (e && e.message) || 'request failed') }
+                done += 1; report(); return
+            }
+            // results arrive in request order; match by file_id when the server echoes it, else by position
+            const retry  = []
+            const byFile = new Map()
+            for (let j = 0; j < (raw || []).length; j++) { const r = raw[j]; if (r && r.file_id) byFile.set(r.file_id, r) }
             for (let j = 0; j < chunk.length; j++) {
-                const r                    = raw[j]
                 const { objectId, filePath } = chunk[j]
+                const r = byFile.get(filePath) || (raw && raw[j])
                 if (r && r.status === 'ok' && r.data) {
                     const bytes = SGVaultObjectStore._b64ToAb(r.data)
                     result.set(objectId, bytes)
-                    await this._cachePut(objectId, filePath, bytes)
+                    this._cachePut(objectId, filePath, bytes)                      // not awaited: see above
+                } else if (r && r.status === 'not_found') {
+                    if (failures) failures.set(objectId, 'not_found')
+                } else {
+                    retry.push(chunk[j])                                            // 'error' / no result: one GET each
                 }
             }
+            for (const { objectId, filePath } of retry) {
+                try {
+                    const data = await this._sgSend.vaultRead(this._vaultId, filePath)
+                    if (data) { result.set(objectId, data); this._cachePut(objectId, filePath, data) }
+                    else if (failures) failures.set(objectId, 'not_found')
+                } catch (e) { if (failures) failures.set(objectId, (e && e.message) || 'request failed') }
+            }
+            done += chunk.length; report()
         }
+
+        // bounded pool: `concurrency` chunks in flight, each worker pulling the next chunk
+        const concurrency = Math.max(1, Math.min(opts.concurrency || SGVaultObjectStore.BATCH_CONCURRENCY, chunks.length))
+        let next = 0
+        const worker = async () => { while (next < chunks.length) { const c = chunks[next++]; await fetchChunk(c) } }
+        await Promise.all(Array.from({ length: concurrency }, worker))
 
         return result
     }

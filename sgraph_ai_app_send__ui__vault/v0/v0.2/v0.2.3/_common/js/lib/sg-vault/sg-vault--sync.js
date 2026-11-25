@@ -8,7 +8,10 @@
      Named ref (ref-pid-muw-*) — published state, advances only on push()
      Clone ref (ref-pid-snw-*) — working state, advances on every _commit()
 
-   Conflict model: fast-forward only. pull() refuses if clone has unpushed commits.
+   Conflict model: pull() is fast-forward only and refuses if the clone has unpushed commits;
+   merge() does a three-way file-level merge; push() is compare-and-swap with one reconcile.
+   sgit-ai 0.21 parity: rewind detection (EREWOUND), 'signatures-required' (ESIGNATURE),
+   shared branch index registration after every push.
    ================================================================================= */
 
 (function() {
@@ -83,38 +86,123 @@
             return false
         },
 
-        // --- Push: fast-forward named branch ref to clone HEAD ------------------
+        // --- Push: publish clone HEAD on the named branch -----------------------------
+        //
+        // sgit-ai 0.21 parity. By default a push is compare-and-swap against the named ref
+        // bytes this session last read: a push that loses a race never overwrites the winner.
+        // On a CAS miss the server's head is read, classified (a REWOUND published branch is
+        // refused unless opts.acceptRewind), merged into the clone (three-way, conflicts saved
+        // as _conflict copies) and the push retried once; a second miss throws EDIVERGED with
+        // the merge kept locally. Under 'signatures-required' an unsigned or unverifiable local
+        // commit is refused BEFORE anything is sent (the CLI's L5). After the ref lands, this
+        // device's public key and clone entry are registered in the shared branch index.
+        //   opts.force        : blind write (the user's explicit "force publish"; the CLI's push --force)
+        //   opts.acceptRewind : take a rewound remote head on a CAS miss (sgit pull --accept-rewind)
 
-        async push() {
+        async push(opts) {
+            opts = opts || {}
             if (!this._cloneRefFileId) throw new Error('No clone branch initialised')
             if (!this.writable)        throw new Error('Read-only: no write key')
-            // named ref + branch index in ONE POST /batch (fixed url → cacheable preflight).
-            await this._withBatch(async () => {
+            if (this._objectStore.batching) throw new Error('push() cannot run inside a write batch')
+
+            await this._refreshGateQuietly()
+            await this._ensurePublicKeyForPush()
+            await this._requireSignaturesForPush()
+
+            if (opts.force) {
                 await this._refManager.writeRef(this._refFileId, this._headCommitId)
-                try { await this._refManager.writeBranchIndex(this._branchIndexFileId, this._refFileId) } catch (_) {}
-            })
+            } else {
+                // A compare-and-swap only proves the ref has not moved since we READ it; it does
+                // not prove our head descends from it. So every attempt reads the published head
+                // afresh (the CAS baseline) and makes the push a fast-forward first: a rewound
+                // branch is refused (sgit: push on a rewound branch exits 1), a diverged one is
+                // merged into the working branch. Never overwrite published commits.
+                let published = false
+                for (let attempt = 0; attempt < 3 && !published; attempt++) {
+                    const serverHead = await this._refManager.readRef(this._refFileId)
+                    if (serverHead && serverHead !== this._headCommitId) {
+                        const status = await this._classifyRemoteHead(serverHead)
+                        if (status === 'rewound' && !opts.acceptRewind) {
+                            const e = new Error(this.rewindMessage(serverHead)); e.code = 'EREWOUND'; e.remoteHead = serverHead; throw e
+                        }
+                        const ff = await this._walkReaches(this._headCommitId, serverHead, 5000)
+                        if (!ff.reached) await this.merge(serverHead, { publish: false, acceptRewind: !!opts.acceptRewind })
+                        if (serverHead !== this._headCommitId && !(await this._walkReaches(this._headCommitId, serverHead, 5000)).reached) {
+                            const e = new Error('push: could not bring the published commits into your branch; nothing was published'); e.code = 'EDIVERGED'; throw e
+                        }
+                    }
+                    try { await this._refManager.writeRefIfMatch(this._refFileId, this._headCommitId); published = true }
+                    catch (err) { if (!err || err.code !== 'ECAS') throw err /* moved between read and write: go round again */ }
+                }
+                if (!published) { const e = new Error('push: the published branch keeps moving; your commits are kept locally, not published'); e.code = 'EDIVERGED'; throw e }
+            }
             this._namedHeadId = this._headCommitId
+            this._recordAcceptedHead(this._headCommitId)
+            try { await this._registerClone() } catch (err) { this._lastRegisterError = err }
         },
 
-        // --- Push, compare-and-swap: refuse to overwrite a moved named ref ------------
-        // push() is unconditional — it re-points the named ref to our head even if another
-        // client published in between, silently dropping their commits from the published
-        // branch. pushIfMatch() only succeeds if the named ref still holds what we last read
-        // (readRef caches the exact ciphertext). Throws 'ECAS' otherwise: the caller
-        // reconciles (merge) and retries. Used by headless child kernels, which have nobody
-        // to notice a lost update; the shells keep push() for now.
+        // --- Push, compare-and-swap, single attempt ------------------------------------
+        // Used by headless child kernels, which run their own reconcile loop (kernel-app-handlers).
+        // Throws 'ECAS' when the named ref moved OR when our head is not a fast-forward of the head
+        // the CAS baseline holds (the caller reconciles — merge — and retries); 'EREWOUND' when that
+        // head is a rewind of what this device last accepted.
         async pushIfMatch() {
             if (!this._cloneRefFileId) throw new Error('No clone branch initialised')
             if (!this.writable)        throw new Error('Read-only: no write key')
+            await this._ensurePublicKeyForPush()
+            await this._requireSignaturesForPush()
+            const baseline = await this._refManager.lastRefCommit(this._refFileId)
+            if (baseline && baseline !== this._headCommitId) {
+                if ((await this._classifyRemoteHead(baseline)) === 'rewound') {
+                    const e = new Error(this.rewindMessage(baseline)); e.code = 'EREWOUND'; e.remoteHead = baseline; throw e
+                }
+                if (!(await this._walkReaches(this._headCommitId, baseline, 5000)).reached) {
+                    const e = new Error('pushIfMatch: not a fast-forward of the published head; merge first'); e.code = 'ECAS'; throw e
+                }
+            }
             await this._refManager.writeRefIfMatch(this._refFileId, this._headCommitId)
-            try { await this._refManager.writeBranchIndex(this._branchIndexFileId, this._refFileId) } catch (_) {}
             this._namedHeadId = this._headCommitId
+            this._recordAcceptedHead(this._headCommitId)
+            try { await this._registerClone() } catch (err) { this._lastRegisterError = err }
+        },
+
+        // The device's public key must be on the server before anything it signed is published:
+        // under 'signatures-required' an unregistered key makes every other device refuse these
+        // commits, so a failed upload refuses the push. Elsewhere it is best effort (reported).
+        async _ensurePublicKeyForPush() {
+            try { await this._ensurePublicKey() }
+            catch (err) {
+                if (this.requiresSignatures) {
+                    const e = new Error('push refused: this device\'s signing key could not be registered on the server (' + (err && err.message) + '); this vault requires signed commits, so nothing was published'); e.code = 'ESIGNATURE'; throw e
+                }
+                this._lastRegisterError = err
+            }
+        },
+
+        // Re-read the gate before a sync (one small read); a vault raised while this tab was
+        // open is honoured from here on. Unavailable index = keep what we have.
+        async _refreshGateQuietly() {
+            try { await this._refreshBranchIndex() } catch (err) { if (err && err.code === 'EFORMAT') throw err }
+        },
+
+        // Under 'signatures-required', every local commit not yet on the named branch must verify.
+        async _requireSignaturesForPush() {
+            if (!this.requiresSignatures || !this._headCommitId || this._headCommitId === this._namedHeadId) return
+            const held   = await this._localHistory(this._namedHeadId)
+            const report = await this.verifyChain(this._headCommitId, { stopAt: held, anchorPrefix: SGVaultBranchIndex.sigAnchor(this._branchIndex) })
+            if (report.firstFailure) {
+                const [cid, status] = report.firstFailure
+                const e = new Error(`this vault requires signed commits and your commit ${cid} is ${status}: it cannot be published. ` +
+                                    (status === 'unsigned' ? 'This session has no signing key (read-only, private mode or an embedded app); open the vault in the SG/Vault app to sign.' : 'Ask the vault owner.'))
+                e.code = 'ESIGNATURE'; e.commitId = cid; e.status = status; throw e
+            }
         },
 
         // --- Behind count: new commits on named branch not yet in clone ----------
 
         async getBehindCount() {
             const serverNamedHead = await this._refManager.readRef(this._refFileId)
+            try { if (serverNamedHead) await this._classifyRemoteHead(serverNamedHead) } catch (_) {}
             if (!serverNamedHead || serverNamedHead === this._namedHeadId) return 0
 
             let count  = 0
@@ -134,23 +222,75 @@
 
         // --- Pull: fast-forward clone to named branch HEAD (no merge) -----------
 
-        async pull() {
+        // opts.acceptRewind: take a rewound published branch (after a deliberate force-push).
+        async pull(opts) {
+            opts = opts || {}
             if (!this.writable) throw new Error('Read-only: no write key')
 
             if (this._headCommitId !== this._namedHeadId) {
                 throw new Error('Cannot pull: you have unpushed local commits. Push first, then pull.')
             }
 
+            await this._refreshGateQuietly()
             const serverNamedHead = await this._refManager.readRef(this._refFileId)
             if (!serverNamedHead || serverNamedHead === this._headCommitId) return false
+
+            await this._guardIncoming(serverNamedHead, this._headCommitId, opts)
 
             this._namedHeadId  = serverNamedHead
             this._headCommitId = serverNamedHead
 
             await this._refManager.writeRef(this._cloneRefFileId, serverNamedHead)
             await this._loadTreeFromCommit(serverNamedHead)
+            this._recordAcceptedHead(serverNamedHead)
 
             return true
+        },
+
+        // The one rule (CLI review d3b8eef N2/N3): nothing accepts a remote head except
+        // verify-then-accept. Rewind check first (nothing is fetched for a refused rewind),
+        // then the signature policy on what is incoming.
+        async _guardIncoming(incomingHead, heldHead, opts) {
+            const status = await this._classifyRemoteHead(incomingHead)
+            if (status === 'rewound' && !(opts && opts.acceptRewind)) {
+                const e = new Error(this.rewindMessage(incomingHead)); e.code = 'EREWOUND'; e.remoteHead = incomingHead; throw e
+            }
+            await this._requireSignatures(incomingHead, heldHead)
+            return status
+        },
+
+        // --- Accept a rewound published branch (sgit pull --accept-rewind) ---------------
+        // The clone MOVES to the new head: the commits the owner removed are not kept, so the
+        // next push cannot put them back. Local changes made since the last accepted head are
+        // re-applied on top as ONE commit whose only parent is the new head (three-way, with
+        // the old accepted head as the base; conflicts saved as _conflict copies).
+        async _acceptRewindTo(newHead) {
+            const old = this._lastAcceptedHead
+            const hasOwn = old && this._headCommitId && this._headCommitId !== old
+            if (!hasOwn) {
+                await this._loadTreeFromCommit(newHead)
+                await this._refManager.writeRef(this._cloneRefFileId, newHead)
+                this._headCommitId = newHead
+                this._namedHeadId  = newHead
+                this._recordAcceptedHead(newHead)
+                return { merged: true, fastForward: true, conflicts: [], rewindAccepted: true }
+            }
+            await this._loadAllSubTreesInMemory()
+            const [baseFiles, oursFiles, theirsFiles] = await Promise.all([
+                this._flattenCommitTree(old),
+                Promise.resolve(this._flattenInMemoryTree()),
+                this._flattenCommitTree(newHead)
+            ])
+            const { mergedFiles, conflicts } = this._mergeFileMaps(baseFiles, oursFiles, theirsFiles)
+            this._applyFileMap(mergedFiles)
+            this._headCommitId  = newHead                  // single parent: the removed history is not carried
+            this._namedHeadId   = newHead
+            this._settingsDirty = true
+            await this._commit(conflicts.length
+                ? `Re-apply local changes after an accepted rewind: ${conflicts.length} conflict(s) saved as _conflict copies`
+                : 'Re-apply local changes after an accepted rewind')
+            this._recordAcceptedHead(newHead)
+            return { merged: true, fastForward: false, conflicts, rewindAccepted: true }
         },
 
         // --- Three-way file-level merge -----------------------------------------------
@@ -167,8 +307,16 @@
             if (!theirCommitId)          throw new Error('No commit ID provided')
 
             if (this._headCommitId === theirCommitId) {
+                if (opts.acceptRewind) this._recordAcceptedHead(theirCommitId)
                 return { merged: false, fastForward: false, conflicts: [], upToDate: true }
             }
+
+            // Rewind + signature policy before anything is loaded or written (opts.checkRewind
+            // === false skips the rewind rule for callers merging an arbitrary local commit).
+            if (opts.checkRewind !== false) {
+                const status = await this._guardIncoming(theirCommitId, this._headCommitId, opts)
+                if (status === 'rewound') return this._acceptRewindTo(theirCommitId)    // only reached with acceptRewind
+            } else await this._requireSignatures(theirCommitId, this._headCommitId)
 
             // Ensure all lazy sub-trees in memory are expanded before we flatten
             await this._loadAllSubTreesInMemory()
@@ -181,6 +329,7 @@
                 await this._refManager.writeRef(this._cloneRefFileId, theirCommitId)
                 this._headCommitId = theirCommitId
                 this._namedHeadId  = theirCommitId
+                this._recordAcceptedHead(theirCommitId)
                 return { merged: true, fastForward: true, conflicts: [] }
             }
 
@@ -200,6 +349,7 @@
             this._applyFileMap(mergedFiles)
 
             this._namedHeadId = theirCommitId
+            this._recordAcceptedHead(theirCommitId)
 
             const mergeMsg = conflicts.length > 0
                 ? `Merge: ${conflicts.length} conflict(s) saved as _conflict copies`
@@ -224,6 +374,14 @@
         // --- Load all lazy sub-trees into in-memory tree ------------------------------
 
         async _loadAllSubTreesInMemory() {
+            if (typeof this.loadAllSubTrees === 'function') {
+                const r = await this.loadAllSubTrees()
+                if (r && r.failed && r.failed.length) {             // an unloaded folder would read as "deleted by ours"
+                    const e = new Error(`merge refused: ${r.failed.length} folder(s) could not be loaded (${r.failed[0].reason}); nothing was changed. Try again.`)
+                    e.code = 'EINCOMPLETE'; e.failed = r.failed; throw e
+                }
+                return
+            }
             const loadNode = async (node, path) => {
                 if (node._loaded === false && node._tree_id) {
                     await this.loadSubTreeOnDemand(path)
@@ -321,7 +479,9 @@
                         files.set(path, {
                             blob_id:      entry.blob_id,
                             size:         entry.size,
-                            content_hash: entry.content_hash
+                            content_hash: entry.content_hash,
+                            content_type: entry.content_type || null,
+                            large:        !!entry.large
                         })
                     }
                 }
@@ -346,7 +506,9 @@
                         files.set(path, {
                             blob_id:      entry.blob_id,
                             size:         entry.size,
-                            content_hash: entry.content_hash
+                            content_hash: entry.content_hash,
+                            content_type: entry.content_type || null,
+                            large:        !!entry.large
                         })
                     }
                 }
@@ -422,7 +584,8 @@
                 }
                 node.children[fileName] = {
                     type: 'file', blob_id: entry.blob_id,
-                    size: entry.size | 0, content_hash: entry.content_hash || null
+                    size: Number(entry.size) || 0, content_hash: entry.content_hash || null,
+                    content_type: entry.content_type || null, large: !!entry.large
                 }
             }
         },
@@ -438,13 +601,14 @@
             const settingsHash      = await this._commitManager.computeContentHash(settingsPlain)
             entries.push({
                 name: '.vault-settings.json', size: settingsPlain.byteLength,
-                content_hash: settingsHash, blob_id: settingsBlobId, tree_id: null
+                content_hash: settingsHash, content_type: 'application/json', large: false,
+                blob_id: settingsBlobId, tree_id: null
             })
 
             const treeId    = await this._commitManager.createTree(entries)
             const parentIds = [this._headCommitId, extraParentId].filter(Boolean)
             const commitId  = await this._commitManager.createCommit({
-                parentIds, treeId, message, branchId: null
+                parentIds, treeId, message, branchId: null, signer: this._signer
             })
 
             const targetRef = this._cloneRefFileId || this._refFileId

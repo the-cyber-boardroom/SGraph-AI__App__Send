@@ -8,6 +8,7 @@ import base64
 import hashlib
 import json
 import re
+from   concurrent.futures                                                        import ThreadPoolExecutor
 from   osbot_utils.type_safe.primitives.domains.identifiers.safe_int.Timestamp_Now import Timestamp_Now
 from   memory_fs.storage_fs.Storage_FS                                           import Storage_FS
 from   memory_fs.storage_fs.providers.Storage_FS__Memory                         import Storage_FS__Memory
@@ -19,6 +20,7 @@ from   sgraph_ai_app_send.lambda__user.storage.Storage__Paths                   
                                                                                          path__vault_tombstone        )
 
 VAULT_ID_PATTERN = re.compile(r'^[a-z0-9]{8,24}$')                              # Opaque lowercase alphanumeric, 8–24 chars, no hyphens/uppercase
+BATCH_READ_WORKERS = 16                                                          # parallel backend reads per batch_read (a 50-object batch: ~1.6 s sequential on S3, a few hundred ms in parallel)
 
 
 class Service__Vault__Pointer(Type_Safe):                                        # Opaque blob storage with write-key auth
@@ -245,17 +247,25 @@ class Service__Vault__Pointer(Type_Safe):                                       
         self.storage_fs.file__save(path, json.dumps(public_vault, indent=2).encode())
 
     def batch_read(self, vault_id, operations):                                  # Read-only batch (no auth required — data is encrypted)
-        results = []
-        for op in operations:
-            file_id = op.get('file_id', '')
-            results.append(self._batch_read(vault_id, file_id))
+        file_ids = [op.get('file_id', '') for op in operations]
+        if not file_ids:
+            return dict(vault_id = vault_id, results = [])
+        results = [self._batch_read(vault_id, file_ids[0])]                      # first read on THIS thread: a lazily-built backend client (the boto3 S3
+        rest    = file_ids[1:]                                                   # client is created on first use, unlocked) is created once, never by 16 threads
+        if len(rest) == 1:                                                       # at once on a cold Lambda (boto3 client creation is not thread-safe)
+            results.append(self._batch_read(vault_id, rest[0]))
+        elif rest:                                                               # many objects: read the backend in parallel, keep request order
+            with ThreadPoolExecutor(max_workers=min(BATCH_READ_WORKERS, len(rest))) as pool:   # the per-object S3 round trip (~30 ms) was the
+                results.extend(pool.map(lambda file_id: self._batch_read(vault_id, file_id), rest))   # floor of every clone and tree walk; reads are independent
         return dict(vault_id = vault_id ,
                     results  = results  )
 
     def _batch_read(self, vault_id, file_id):                                    # Internal: read single file for batch response
         payload_path = self.vault_payload_path(vault_id, file_id)
         payload      = self.storage_fs.file__bytes(payload_path)                 # None when absent — single read, no pre-exists check
-        if payload is None:
+        if payload is None:                                                      # a backend error (S3 SlowDown, timeout) raises and fails the WHOLE
+                                                                                 # request, as before the parallel read: deployed and rollback UIs only
+                                                                                 # understand 'ok' / 'not_found', and retry a failed request by splitting it
             return dict(file_id = file_id, status = 'not_found')
         return dict(file_id = file_id                                ,
                     status  = 'ok'                                   ,

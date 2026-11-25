@@ -1,6 +1,6 @@
 # vault — Reality Index
 
-**Domain:** `vault/` | **Last updated:** 2026-09-07 | **Maintained by:** Librarian (daily run)
+**Domain:** `vault/` | **Last updated:** 2026-10-12 | **Maintained by:** Librarian (daily run)
 
 The vault/SGit cryptographic storage system. This domain covers the encryption layer, the
 object storage model, the browser JS client, PKI, and the sgit CLI as it relates to vault
@@ -370,6 +370,43 @@ Round-1 and Round-2 review findings addressed after the initial surface landed:
 
 ---
 
+### Final review fixes before dev (2026-11-25)
+
+| Item | Status | Evidence |
+|---|---|---|
+| sgit-ai pack-mode vaults (`packs`, `blob-deflate`, 0.24.0+) refused by name on open (`EFORMAT`, names `sgit pack export`) | **EXISTS** | `SGVaultBranchIndex.checkFormat`; `test__sgit_parity.js` |
+| Web commit messages capped at 740 UTF-8 bytes (sgit < 0.26.4 limit) | **EXISTS** | `SGVaultCommit.capMessage`; `test__sgit_parity.js` |
+| Signing key created insert-if-absent: concurrent first opens in two tabs share one key | **EXISTS** | `SGVaultSigner.forVault` (`idbAdd`) |
+| Server `batch_read` reads the first object on the request thread before fanning out (cold-Lambda boto3 client creation) | **EXISTS** | `Service__Vault__Pointer.batch_read`; `test__batch_read__first_read_on_calling_thread` |
+| Compatibility re-verified against sgit-ai 0.27.0 (`user_signature` is outside the signing bytes) | **VERIFIED** | `tests/integration/vault_ui/cli/test__sgit_cli_parity.py`; changelog `team/comms/changelog/11/25/` |
+
+### Bulk sub-tree loading (2026-10-23)
+
+| Item | Status | Evidence |
+|---|---|---|
+| **`SGVault.loadAllSubTrees()`** — streaming tree walk: up to 16 batch POSTs in flight, 50 tree ids each, decrypt in parallel, children queued as they arrive; shared tree ids fetched once; progress per chunk. `VaultDataSource.loadAllSubTrees` and merge's full expansion delegate to it. Measured on a 9,682-folder / 24,866-file vault: 204 POSTs, 24 s, against 7,843 GETs and ~650 s before | **EXISTS** | `sg-vault--folder-ops.js`; `test__bulk_subtree_load.js` (14); changelog `team/comms/changelog/10/23/` |
+| **`SGVaultObjectStore.batchLoad`** — bounded fan-out (16), refused chunk split in two down to a single GET, results matched by `file_id` | **EXISTS** | `sg-vault-object-store.js` |
+| Server `batch_read` reads the backend in parallel (16 workers), request order preserved | **EXISTS** | `Service__Vault__Pointer.py`; `test__batch_read__many_files__parallel_keeps_order` |
+| Progressive rendering of the Browse view while the walk runs | PROPOSED | — |
+
+### sgit-ai 0.21.0 parity — format gate, shared index, signed commits, rewinds, deterministic trees (2026-10-12)
+
+Verified against the REAL sgit-ai 0.21.0 on this repo's in-memory server (`tests/integration/vault_ui/cli/test__sgit_cli_parity.py`): `sgit check verify` reports every web commit **verified**, `fsck` is OK, the gate / tags / CLI entries survive web pushes, and a CLI-written folder re-encrypted by the web gets the identical tree id.
+
+| Item | Status | Evidence |
+|---|---|---|
+| **Format gate read on open** (`format`, `min_client`, `features` from the branch index; re-read before every sync); `computeObjectId` cuts at 12 or 32 hex by vault format; an unknown format refuses the open (`EFORMAT`) | **EXISTS** | `sg-vault.js` `_refreshBranchIndex` / `_applyBranchIndex`; `sg-vault-object-store.js` `setFormat`; `SGVaultBranchIndex` in `sg-vault-interop.js`; `test__sgit_parity.js` |
+| **Branch index as a shared document**: read → merge (branches by id, server's gate unless absent, tags per name with tombstones and clock-skew rule, unknown members kept) → `write-if-match` → re-read/retry ×3; never staged in the commit batch; this device's clone entry (`branch-clone-<16 hex>`, `name: web-ui`, `public_key_id`) upserted after every push | **EXISTS** | `SGVaultRefManager.upsertBranchIndex`; `SGVaultBranchIndex.merge`; `SGVault._registerClone`; parity test §2 |
+| **Per-device P-256 signing key** (non-extractable `CryptoKey` in IndexedDB, keyed by vault id); public key published at `bare/keys/key-rnd-imm-<id>` as `{"type":"public","pem"}` under the read key before the first push | **EXISTS** | `SGVaultSigner` (`sg-vault-interop.js`); `SGVault._ensurePublicKey` |
+| **Signed `commit_v1`**: the ten CLI members, ECDSA P-256 / SHA-256 over RFC 8785 bytes, raw `r‖s` base64, `author_key_id`, CLI-conforming `branch_id`; unsigned sessions write the same shape with `signature: null` | **EXISTS** | `SGVaultCommit.createCommit`; `SGVaultSigning`; vectors in `test__sgit_interop_vectors.js` |
+| **Verification**: `verifyCommit` / `verifyChain` with the CLI's statuses (verified / bad / unsigned / no-key / missing), key from `author_key_id` else the index's branch → key mapping, legacy (pre-0.19) bytes accepted for `author_key_id: null`; chips in the SGit history and object views; gate + signing key + tags in the Refs tab | **EXISTS** | `sg-vault.js`; `vault-sgit-view*.js` |
+| **`signatures-required`**: refuse to publish an unsigned / unverifiable local commit before anything is sent (`ESIGNATURE`); refuse an incoming unverifiable commit after `signed-since-<id>` on pull / merge | **EXISTS** | `sg-vault--sync.js` `_requireSignaturesForPush`, `_guardIncoming` |
+| **Rewind detection**: last accepted named head per device (`localStorage`), classified forward / rewound / unknown on every named-ref read; `pull` / `merge` refuse with `EREWOUND` unless `{ acceptRewind: true }`; shell banner with the CLI's wording and an "Accept rewind" action | **EXISTS** | `sg-vault.js` `_classifyRemoteHead`; `vault-shell.js` `_onAcceptRewind` |
+| **Compare-and-swap publish by default**: `push()` is CAS with one reconcile (merge the server head, retry), `EDIVERGED` on a second miss; `push({ force: true })` is the explicit blind write; `pushIfMatch()` unchanged for child kernels | **EXISTS** | `sg-vault--sync.js` `push`; shells' push dialog |
+| **Deterministic trees byte-identical to the CLI**: HMAC-SHA256 IV, Python `json.dumps` separators, 7-member entries in CLI order with `content_type_enc` (Python `mimetypes` table) and `large`, files then folders sorted by code point; an unchanged file reuses its blob | **EXISTS** | `SGVaultCommit.createTree`; `SGVaultPyJson`, `SGVaultPyMimetypes`; parity test `rebuild-tree` |
+| **Per-device clone ref** (`web-ui:<branch id>`) for signed sessions; unpublished work left on the old shared `web-ui` ref is adopted once (`_adoptedLegacyClone`) | **EXISTS** | `sg-vault.js` `open()`; `test__sgit_parity.js` migration suite |
+| Pages load `lib/sg-vault/sg-vault-interop.js` (index, app, browse, sgit, token, public-preview); kernel bundle regenerated | **EXISTS** | `scripts/build-kernel-shell-bundle.py`; `test__bundle_freshness.js` |
+
 ### Routing — the locale landing is a hash inbox (2026-09-09)
 
 | Item | Status | Evidence |
@@ -381,6 +418,9 @@ Round-1 and Round-2 review findings addressed after the initial surface landed:
 | Claimed | Reality |
 |---------|---------|
 | `structure_key` used for encryption | PROPOSED — derived but never used currently |
+| Web UI creates signed tags | **DOES NOT EXIST** — the web reads and preserves `tags[]` (EXISTS, 2026-10-12) but `sgit vault tag create` has no web equivalent yet |
+| Web UI honours `min_client` as a version floor | **DOES NOT EXIST by design** — `min_client` names a sgit-ai version; the web reads it (shown in the SGit view), refuses only an unknown `format`, and refuses writes it cannot make policy-compliant |
+| Web UI signs in a sandboxed child kernel (null-origin iframe) | **DOES NOT EXIST** — no IndexedDB there; kernel commits stay unsigned unless a parent hands it a signer (`options.signer`); under `signatures-required` such a kernel cannot publish |
 | `GET /api/vault/bundle/{vault_id}` (single-call clone) | PROPOSED |
 | MCP transport backend for sgit | PROPOSED |
 | Merge and conflict resolution | PROPOSED — architecture simulated, no code |
@@ -393,6 +433,7 @@ Round-1 and Round-2 review findings addressed after the initial surface landed:
 
 Key proposals for this domain. Full details: see sub-files in `proposed/`.
 
+- **sgit-ai 0.21.0 interop** — SHIPPED on the branch 2026-10-12 (see EXISTS above; plan and contract: `team/roles/architect/reviews/10/12/v0.33.69__architect-review__sgit-0.21-vault-web-gap-analysis.md`). Still PROPOSED: web-created signed tags; parent-held signer for sandboxed kernels; and, on the CLI side, writer-signed refs/index (Ed25519), native PKI vault mode (`format: 3`), sealed files.
 - **Structure key encryption split** — activate `structure_key` for structural objects (four-team, 04/28 review) → `proposed/structure-key-split.md`
 - **Vault architecture overhaul** — self-describing file IDs, sub-tree model, batch read API → `proposed/vault-architecture.md`
 - **SG Vault Hub** — GitHub-equivalent for encrypted vaults, change packs, public view publishing → `proposed/vault-hub.md`

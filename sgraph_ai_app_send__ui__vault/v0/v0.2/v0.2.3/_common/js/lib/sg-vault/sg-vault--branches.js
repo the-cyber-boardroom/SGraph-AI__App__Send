@@ -47,8 +47,11 @@
             if (!commitId) throw new Error(`Branch ref not found: ${headRefId}`)
 
             this._refFileId    = headRefId
+            this._refPinned    = true                    // an index refresh must not flip the ref back to 'current'
             this._namedHeadId  = commitId
             this._headCommitId = commitId
+            this._loadAcceptedHead()
+            if (!this._lastAcceptedHead) this._recordAcceptedHead(commitId)
 
             await this._loadTreeFromCommit(commitId)
         }

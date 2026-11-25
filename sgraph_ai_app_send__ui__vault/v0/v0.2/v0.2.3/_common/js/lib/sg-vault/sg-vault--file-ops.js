@@ -11,6 +11,7 @@
     Object.assign(SGVault.prototype, {
 
         async addFile(folderPath, fileName, fileData) {
+          await this._ensureFolderLoaded(folderPath)
           // Batch scope: the blob store + the commit it triggers (tree+commit+clone-ref) flush
           // as ONE POST /batch instead of 4 preflighted PUTs.
           return this._withBatch(async () => {
@@ -25,7 +26,9 @@
 
             folder.children[fileName] = {
                 type: 'file', blob_id: blobId,
-                size: data.byteLength || data.length, content_hash: contentHash
+                size: data.byteLength || data.length, content_hash: contentHash,
+                content_type: SGVaultPyMimetypes.contentTypeFor(fileName),
+                large: encrypted.byteLength > SGVault.LARGE_BLOB_THRESHOLD
             }
 
             this._markDirty(folderPath)
@@ -40,6 +43,7 @@
 
         async addFiles(items) {
             if (!items || items.length === 0) return []
+            for (const folder of new Set(items.map(i => i.folderPath))) await this._ensureFolderLoaded(folder)
           // All blobs + the single commit flush as ONE POST /batch.
           return this._withBatch(async () => {
             const results = []
@@ -60,7 +64,9 @@
 
                 folder.children[item.fileName] = {
                     type: 'file', blob_id: blobId,
-                    size: data.byteLength || data.length, content_hash: contentHash
+                    size: data.byteLength || data.length, content_hash: contentHash,
+                    content_type: SGVaultPyMimetypes.contentTypeFor(item.fileName),
+                    large: encrypted.byteLength > SGVault.LARGE_BLOB_THRESHOLD
                 }
 
                 this._markDirty(item.folderPath)
@@ -79,6 +85,7 @@
         },
 
         async updateFile(folderPath, fileName, fileData) {
+          await this._ensureFolderLoaded(folderPath)
           // Batch scope: blob store + commit → ONE POST /batch.
           return this._withBatch(async () => {
             const data   = fileData instanceof ArrayBuffer ? new Uint8Array(fileData) : fileData
@@ -88,13 +95,24 @@
                 throw new Error(`File not found: ${fileName}`)
             }
 
-            const encrypted   = await this._sgSend.encrypt(data, this._readKey)
-            const blobId      = await this._objectStore.store(encrypted)
+            // Reuse the stored blob when the bytes are unchanged (sgit encrypt_or_reuse_blob): a
+            // fresh random-IV encryption would give a new blob id and a new tree id for nothing.
+            const prev        = folder.children[fileName]
             const contentHash = await this._commitManager.computeContentHash(data)
+            let blobId, large
+            if (prev && prev.blob_id && prev.content_hash === contentHash) {
+                blobId = prev.blob_id; large = !!prev.large
+            } else {
+                const encrypted = await this._sgSend.encrypt(data, this._readKey)
+                blobId = await this._objectStore.store(encrypted)
+                large  = encrypted.byteLength > SGVault.LARGE_BLOB_THRESHOLD
+            }
 
             folder.children[fileName] = {
                 type: 'file', blob_id: blobId,
-                size: data.byteLength || data.length, content_hash: contentHash
+                size: data.byteLength || data.length, content_hash: contentHash,
+                content_type: SGVaultPyMimetypes.contentTypeFor(fileName),
+                large
             }
 
             this._markDirty(folderPath)
@@ -109,14 +127,14 @@
             const entry = folder.children[fileName]
             if (!entry || entry.type !== 'file') throw new Error(`File not found: ${fileName}`)
 
-            const LARGE_FILE_THRESHOLD = 4 * 1024 * 1024
-            const encrypted = (entry.size || 0) > LARGE_FILE_THRESHOLD
+            const encrypted = (entry.large || (entry.size || 0) > SGVault.LARGE_BLOB_THRESHOLD)
                 ? await this._objectStore.loadLarge(entry.blob_id)
                 : await this._objectStore.load(entry.blob_id)
             return SGSendCrypto.decrypt(encrypted, this._readKey)
         },
 
         async removeFile(folderPath, fileName) {
+            await this._ensureFolderLoaded(folderPath)
             const folder = this._findNode(folderPath)
             if (!folder) throw new Error(`Folder not found: ${folderPath}`)
             delete folder.children[fileName]
@@ -125,18 +143,21 @@
         },
 
         async renameFile(folderPath, oldName, newName) {
+            await this._ensureFolderLoaded(folderPath)
             const folder = this._findNode(folderPath)
             if (!folder) throw new Error(`Folder not found: ${folderPath}`)
             if (!folder.children[oldName]) throw new Error(`File not found: ${oldName}`)
             if (folder.children[newName]) throw new Error(`Already exists: ${newName}`)
             folder.children[newName] = folder.children[oldName]
             delete folder.children[oldName]
+            if (folder.children[newName].type === 'file') folder.children[newName].content_type = SGVaultPyMimetypes.contentTypeFor(newName)
             this._markDirty(folderPath)
             await this._commit(`Rename ${oldName} to ${newName}`)
         },
 
         async moveFile(srcFolderPath, fileName, destFolderPath) {
             if (srcFolderPath === destFolderPath) return
+            await this._ensureFolderLoaded(srcFolderPath); await this._ensureFolderLoaded(destFolderPath)
             const srcFolder = this._findNode(srcFolderPath)
             if (!srcFolder || srcFolder.type !== 'folder') throw new Error(`Source folder not found: ${srcFolderPath}`)
             const entry = srcFolder.children[fileName]

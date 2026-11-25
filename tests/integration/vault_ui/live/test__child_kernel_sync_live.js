@@ -225,9 +225,15 @@ try {
     ok('pushIfMatch after merge → ok', e8b === null, e8b && e8b.message);
     v = await freshOpen(api, KEY);
     ok('published tree has from-a.md and moved.md', v.files.includes('from-a.md') && v.files.includes('notes/moved.md'));
+    // A ref this vault WROTE is a known CAS baseline (since the sgit-0.21 parity work): a freshly
+    // created vault pushes with compare-and-swap without reading its own named ref first.
     const fresh = await SGVault.create(sgSend(api), randomWord('fresh'), { name: 'Fresh' });
     const e8c = await errOf(() => fresh.pushIfMatch());
-    ok('never-read ref → ENOMATCH', e8c && e8c.code === 'ENOMATCH', e8c && e8c.code);
+    ok('freshly created vault: its own write is the CAS baseline → pushIfMatch ok', e8c === null, e8c && (e8c.code || e8c.message));
+    // A ref neither read nor written through this manager still refuses.
+    const blind = new SGVaultRefManager(sgSend(api), fresh._vaultId, fresh._writeKey, fresh._readKey);
+    const e8d = await errOf(() => blind.writeRefIfMatch(fresh._refFileId, fresh._headCommitId));
+    ok('never-read, never-written ref → ENOMATCH', e8d && e8d.code === 'ENOMATCH', e8d && e8d.code);
 
 } finally {
     await api.stop();

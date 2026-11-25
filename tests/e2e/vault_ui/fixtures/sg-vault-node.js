@@ -25,6 +25,7 @@ const LIB_FILES = [
     'lib/sg-send/sg-send-crypto.js',
     'lib/sg-send/sg-send.js',
     'lib/sg-vault/sg-vault-crypto.js',
+    'lib/sg-vault/sg-vault-interop.js',
     'lib/sg-vault/sg-vault-object-store.js',
     'lib/sg-vault/sg-vault-ref-manager.js',
     'lib/sg-vault/sg-vault-commit.js',
@@ -40,7 +41,7 @@ const LIB_FILES = [
     'components/app-shell/app-permissions.js',
     'components/app-shell/kernel-app-handlers.js'
 ];
-const GLOBALS = ['SGSend', 'SGSendCrypto', 'SGVault', 'SGVaultCrypto', 'SGVaultObjectStore',
+const GLOBALS = ['SGSend', 'SGSendCrypto', 'SGVault', 'SGVaultCrypto', 'SGVaultObjectStore', 'SGVaultSigning', 'SGVaultSigner', 'SGVaultBranchIndex',
                  'SGVaultRefManager', 'SGVaultCommit', 'VaultLinks', 'VaultDataSource'];
 
 let _loaded = false;

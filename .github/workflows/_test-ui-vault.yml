@@ -49,7 +49,9 @@ jobs:
   # ── E2E tests (~60s): Playwright + local file server ──────────────────────
   e2e:
     name: E2E tests (Playwright)
-    runs-on: ubuntu-latest
+    # Pinned: the locked Playwright cannot install Chromium on ubuntu-latest (26.04):
+    # "Playwright does not support chromium on ubuntu26.04-x64". Unpin when Playwright is upgraded.
+    runs-on: ubuntu-24.04
     timeout-minutes: 2          # healthy run is ~1 min; fail fast if the Playwright install hangs
     needs: [unit, integration]
     steps:
@@ -84,7 +86,7 @@ jobs:
   # Guide: library/guides/vault-html/DECLARED-MOUNTS-E2E.md
   declared-mounts-e2e:
     name: Declared mounts e2e + live sync (Python API + Playwright)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04            # pinned for Playwright, see the e2e job
     timeout-minutes: 8
     needs: [unit, integration]
     steps:

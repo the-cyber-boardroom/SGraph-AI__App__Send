@@ -479,6 +479,77 @@ class test_Service__Vault__Pointer(TestCase):
             assert result['results'][i]['status']  == 'ok'
             assert result['results'][i]['data']    == base64.b64encode(data).decode('ascii')
 
+    def test__batch_read__many_files__parallel_keeps_order(self):
+        """batch_read reads the backend in parallel (BATCH_READ_WORKERS) but the results
+        stay in request order, one per operation, absent files included — the clients
+        (CLI batch_read, web batchLoad) match results to requests by position."""
+        from sgraph_ai_app_send.lambda__user.service.Service__Vault__Pointer import BATCH_READ_WORKERS
+        assert BATCH_READ_WORKERS > 1
+        n     = BATCH_READ_WORKERS * 3 + 7                                       # more ops than workers: several rounds
+        files = {f'bare/data/obj-cas-imm-{i:012x}': f'blob-{i}'.encode() for i in range(n)}
+        for fid, data in files.items():
+            self.service.write(self.vault_id, fid, self.write_key, data)
+        ops = [dict(op='read', file_id=fid) for fid in files]
+        ops.insert(5, dict(op='read', file_id='bare/data/obj-cas-imm-000000000000'))   # absent, mid-list
+        result = self.service.batch_read(self.vault_id, ops)
+        assert len(result['results']) == len(ops)
+        for op, r in zip(ops, result['results']):
+            assert r['file_id'] == op['file_id']
+            if op['file_id'] in files:
+                assert r['status'] == 'ok'
+                assert base64.b64decode(r['data']) == files[op['file_id']]
+            else:
+                assert r['status'] == 'not_found'
+                assert 'data' not in r
+        sequential = [self.service._batch_read(self.vault_id, op['file_id']) for op in ops]
+        assert result['results'] == sequential                                   # identical to the one-by-one answer
+
+    def test__batch_read__backend_error_fails_the_whole_request(self):
+        """A backend exception while reading one object (S3 SlowDown, a timeout) fails the
+        whole batch, exactly as the sequential read did: every deployed UI (and every rollback
+        release) understands only 'ok' / 'not_found' per op and retries a failed REQUEST by
+        splitting it. A per-op 'error' status would read as a silently missing object there."""
+        import pytest
+        from memory_fs.storage_fs.providers.Storage_FS__Memory import Storage_FS__Memory
+        class Flaky_FS(Storage_FS__Memory):
+            def file__bytes(self, path):
+                if 'obj-bad' in str(path):
+                    raise RuntimeError('SlowDown')
+                return super().file__bytes(path)
+        service = Service__Vault__Pointer(storage_fs=Flaky_FS())
+        service.write(self.vault_id, 'bare/data/obj-good', self.write_key, b'ok')
+        service.write(self.vault_id, 'bare/data/obj-bad',  self.write_key, b'never read')
+        ops = [dict(op='read', file_id='bare/data/obj-good'),
+               dict(op='read', file_id='bare/data/obj-bad' ),
+               dict(op='read', file_id='bare/data/obj-absent')]
+        with pytest.raises(RuntimeError, match='SlowDown'):
+            service.batch_read(self.vault_id, ops)                               # parallel path
+        with pytest.raises(RuntimeError, match='SlowDown'):
+            service.batch_read(self.vault_id, ops[1:2])                          # single-op path
+
+    def test__batch_read__first_read_on_calling_thread(self):
+        """The first operation is read on the request thread before the pool starts, so a
+        backend that builds its client lazily (Storage_FS__S3 → boto3) builds it once,
+        not concurrently from BATCH_READ_WORKERS threads on a cold Lambda."""
+        import threading
+        from memory_fs.storage_fs.providers.Storage_FS__Memory import Storage_FS__Memory
+        calls = []
+        class Recording_FS(Storage_FS__Memory):
+            def file__bytes(self, path):
+                calls.append((str(path), threading.current_thread() is threading.main_thread()))
+                return super().file__bytes(path)
+        service = Service__Vault__Pointer(storage_fs=Recording_FS())
+        fids    = [f'bare/data/obj-cas-imm-{i:012x}' for i in range(20)]
+        for fid in fids:
+            service.write(self.vault_id, fid, self.write_key, fid.encode())
+        calls.clear()
+        result = service.batch_read(self.vault_id, [dict(op='read', file_id=f) for f in fids])
+        assert [r['file_id'] for r in result['results']] == fids                 # order kept
+        assert all(r['status'] == 'ok' for r in result['results'])
+        assert calls[0][1] is True                                               # the first read ran on the calling thread
+        assert fids[0] in calls[0][0]
+        assert service.batch_read(self.vault_id, [])['results'] == []            # no ops: no reads, no pool
+
     def test__batch_read__not_found(self):
         """Reading a nonexistent file in batch_read returns not_found."""
         operations = [dict(op='read', file_id='bare/data/ghost')]
