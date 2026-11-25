@@ -885,7 +885,7 @@ message is for humans and will change.
 | `EINVAL` | bad arguments, or no vault id — **nothing was sent** |
 | `ENOAUTH` | this session has no key for that verb (a read-only session calling a read verb) |
 | `E2BIG` | payload over 5 MB, or a batch over 100 `file_ids` |
-| `ENOSPC` | the lane is at its 1000-file ceiling |
+| `ENOSPC` | the lane is full: 1000 pending files by default, or the owner's per-lane limit / byte budget |
 | `EUNREACH` | the request never completed (offline, DNS, CSP) |
 | `ENOTRANSPORT` | no vault open, or the transport isn't loaded on this surface |
 | `EEDGE` | **an HTML error page came back instead of JSON — see below** |
@@ -942,6 +942,15 @@ lane**, and **100 `file_ids` per batch** for `fetch`/`markProcessed`/`purge`.
 and a `features` list. A `fetch` stops at a 5.5 MB encoded response: the ids it did not return
 come back in `deferred` — fetch those in the next call. `inbox` is the lane's raw append token
 (its folder name), not a hash. Use random append tokens, never ones derived from a public key.
+
+**Owner-side lane controls (server, 25 Nov 2026) — not on the app bridge.** The HTTP API can now
+list `processed` entries, `unmark` them back to pending, read one lane's `stats`,
+set per-lane limits (`hard_pending` up to 5000, `soft_pending`, a byte budget) and a retention
+class for processed entries (1, 3, 7, 30, 90 or 365 days), and issue **scoped read keys** that
+see only named lanes. `sg.append.configure` from an app still sends only `append_anchors` (and
+the derived enum-key hash); `configure` now refuses unknown fields with 400, and removing an
+anchor drops that lane's settings. None of these powers are granted to apps yet: `sg.append.*`
+keeps its six verbs. Reference: `team/comms/changelog/11/25/v0.33.69__changelog__append-lanes-v2-phase-2.md`.
 
 ### Draining the lanes of your **declared** sub-vaults — NEW 2026-09-07
 

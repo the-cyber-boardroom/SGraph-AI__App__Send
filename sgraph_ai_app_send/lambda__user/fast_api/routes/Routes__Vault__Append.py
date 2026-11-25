@@ -5,6 +5,7 @@ from   fastapi.responses                                                        
 from   osbot_fast_api.api.routes.Fast_API__Routes                                  import Fast_API__Routes
 from   osbot_utils.type_safe.primitives.domains.identifiers.safe_str.Safe_Str__Id  import Safe_Str__Id
 from   sgraph_ai_app_send.lambda__user.service.Service__Vault__Append              import Service__Vault__Append
+from   sgraph_ai_app_send.lambda__user.service.Vault__Append__Config               import CONFIGURE_MAX_BODY
 from   sgraph_ai_app_send.lambda__user.service.Service__Vault__Pointer             import VAULT_ID_PATTERN
 from   sgraph_ai_app_send.lambda__user.user__config                                import (HEADER__SGRAPH_SEND__ACCESS_TOKEN ,
                                                                                            HEADER__SGRAPH_VAULT__WRITE_KEY  ,
@@ -17,6 +18,8 @@ ROUTES_PATHS__VAULT_APPEND = [f'/{TAG__ROUTES_VAULT_APPEND}/limits'             
                               f'/{TAG__ROUTES_VAULT_APPEND}/list/{{vault_id}}'            ,
                               f'/{TAG__ROUTES_VAULT_APPEND}/fetch/{{vault_id}}'           ,
                               f'/{TAG__ROUTES_VAULT_APPEND}/mark-processed/{{vault_id}}'  ,
+                              f'/{TAG__ROUTES_VAULT_APPEND}/unmark/{{vault_id}}'          ,
+                              f'/{TAG__ROUTES_VAULT_APPEND}/stats/{{vault_id}}'           ,
                               f'/{TAG__ROUTES_VAULT_APPEND}/purge/{{vault_id}}'           ,
                               f'/{TAG__ROUTES_VAULT_APPEND}/configure/{{vault_id}}'       ]
 
@@ -88,6 +91,8 @@ class Routes__Vault__Append(Fast_API__Routes):
             raise HTTPException(status_code = 400, detail = 'Invalid append_token')
         if result['status'] == 'gate_failed':
             raise HTTPException(status_code = 403, detail = 'Forbidden')
+        if result['status'] == 'lane_mode_unsupported':                          # fail closed: a lane mode this build does not know (401: passes the CDN as JSON)
+            raise HTTPException(status_code = 401, detail = dict(error='lane_mode_unsupported'))
         if result['status'] == 'payload_too_large':
             raise HTTPException(status_code = 413, detail = dict(error    = 'payload_too_large' ,
                                                                   limit    = result['limit']     ,
@@ -109,9 +114,10 @@ class Routes__Vault__Append(Fast_API__Routes):
             inbox           = body.get('inbox')                 ,
             after_file_id   = body.get('after_file_id')         ,
             limit           = body.get('limit')                 ,
-            include_content = body.get('include_content', False))
+            include_content = body.get('include_content', False),
+            folder          = body.get('folder', 'pending')     )
         if result['status'] == 'invalid_input':
-            raise HTTPException(status_code = 400, detail = 'Invalid inbox, after_file_id, limit or include_content')
+            raise HTTPException(status_code = 400, detail = 'Invalid inbox, after_file_id, limit, include_content or folder')
         if result['status'] == 'gate_failed':
             raise HTTPException(status_code = 403, detail = 'Forbidden')
         if result['status'] == 'content_too_large':
@@ -193,16 +199,55 @@ class Routes__Vault__Append(Fast_API__Routes):
         write_key = request.headers.get(HEADER__SGRAPH_VAULT__WRITE_KEY, '')
         if not write_key:
             raise HTTPException(status_code = 400, detail = 'Missing write key')
+        if len(await request.body()) > CONFIGURE_MAX_BODY:
+            raise HTTPException(status_code = 413, detail = dict(error='configure_body_too_large', limit=CONFIGURE_MAX_BODY))
         body = await _json_body(request)
-        result = self.append_service.configure(
-            vault_id       = str(vault_id)                ,
-            write_key_hex  = write_key                    ,
-            append_anchors = body.get('append_anchors')   ,
-            enum_key_hash  = body.get('enum_key_hash')    )
+        result = self.append_service.configure_request(vault_id      = str(vault_id),
+                                                       write_key_hex = write_key    ,
+                                                       request       = body         )
         if result is None:
             raise HTTPException(status_code = 403, detail = 'Write key mismatch')
         if result.get('status') == 'invalid_input':
-            raise HTTPException(status_code = 400, detail = 'append_anchors must be a list of strings and enum_key_hash a string')
+            raise HTTPException(status_code = 400, detail = result.get('detail') or 'Invalid configure body')
+        if result.get('status') == 'conflict':
+            raise HTTPException(status_code = 409, detail = 'Config changed concurrently; retry')
+        return result
+
+    def _enum_key(self, request: Request):                                      # new enum-key endpoints answer 401, not 403 (the CDN rewrites 403 into an HTML 404)
+        enum_key = request.headers.get(HEADER__SGRAPH_VAULT__ENUM_KEY, '')
+        if not enum_key:
+            raise HTTPException(status_code = 401, detail = 'Missing enum key')
+        return enum_key
+
+    async def unmark__vault_id(self, vault_id: Safe_Str__Id,                     # processed → pending (undo a mark)
+                                     request : Request      ) -> dict:
+        self._validate_vault_id(vault_id)
+        enum_key = self._enum_key(request)
+        body     = await _json_body(request)
+        result   = self.append_service.unmark(vault_id = str(vault_id)          ,
+                                              enum_key = enum_key               ,
+                                              inbox    = body.get('inbox')      ,
+                                              file_ids = body.get('file_ids')   )
+        if result['status'] == 'invalid_input':
+            raise HTTPException(status_code = 400, detail = 'Invalid inbox or file_ids')
+        if result['status'] == 'unauthorized':
+            raise HTTPException(status_code = 401, detail = 'Unauthorized')
+        if result['status'] == 'lane_mode_unsupported':
+            raise HTTPException(status_code = 401, detail = dict(error='lane_mode_unsupported'))
+        return result
+
+    async def stats__vault_id(self, vault_id: Safe_Str__Id,                      # one lane's counts, bytes and times
+                                    request : Request      ) -> dict:
+        self._validate_vault_id(vault_id)
+        enum_key = self._enum_key(request)
+        body     = await _json_body(request)
+        result   = self.append_service.stats(vault_id = str(vault_id)       ,
+                                             enum_key = enum_key            ,
+                                             inbox    = body.get('inbox')   )
+        if result['status'] == 'invalid_input':
+            raise HTTPException(status_code = 400, detail = 'inbox (the lane token) is required')
+        if result['status'] == 'unauthorized':
+            raise HTTPException(status_code = 401, detail = 'Unauthorized')
         return result
 
     def limits(self):                                                            # public: server limits, server time and feature flags (no vault or lane input)
@@ -215,6 +260,8 @@ class Routes__Vault__Append(Fast_API__Routes):
         self.add_route_post(self.list__vault_id           )
         self.add_route_post(self.fetch__vault_id          )
         self.add_route_post(self.mark_processed__vault_id )
+        self.add_route_post(self.unmark__vault_id         )
+        self.add_route_post(self.stats__vault_id          )
         self.add_route_post(self.purge__vault_id          )
         self.add_route_post(self.configure__vault_id      )
         return self

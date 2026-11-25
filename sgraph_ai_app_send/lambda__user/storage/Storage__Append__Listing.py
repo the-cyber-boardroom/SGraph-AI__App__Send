@@ -1,13 +1,18 @@
 # ===============================================================================
-# SGraph Send - Append lane listing (bounded)
-# Counting, paging, lane discovery and copy for append lanes. On S3 these use the
-# backend's bounded fast paths (early stop, StartAfter, Delimiter, CopyObject), so
-# a request costs what it asks for, not the size of the lane. Every other backend
+# SGraph Send - Append lane storage helpers (bounded)
+# Counting, paging, usage, lane discovery, copy and conditional config writes for
+# append lanes. On S3 these use the backend's bounded fast paths (early stop,
+# StartAfter, Delimiter, CopyObject with tagging, If-Match / If-None-Match), so a
+# request costs what it asks for, not the size of the lane. Every other backend
 # (memory, disk) uses the generic Storage_FS methods, with identical results.
 # ===============================================================================
 
-from memory_fs.storage_fs.Storage_FS                                            import Storage_FS
-from osbot_utils.type_safe.Type_Safe                                            import Type_Safe
+import hashlib
+import threading
+from   memory_fs.storage_fs.Storage_FS                                          import Storage_FS
+from   osbot_utils.type_safe.Type_Safe                                          import Type_Safe
+
+_GENERIC_WRITE_LOCK = threading.Lock()                                           # conditional writes on memory/disk: one process, one lock
 
 
 class Storage__Append__Listing(Type_Safe):
@@ -15,6 +20,9 @@ class Storage__Append__Listing(Type_Safe):
 
     def _has(self, method_name):
         return callable(getattr(self.storage_fs, method_name, None))
+
+    def is_s3(self):                                                             # S3 enforces retention by lifecycle; other backends sweep on access
+        return self._has('folder__files__usage')
 
     @staticmethod
     def _name(path):                                                             # last path segment of a listed file
@@ -24,6 +32,15 @@ class Storage__Append__Listing(Type_Safe):
         if self._has('folder__files__count'):
             return self.storage_fs.folder__files__count(folder, up_to)
         return min(len(self.storage_fs.folder__files__all(folder)), up_to)
+
+    def usage(self, folder, up_to):                                              # count, bytes, first and last names of up to up_to files, in key order
+        if self._has('folder__files__usage'):
+            return self.storage_fs.folder__files__usage(folder, up_to)
+        names = sorted(self._name(path) for path in self.storage_fs.folder__files__all(folder))[:up_to]
+        size  = 0
+        for name in names:
+            size += len(self.storage_fs.file__bytes(f'{str(folder).rstrip("/")}/{name}') or b'')
+        return dict(count=len(names), bytes=size, first=names[0] if names else None, last=names[-1] if names else None)
 
     def page(self, folder, start_after=None, max_keys=1000):                     # file names in key order, strictly after start_after, at most max_keys
         if self._has('folder__files__page'):
@@ -38,11 +55,30 @@ class Storage__Append__Listing(Type_Safe):
             return self.storage_fs.folder__subfolder_names(folder)
         return sorted(self._name(path) for path in self.storage_fs.folder__folders(folder))
 
-    def copy(self, source_path, target_path):                                    # copy one file (server-side on S3)
+    def copy(self, source_path, target_path, tags=None):                         # copy one file (server-side on S3); tags: None = keep, {} = clear, {k: v} = replace
         if self._has('file__copy'):
-            return self.storage_fs.file__copy(source_path, target_path)
+            return self.storage_fs.file__copy(source_path, target_path, tags=tags)
         file_bytes = self.storage_fs.file__bytes(source_path)
         if file_bytes is None:
             return False
-        self.storage_fs.file__save(target_path, file_bytes)
+        self.storage_fs.file__save(target_path, file_bytes)                      # memory/disk have no object tags: retention is swept on access instead
         return True
+
+    # --- conditional writes (config.json) -----------------------------------------------
+
+    def read_versioned(self, path):                                              # (bytes, version) — version is the S3 etag, or a content hash elsewhere
+        if self._has('file__bytes__versioned'):
+            return self.storage_fs.file__bytes__versioned(path)
+        data = self.storage_fs.file__bytes(path)
+        return (data, hashlib.sha256(data).hexdigest()) if data is not None else (None, None)
+
+    def write_if_version(self, path, data, version):                             # True if written; False if someone else wrote first
+        if self._has('file__save__if_version'):
+            return self.storage_fs.file__save__if_version(path, data, version)
+        with _GENERIC_WRITE_LOCK:
+            current = self.storage_fs.file__bytes(path)
+            current_version = hashlib.sha256(current).hexdigest() if current is not None else None
+            if current_version != version:
+                return False
+            self.storage_fs.file__save(path, data)
+            return True

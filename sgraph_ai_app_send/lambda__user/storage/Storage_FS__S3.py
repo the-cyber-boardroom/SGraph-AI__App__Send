@@ -206,12 +206,66 @@ class Storage_FS__S3(Storage_FS):                                               
             params['ContinuationToken'] = response['NextContinuationToken']
         return sorted(names)
 
-    def file__copy(self, source_path, target_path) -> bool:                     # server-side CopyObject: the bytes never pass through Lambda
-        self._s3().file_copy(bucket_source      = self.s3_bucket            ,
-                             key_source         = self.s3_key(source_path)  ,
-                             bucket_destination = self.s3_bucket            ,
-                             key_destination    = self.s3_key(target_path)  )
+    def file__copy(self, source_path, target_path, tags: dict = None) -> bool:  # server-side CopyObject: the bytes never pass through Lambda
+        if tags is None:                                                         # plain copy: the object's tags travel with it (COPY directive)
+            self._s3().file_copy(bucket_source      = self.s3_bucket            ,
+                                 key_source         = self.s3_key(source_path)  ,
+                                 bucket_destination = self.s3_bucket            ,
+                                 key_destination    = self.s3_key(target_path)  )
+            return True
+        from urllib.parse import urlencode                                       # tags={} clears them, tags={k: v} replaces them (osbot's helper exposes neither)
+        self._s3().s3().copy_object(Bucket           = self.s3_bucket                                       ,
+                                    Key              = self.s3_key(target_path)                             ,
+                                    CopySource       = {'Bucket': self.s3_bucket, 'Key': self.s3_key(source_path)},
+                                    TaggingDirective = 'REPLACE'                                            ,
+                                    Tagging          = urlencode(tags)                                      )
         return True
+
+    def file__tags(self, path) -> dict:                                          # the object's tags (used by tests and stats)
+        response = self._s3().s3().get_object_tagging(Bucket=self.s3_bucket, Key=self.s3_key(path))
+        return {tag['Key']: tag['Value'] for tag in response.get('TagSet', [])}
+
+    def folder__files__usage(self, parent_folder, up_to: int) -> dict:           # count, bytes and first/last names of up to up_to keys, in key order
+        client = self._s3().s3()
+        prefix = self._folder_prefix(parent_folder)
+        params = dict(Bucket=self.s3_bucket, Prefix=prefix)
+        usage  = dict(count=0, bytes=0, first=None, last=None)
+        while usage['count'] < up_to:
+            params['MaxKeys'] = min(1000, up_to - usage['count'])
+            response = client.list_objects_v2(**params)
+            for item in response.get('Contents', []):
+                name = item['Key'][len(prefix):]
+                usage['count'] += 1
+                usage['bytes'] += item.get('Size', 0)
+                usage['first']  = usage['first'] or name
+                usage['last']   = name
+            if not response.get('IsTruncated'):
+                break
+            params['ContinuationToken'] = response['NextContinuationToken']
+        return usage
+
+    def file__bytes__versioned(self, path):                                      # (bytes, etag) — (None, None) when absent
+        try:
+            response = self._s3().s3().get_object(Bucket=self.s3_bucket, Key=self.s3_key(path))
+            return response['Body'].read(), response.get('ETag')
+        except ClientError as error:
+            if self._is_not_found(error):
+                return None, None
+            raise
+
+    def file__save__if_version(self, path, data: bytes, version) -> bool:       # conditional write: If-Match the etag read, or If-None-Match '*' when it was absent
+        kwargs = dict(Bucket=self.s3_bucket, Key=self.s3_key(path), Body=data)
+        if version is None:
+            kwargs['IfNoneMatch'] = '*'
+        else:
+            kwargs['IfMatch'] = version
+        try:
+            self._s3().s3().put_object(**kwargs)
+            return True
+        except ClientError as error:
+            if error.response.get('Error', {}).get('Code') in ('PreconditionFailed', 'ConditionalRequestConflict', '412', '409'):
+                return False
+            raise
 
     def files__paths(self) -> List[Safe_Str__File__Path]:                       # List all file paths in bucket
         prefix  = self.s3_prefix if self.s3_prefix else ''

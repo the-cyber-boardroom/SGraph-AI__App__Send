@@ -57,12 +57,12 @@ Read-base64 response size limited to 3.75MB (Lambda response limit).
 Destroy without `purge` writes a tombstone at `vault/{id[:2]}/{id}/deleted.json` to block vault_id reuse.
 Destroy with `purge: true` skips the tombstone — vault_id is fully reusable afterwards.
 
-### Vault Append (`/vault/append/*`) — 7 endpoints
+### Vault Append (`/vault/append/*`) — 9 endpoints
 
 Generic append-only, gate-controlled storage primitive. Not messaging-specific — same infrastructure
 serves logs, signals, control messages, state flows, and email-style workflows.
 
-Four-tier capability model: `append_token` (write-only), `enum_key` (list/fetch/mark-processed),
+Four-tier capability model: `append_token` (write-only), `enum_key` (list/fetch/mark-processed/unmark/stats; since v2 Phase 2 optionally **scoped** to named lanes),
 `write_key` (purge + configure), `private_key` (decrypt — client-only, never on server).
 Gates use `H(key) == stored_hash` pattern (SHA-256).
 
@@ -72,12 +72,14 @@ without requiring both parties to have SGraph accounts.
 
 | Method | Path | What It Does | Auth | Tested |
 |--------|------|-------------|------|--------|
-| GET | `/vault/append/limits` | Public server limits, `now_ms`, `config_ttl_seconds`, `features` (`Cache-Control: no-store`; no vault input) — v2 Phase 1, 2026-11-25 | none | Yes |
-| POST | `/vault/append/configure/{vault_id}` | Store append config (enum_key_hash, append_token hashes). Since v2 Phase 1: on a vault with no commit yet it creates the manifest (first-write rule; a tombstone still refuses); badly typed fields → 400 | write_key | Yes |
+| GET | `/vault/append/limits` | Public server limits, `now_ms`, `config_ttl_seconds`, `features`; since Phase 2 also `token_lane_hard_ceiling`, `token_lane_bytes_ceiling`, `retention_classes` (`Cache-Control: no-store`; no vault input) — v2 Phase 1, 2026-11-25 | none | Yes |
+| POST | `/vault/append/configure/{vault_id}` | Store append config. Since v2 Phase 1: on a vault with no commit yet it creates the manifest (first-write rule; a tombstone still refuses). **Since v2 Phase 2:** typed, merged per field (`append_anchors`, `enum_key_hash`, `legacy_enum_key`, `remove_legacy_enum_key`, `add_enum_keys`, `remove_enum_keys`, `lane_defaults`, `lanes`); unknown fields → 400 naming them; body > 64 KiB → 413; conditional write, 409 `conflict` after 3 attempts; returns `ignored` when a re-sent legacy key is not restored | write_key | Yes |
 | POST | `/vault/append/write/{vault_id}` | Append encrypted payload (blind — no id/count returned) | append_token (body) | Yes |
-| POST | `/vault/append/list/{vault_id}` | List pending entries (metadata or with content, paginated) | enum_key (header) | Yes |
+| POST | `/vault/append/list/{vault_id}` | List entries (metadata or with content, paginated). Since v2 Phase 2: `folder` = `pending` (default) or `processed`; a scoped key sees only its lanes | enum_key (header) | Yes |
 | POST | `/vault/append/fetch/{vault_id}` | Fetch content for specific file_ids (batched, max 100). Since v2 Phase 1: entries past a 5.5 MB encoded response ceiling come back in `deferred` (never read); the first entry is always returned | enum_key (header) | Yes |
-| POST | `/vault/append/mark-processed/{vault_id}` | Move entries pending → processed (copy+delete, idempotent) | enum_key (header) | Yes |
+| POST | `/vault/append/mark-processed/{vault_id}` | Move entries pending → processed (copy+delete, idempotent). Since v2 Phase 2: on S3, a lane with `retention_days` tags the copy `sg-retention=<N>d` | enum_key (header) | Yes |
+| POST | `/vault/append/unmark/{vault_id}` | **v2 Phase 2.** Move entries processed → pending; hard limit applies (`refused`); clears object tags; unknown lane mode → 401 `lane_mode_unsupported`; bad key → **401** | enum_key (header) | Yes |
+| POST | `/vault/append/stats/{vault_id}` | **v2 Phase 2.** One lane (`{inbox}`): pending count/bytes/oldest/newest, processed (capped 10,000), soft/hard/bytes limits, `over_soft`, `retention_days`; cached 30 s per instance; bad key → **401** | enum_key (header) | Yes |
 | POST | `/vault/append/purge/{vault_id}` | Delete entries from pending or processed (batched, max 100) | write_key (header) | Yes |
 
 **Edge rewrites API 403 → static `404.html` — measured 7 Sep 2026, NOT an API defect.** The
@@ -107,7 +109,8 @@ token and hashes it). Breaking change for existing lanes — needs migration.
 **Security hardening:**
 - Path-component inputs validated via `Safe_Str__Vault__Append_Token` and `Safe_Str__Vault__Append__File_Id` (Type_Safe strict validation) — blocks path traversal
 - Batch operations capped at `APPEND_BATCH_MAX_FILE_IDS = 100`
-- Per-message size cap: `APPEND_MAX_PAYLOAD = 5 MB`; per-token file-count cap: `APPEND_MAX_FILES = 1000`
+- Per-message size cap: `APPEND_MAX_PAYLOAD = 5 MB` (≈ 4.4 MB on Lambda); per-lane pending cap: 1,000 by default, `hard_pending` 1–5,000 and `max_pending_bytes` 10 MiB–1 GiB per lane since v2 Phase 2 (`Vault__Append__Config.py`)
+- `write` / `unmark` on a lane with an unknown `mode` → 401 `lane_mode_unsupported` (fail closed, v2 Phase 2)
 - Metadata-only listing reads zero payloads; content reads only for the paged window
 - Incremental ceiling check on include_content (M-1 fix) — bails early instead of reading all files
 - Append config stored in separate `config.json` (L-2 fix) — `config.json` is the authoritative source for gates; manifest never written with append fields
@@ -117,12 +120,13 @@ token and hashes it). Breaking change for existing lanes — needs migration.
 **Storage model:** Files stored inside `bare/append/` under the vault tree (managed-but-unversioned by sgit):
 - Pending: `{_ROOT}/vault/{vault_id[:2]}/{vault_id}/bare/append/{token}/pending/{timestamp}_{random}.enc`
 - Processed: `{_ROOT}/vault/{vault_id[:2]}/{vault_id}/bare/append/{token}/processed/{filename}`
-- Config: `{_ROOT}/vault/{vault_id[:2]}/{vault_id}/bare/append/config.json`
+- Config: `{_ROOT}/vault/{vault_id[:2]}/{vault_id}/bare/append/config.json` — keys `append_anchors`, `enum_key_hash` (legacy, scope `*`), `enum_keys` (scoped), `lane_defaults`, `lanes` (v2 Phase 2; older code ignores the new keys)
 
-**TODO — LocalStack S3 integration tests:** All append tests run on the memory backend.
-Behavioural parity on S3 is verified structurally (method-override assertions in `test_Storage_FS__S3.py`)
-but not exercised end-to-end via LocalStack. This is not urgent — the memory backend faithfully
-exercises all service logic — but should be done before production launch.
+**LocalStack S3 integration tests — EXIST since v2 Phase 1/2 (2026-11-25):**
+`tests/unit/lambda__user/storage/test_Storage_FS__S3__LocalStack.py` (11; skipped when LocalStack is not
+reachable — the CI workflow does not start it, so these run locally only): early-stop count, `StartAfter`
+paging across 1,000 keys, delimiter discovery, `CopyObject`, usage, tags set/cleared on copy,
+`If-None-Match`, `If-Match` (skips on LocalStack 3, which ignores it), and the append service end to end.
 
 ### Vault Zip (`/vault/zip/*`) — 1 endpoint
 

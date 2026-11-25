@@ -259,6 +259,33 @@ async function main() {
         ok('500 text → EHTTP, message truncated', err && err.code === 'EHTTP' && err.message.length <= 310);
     }
 
+    console.log('\n[suite] SGAppend — v2 Phase 2 verbs (unmark, stats, list folder, 401)');
+    {
+        const c = client();
+        await c.unmark({ inbox: 'h1', file_ids: ['a'] });
+        ok('unmark posts to /unmark with the enum-key header', c._fetch.calls[0].url.endsWith('/api/vault/append/unmark/vault1234')
+                                                          && c._fetch.calls[0].headers['x-sgraph-vault-enum-key'] === 'a'.repeat(64));
+        let threw = null;
+        try { await c.unmark({ inbox: 'h1', file_ids: [] }); } catch (e) { threw = e; }
+        ok('unmark rejects empty file_ids (EINVAL)', threw && threw.code === 'EINVAL');
+
+        await c.stats({ inbox: 'h1' });
+        ok('stats posts {inbox} to /stats', c._fetch.calls[1].url.endsWith('/stats/vault1234') && c._fetch.calls[1].body.inbox === 'h1');
+        threw = null;
+        try { await c.stats({}); } catch (e) { threw = e; }
+        ok('stats requires inbox', threw && threw.code === 'EINVAL');
+
+        await c.list({ folder: 'processed' });
+        ok('list passes folder', c._fetch.calls[2].body.folder === 'processed');
+        await c.list({});
+        ok('list omits folder by default', c._fetch.calls[3].body.folder === undefined);
+
+        const res401 = { ok: false, status: 401, headers: { get: () => 'application/json' }, text: async () => JSON.stringify({ detail: 'Unauthorized' }) };
+        threw = null;
+        try { await client({ fetchImpl: makeFetch(res401) }).stats({ inbox: 'h1' }); } catch (e) { threw = e; }
+        ok('401 maps to EPERM', threw && threw.code === 'EPERM');
+    }
+
     console.log(`\n  ${pass} pass, ${fail} fail`);
     if (fail) process.exitCode = 1;
 }

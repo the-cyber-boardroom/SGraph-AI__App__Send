@@ -22,6 +22,8 @@
      | list           | POST /list/{vault_id}        | x-sgraph-vault-enum-key                      |
      | fetch          | POST /fetch/{vault_id}       | x-sgraph-vault-enum-key                      |
      | markProcessed  | POST /mark-processed/{vid}   | x-sgraph-vault-enum-key                      |
+     | unmark         | POST /unmark/{vault_id}      | x-sgraph-vault-enum-key (v2: processed → pending) |
+     | stats          | POST /stats/{vault_id}       | x-sgraph-vault-enum-key (v2: one lane's counts)   |
      | purge          | POST /purge/{vault_id}       | x-sgraph-vault-write-key + x-sgraph-access-token |
 
    enum_key derivation (Q1, recommended form — locked here):
@@ -95,8 +97,9 @@ class SGAppend {
         return this._post(`/write/${vault_id}`, { append_token, payload: payload_b64 }, {})    // v0.32.7: /append/ → /write/
     }
 
-    async list({ inbox, after_file_id, limit, include_content } = {}) {         // metadata-only by default (cheap; the checker's hot path)
+    async list({ inbox, after_file_id, limit, include_content, folder } = {}) { // metadata-only by default (cheap; the checker's hot path)
         const body = {}
+        if (folder        != null) body.folder          = folder                 // v2: 'pending' (default) or 'processed'
         if (inbox         != null) body.inbox           = inbox
         if (after_file_id != null) body.after_file_id   = after_file_id
         if (limit         != null) body.limit           = limit
@@ -114,6 +117,17 @@ class SGAppend {
         if (!inbox) throw SGAppend._err('EINVAL', 'inbox required')
         SGAppend._assertBatch(file_ids)
         return this._post(this._vaultPath('mark-processed'), { inbox, file_ids }, this._enumHeaders())
+    }
+
+    async unmark({ inbox, file_ids } = {}) {                                   // v2: move processed/ → pending/ (undo a mark); ids the lane cannot take come back in `refused`
+        if (!inbox) throw SGAppend._err('EINVAL', 'inbox required')
+        SGAppend._assertBatch(file_ids)
+        return this._post(this._vaultPath('unmark'), { inbox, file_ids }, this._enumHeaders())
+    }
+
+    async stats({ inbox } = {}) {                                               // v2: one lane's pending/processed counts, bytes, times and limits
+        if (!inbox) throw SGAppend._err('EINVAL', 'inbox required')
+        return this._post(this._vaultPath('stats'), { inbox }, this._enumHeaders())
     }
 
     async purge({ folder = 'processed', inbox, file_ids } = {}) {              // owner: delete; empty file_ids + processed = bulk purge
@@ -225,6 +239,7 @@ class SGAppend {
 
     static _codeForStatus(s) {
         if (s === 400) return 'EINVAL'                                          // invalid input
+        if (s === 401) return 'EPERM'                                           // v2 endpoints answer 401 for a gate failure (403 is rewritten by the CDN)
         if (s === 403) return 'EPERM'                                           // gate failed (token/key mismatch)
         if (s === 413) return 'E2BIG'                                           // payload / content too large
         if (s === 507) return 'ENOSPC'                                          // append lane at capacity

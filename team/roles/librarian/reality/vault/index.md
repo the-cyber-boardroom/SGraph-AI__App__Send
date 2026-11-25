@@ -133,13 +133,13 @@ encrypted ciphertext and checks capability gates (`H(key) == stored_hash`). All 
 - Client (sgit CLI / vault web): `enum_key` derivation, `append_token = H(pubkey)`, X25519 keygen,
   seal/open — all client-side. **Not SG/API work.**
 
-See `send-api/index.md` for the 6 HTTP endpoints.
+See `send-api/index.md` for the 9 HTTP endpoints.
 
 **Limits and known defects (code-verified 2026-11-25, `dev` @ `da293d4f`):**
 
 | Item | State |
 |---|---|
-| Entry limit | 1,000 **pending** per lane (`APPEND_MAX_FILES`); `processed/` unlimited; 507 when full. Counted by listing the whole pending prefix on every append |
+| Entry limit | 1,000 **pending** per lane by default; `processed/` unlimited; 507 when full. **v2 Phase 1:** counted with an early stop. **v2 Phase 2:** per-lane `hard_pending` (1–5,000), `soft_pending`, `max_pending_bytes` (10 MiB–1 GiB; refuses when less than one max inline payload of room is left — one fixed bit). A 5 s count cache is trusted only more than `max(100, 10%)` below the hard limit |
 | Payload limit | `APPEND_MAX_PAYLOAD` = 5 MiB, but base64-in-JSON over Lambda's 6 MB request cap → real max ≈ 4.4 MB; now reported by `GET /limits` (v2 Phase 1) |
 | `fetch` response | **FIXED (v2 Phase 1):** 5.5 MB encoded ceiling, the rest in `deferred` |
 | `list` without `inbox` | **FIXED (v2 Phase 1):** lanes found with `Delimiter='/'`; each lane read from the cursor (`StartAfter`, limit+1); legacy path behind `SGRAPH_SEND__APPEND_FAST_LISTING=false` |
@@ -148,10 +148,12 @@ See `send-api/index.md` for the 6 HTTP endpoints.
 | `configure` before the vault's first commit | **FIXED (v2 Phase 1):** creates the manifest (first-write rule; tombstone refuses). Before: 403 "Write key mismatch", shown as an HTML 404 by the CDN |
 | Request bodies | **FIXED (v2 Phase 1):** every append route parses with one helper — empty body = `{}`; non-object, malformed, `NaN`/`Infinity` → 400; badly typed fields → 400. Before: `list` with no body → 500 |
 | `list` → `inbox` | the raw append token (the lane folder name), not a hash (reproduced) |
-| `configure` input | stores `append_anchors` / `enum_key_hash` as given (no schema beyond Phase 1's type checks; unknown top-level fields are ignored, not stored). Full typed schema = v2 Phase 2 (2.7) |
+| `configure` input | **FIXED (v2 Phase 2):** typed (`Schema__Vault__Append__Lane`, `Vault__Append__Config`), merged per field, unknown fields → 400, body cap 64 KiB, conditional write (If-Match) with 409 after 3 attempts. A removed anchor drops its lane settings. Once scoped keys replaced the legacy key, a re-sent `enum_key_hash` is reported in `ignored`, not restored |
 | `Safe_Str__Vault__Append_Token` / `__File_Id` | **FIXED (v2 Phase 1):** `\Z` and `[0-9]`. Before: accepted a trailing newline; the file id also non-ASCII digits |
 | Server-initiated outbound calls (webhook) | **DOES NOT EXIST and dropped** (25 Nov, Dinis): the server makes no outbound calls |
-| Per-lane limits, burst ceiling, blobs (presigned), signed lanes (lane keys + grants), scoped read keys, retention, lane stats | **PROPOSED** — `team/roles/dev/reviews/11/25/v0.33.69__dev-plan__append-lanes-v2-implementation.md` (plan, revised after review); AppSec review `team/roles/appsec/reviews/11/25/v0.33.69__appsec-review__append-lanes-v2-plan.md` |
+| Processed listing, `unmark`, per-lane limits + byte budget, scoped read keys, retention (S3 tag + lifecycle; memory/disk sweep on access), lane `stats`, fail-closed lane `mode` | **EXISTS (v2 Phase 2, 2026-11-25)** — `test_Vault__Append__Config.py` (15), `test_Service__Vault__Append__v2_Phase2.py` (19), `test_Routes__Vault__Append__v2_Phase2.py` (7), LocalStack (+5). Retention on S3 deletes nothing until DevOps adds the six tag-filtered lifecycle rules and `s3:PutObjectTagging` (see the Phase 2 changelog). On memory/disk the retention clock is the **write** time (file id epoch); on S3 it is the **mark** time (the processed copy's creation) |
+| `sg-append.js` `unmark` / `stats` / `list({folder})`, 401 → `EPERM` | **EXISTS** (transport only) — `test__sg_append_client.js`. **Not on the `sg.append.*` app bridge** (AS-10) |
+| Burst ceiling, blobs (presigned), signed lanes (lane keys + grants) | **PROPOSED** (Phases 3–4) — `team/roles/dev/reviews/11/25/v0.33.69__dev-plan__append-lanes-v2-implementation.md` (plan, revised after review); AppSec review `team/roles/appsec/reviews/11/25/v0.33.69__appsec-review__append-lanes-v2-plan.md` |
 
 ### Vault-App Vault Management — `sg.vault.*` create/manage (v0.33.5, 2026-06-08)
 

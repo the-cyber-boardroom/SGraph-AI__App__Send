@@ -142,8 +142,8 @@ class test_Service__Vault__Append__v2_Phase1(TestCase):
 
     def test__limits(self):
         limits = self.service.limits()
-        assert set(limits) == {'max_inline_payload', 'max_pending', 'max_batch_ids', 'list_page_default', 'list_page_max',
-                               'inline_content_ceiling', 'fetch_content_ceiling', 'config_ttl_seconds', 'now_ms', 'features'}
+        assert {'max_inline_payload', 'max_pending', 'max_batch_ids', 'list_page_default', 'list_page_max',      # Phase 1 keys (later phases add more)
+                'inline_content_ceiling', 'fetch_content_ceiling', 'config_ttl_seconds', 'now_ms', 'features'} <= set(limits)
         assert limits['max_inline_payload'] == APPEND_MAX_PAYLOAD
         assert limits['max_pending'] == 1000 and limits['max_batch_ids'] == 100 and limits['list_page_max'] == 200
         assert abs(limits['now_ms'] - int(time.time() * 1000)) < 5_000

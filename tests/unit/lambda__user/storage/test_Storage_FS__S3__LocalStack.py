@@ -123,3 +123,49 @@ class test_Storage_FS__S3__LocalStack(TestCase):
         assert fast.mark_processed(vault_id, enum_key, tokens[0], [first['file_id']])['moved'] == [first['file_id']]
         assert self.storage.file__exists(path__vault_append_processed(vault_id, tokens[0], first['file_id']))
         assert not self.storage.file__exists(path__vault_append_pending(vault_id, tokens[0], first['file_id']))
+
+    # --- v2 Phase 2 ----------------------------------------------------------------------------
+
+    def test__usage__counts_bytes_and_ends(self):
+        names = self._fill('usage/lane/pending', 7, size=3)
+        assert self.storage.folder__files__usage('usage/lane/pending', 100) == dict(count=7, bytes=21, first=names[0], last=names[-1])
+        assert self.storage.folder__files__usage('usage/lane/pending', 4)   == dict(count=4, bytes=12, first=names[0], last=names[3])
+
+    def test__copy__sets_and_clears_tags(self):                                 # AS-8: an unmarked entry must not carry a retention tag back into pending/
+        self.storage.file__save('tags/pending/one.enc', b'x')
+        self.storage.file__copy('tags/pending/one.enc', 'tags/processed/one.enc', tags={'sg-retention': '30d'})
+        assert self.storage.file__tags('tags/processed/one.enc') == {'sg-retention': '30d'}
+        self.storage.file__copy('tags/processed/one.enc', 'tags/back/one.enc', tags={})
+        assert self.storage.file__tags('tags/back/one.enc') == {}
+
+    def test__conditional_writes__if_none_match(self):
+        assert self.storage.file__save__if_version('cas/new.json', b'{"v":1}', None) is True          # create-if-absent
+        assert self.storage.file__save__if_version('cas/new.json', b'{"v":2}', None) is False         # already exists
+        data, etag = self.storage.file__bytes__versioned('cas/new.json')
+        assert data == b'{"v":1}' and etag
+        assert self.storage.file__bytes__versioned('cas/missing.json') == (None, None)
+
+    def test__conditional_writes__if_match(self):                               # AWS S3 enforces If-Match on PutObject (since Nov 2024); LocalStack 3 ignores it
+        self.storage.file__save('cas/match.json', b'{"v":1}')
+        _, etag = self.storage.file__bytes__versioned('cas/match.json')
+        assert self.storage.file__save__if_version('cas/match.json', b'{"v":2}', etag) is True
+        if self.storage.file__save__if_version('cas/match.json', b'{"v":3}', etag) is True:
+            self.skipTest('this S3 backend ignores If-Match on PutObject (LocalStack 3); AWS S3 refuses the stale write with 412')
+        assert self.storage.file__bytes('cas/match.json') == b'{"v":2}'
+
+    def test__phase2__end_to_end_on_s3(self):                                   # configure (CAS), retention tag on mark, cleared on unmark, stats
+        vault_id, write_key, enum_key = 'lsvault0002', 'ls-write-key-2', hashlib.sha256(b'ls-enum-2').hexdigest()
+        token = hashlib.sha256(b'ls-p2-lane').hexdigest()
+        lane  = hashlib.sha256(token.encode()).hexdigest()
+        service = Service__Vault__Append(storage_fs=self.storage)
+        assert service.configure(vault_id, write_key, append_anchors=[lane], enum_key_hash=hashlib.sha256(enum_key.encode()).hexdigest())['status'] == 'configured'
+        assert service.configure(vault_id, write_key, lanes={lane: dict(retention_days=30, hard_pending=50)})['status'] == 'configured'
+        for _ in range(3):
+            assert service.append(vault_id, token, b'abc')['status'] == 'ok'
+        ids = [e['file_id'] for e in service.list_entries(vault_id, enum_key, inbox=token)['entries']]
+        service.mark_processed(vault_id, enum_key, token, ids[:2])
+        assert self.storage.file__tags(path__vault_append_processed(vault_id, token, ids[0])) == {'sg-retention': '30d'}
+        assert service.unmark(vault_id, enum_key, token, ids[:1])['moved'] == ids[:1]
+        assert self.storage.file__tags(path__vault_append_pending(vault_id, token, ids[0])) == {}
+        stats = service.stats(vault_id, enum_key, token)
+        assert (stats['pending'], stats['pending_bytes'], stats['processed'], stats['hard_pending'], stats['retention_days']) == (2, 6, 1, 50, 30)
