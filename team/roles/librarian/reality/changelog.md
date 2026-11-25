@@ -7,6 +7,18 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-11-25
+
+Append lanes reviewed for v2 (capacity, large payloads, signed lanes). `vault/index.md` Vault Append section: new code-verified "Limits and known defects" table (1,000 pending cap counted by full listing; real payload max ≈ 4.4 MB; `fetch` has no response ceiling; config cache never expires, so token revocation does not reach other warm instances; v2 features PROPOSED).
+
+Files changed:
+- `reality/vault/index.md` — limits/defects table under "Vault Append"
+- `reality/changelog.md` — this entry
+
+Design: `team/roles/architect/reviews/11/25/v0.33.69__architect-review__append-lanes-v2-capacity-large-payloads-signed-lanes.md`
+
+---
+
 ## 2026-09-03
 
 B-015 completed: `test__sgit_key_prefixes.js` (08/25 commit `b3a9220`) counted and added to the ViV loader suite table. 28 assertions (4 suites). Test count updated ~3100+ → ~3130+; ViV suite ~1060+ → ~1090+.

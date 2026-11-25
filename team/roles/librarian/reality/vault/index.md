@@ -135,6 +135,18 @@ encrypted ciphertext and checks capability gates (`H(key) == stored_hash`). All 
 
 See `send-api/index.md` for the 6 HTTP endpoints.
 
+**Limits and known defects (code-verified 2026-11-25, `dev` @ `da293d4f`):**
+
+| Item | State |
+|---|---|
+| Entry limit | 1,000 **pending** per lane (`APPEND_MAX_FILES`); `processed/` unlimited; 507 when full. Counted by listing the whole pending prefix on every append |
+| Payload limit | `APPEND_MAX_PAYLOAD` = 5 MiB, but base64-in-JSON over Lambda's 6 MB request cap → real max ≈ 4.4 MB |
+| `fetch` response | no ceiling — several MB-sized entries in one fetch exceed Lambda's 6 MB response (defect) |
+| `list` without `inbox` | walks every key under `bare/append/` (incl. `processed/`) to find lane folders; every page re-lists and sorts the whole lane |
+| `mark_processed` | bytes read into Lambda and written back (no server-side copy) |
+| Config / manifest cache | per Lambda instance, **never expires** → revoking a token (or rotating the enum key) does not reach other warm instances (defect, reproduced with two service instances on one store) |
+| Per-lane limits, burst ceiling, large (presigned) appends, signed lanes (P-256, pki.sgit.ai fingerprints), lane stats, batch write | **PROPOSED** — `team/roles/architect/reviews/11/25/v0.33.69__architect-review__append-lanes-v2-capacity-large-payloads-signed-lanes.md` |
+
 ### Vault-App Vault Management — `sg.vault.*` create/manage (v0.33.5, 2026-06-08)
 
 A vault app (sandboxed iframe under `/en-gb/app/`) can create and manage other vaults via the
