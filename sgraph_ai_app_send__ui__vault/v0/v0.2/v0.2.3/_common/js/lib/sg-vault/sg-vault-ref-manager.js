@@ -81,6 +81,15 @@ class SGVaultRefManager {
         this._rawRefs[refFileId] = encrypted ? new Uint8Array(encrypted) : null
     }
 
+    // The commit id inside the ref bytes last read or written (the CAS baseline), without a
+    // network call; null when the ref was absent or never seen.
+    async lastRefCommit(refFileId) {
+        const raw = this.lastRawRef(refFileId)
+        if (!raw) return null
+        try { return JSON.parse(new TextDecoder().decode(await SGSendCrypto.decrypt(raw, this._readKey))).commit_id || null }
+        catch (_) { return null }
+    }
+
     lastRawRef(refFileId) {
         return (this._rawRefs && refFileId in this._rawRefs) ? this._rawRefs[refFileId] : undefined
     }

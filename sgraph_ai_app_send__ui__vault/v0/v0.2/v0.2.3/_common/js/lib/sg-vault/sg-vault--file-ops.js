@@ -11,6 +11,7 @@
     Object.assign(SGVault.prototype, {
 
         async addFile(folderPath, fileName, fileData) {
+          await this._ensureFolderLoaded(folderPath)
           // Batch scope: the blob store + the commit it triggers (tree+commit+clone-ref) flush
           // as ONE POST /batch instead of 4 preflighted PUTs.
           return this._withBatch(async () => {
@@ -42,6 +43,7 @@
 
         async addFiles(items) {
             if (!items || items.length === 0) return []
+            for (const folder of new Set(items.map(i => i.folderPath))) await this._ensureFolderLoaded(folder)
           // All blobs + the single commit flush as ONE POST /batch.
           return this._withBatch(async () => {
             const results = []
@@ -83,6 +85,7 @@
         },
 
         async updateFile(folderPath, fileName, fileData) {
+          await this._ensureFolderLoaded(folderPath)
           // Batch scope: blob store + commit → ONE POST /batch.
           return this._withBatch(async () => {
             const data   = fileData instanceof ArrayBuffer ? new Uint8Array(fileData) : fileData
@@ -131,6 +134,7 @@
         },
 
         async removeFile(folderPath, fileName) {
+            await this._ensureFolderLoaded(folderPath)
             const folder = this._findNode(folderPath)
             if (!folder) throw new Error(`Folder not found: ${folderPath}`)
             delete folder.children[fileName]
@@ -139,6 +143,7 @@
         },
 
         async renameFile(folderPath, oldName, newName) {
+            await this._ensureFolderLoaded(folderPath)
             const folder = this._findNode(folderPath)
             if (!folder) throw new Error(`Folder not found: ${folderPath}`)
             if (!folder.children[oldName]) throw new Error(`File not found: ${oldName}`)
@@ -152,6 +157,7 @@
 
         async moveFile(srcFolderPath, fileName, destFolderPath) {
             if (srcFolderPath === destFolderPath) return
+            await this._ensureFolderLoaded(srcFolderPath); await this._ensureFolderLoaded(destFolderPath)
             const srcFolder = this._findNode(srcFolderPath)
             if (!srcFolder || srcFolder.type !== 'folder') throw new Error(`Source folder not found: ${srcFolderPath}`)
             const entry = srcFolder.children[fileName]

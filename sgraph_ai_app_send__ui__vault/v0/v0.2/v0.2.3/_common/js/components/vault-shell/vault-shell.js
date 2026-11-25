@@ -574,7 +574,7 @@
             // Load all lazy sub-trees before building the Browse tree
             const loaded = await rootDataSource.loadAllSubTrees({ onProgress });
             if (loaded && loaded.failed && loaded.failed.length) {
-                window.sgraphVault.messages.warn(`${loaded.failed.length} folder(s) could not be loaded and are shown empty \u2014 reload to retry (${loaded.failed[0].reason})`);
+                window.sgraphVault.messages.warning(`${loaded.failed.length} folder(s) could not be loaded and are shown empty \u2014 reload to retry (${loaded.failed[0].reason})`);
             }
 
             // Wrap so `*.link.json` sub-vaults splice in as inline, expandable folders.
@@ -763,7 +763,7 @@
             // published branch is ever overwritten. A rewound branch is refused unless accepted.
             const { diverged, behind, rewound } = this._syncState || {};
             if (rewound) {
-                window.sgraphVault.messages.warn('The published branch was rewound \u2014 accept the rewind in the banner before pushing');
+                window.sgraphVault.messages.warning('The published branch was rewound \u2014 accept the rewind in the banner before pushing');
                 return;
             }
             if (diverged) {
@@ -783,7 +783,7 @@
                 await this._refreshSyncState();
                 window.sgraphVault.messages.success('Pushed \u2014 named branch updated');
                 if (this._vault._lastRegisterError) {
-                    window.sgraphVault.messages.warn('Pushed, but this device could not be registered in the branch index: ' + this._vault._lastRegisterError.message);
+                    window.sgraphVault.messages.warning('Pushed, but this device could not be registered in the branch index: ' + this._vault._lastRegisterError.message);
                     this._vault._lastRegisterError = null;
                 }
                 if (this._activeView === 'sgit') {
@@ -924,7 +924,7 @@
                     }));
 
                     if (result.conflicts?.length > 0) {
-                        window.sgraphVault.messages.warn(
+                        window.sgraphVault.messages.warning(
                             `Merged \u2014 ${result.conflicts.length} conflict(s) saved as _conflict copies`
                         );
                     } else {
@@ -1092,7 +1092,7 @@
                         if (sgit) { sgit.vault = this._vault; sgit.refresh() }
                     }
                     if (result.conflicts?.length > 0) {
-                        window.sgraphVault.messages.warn(
+                        window.sgraphVault.messages.warning(
                             `Synced \u2014 ${result.conflicts.length} conflict(s) saved as _conflict copies`
                         )
                     } else {

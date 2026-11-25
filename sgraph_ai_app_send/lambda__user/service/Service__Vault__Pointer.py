@@ -262,13 +262,10 @@ class Service__Vault__Pointer(Type_Safe):                                       
 
     def _batch_read(self, vault_id, file_id):                                    # Internal: read single file for batch response
         payload_path = self.vault_payload_path(vault_id, file_id)
-        try:
-            payload = self.storage_fs.file__bytes(payload_path)                  # None when absent — single read, no pre-exists check
-        except Exception as error:                                               # a backend error (S3 SlowDown, timeout) fails THIS object, not the
-            return dict(file_id = file_id        ,                               # whole batch: clients read per-op status and retry or fall back
-                        status  = 'error'        ,                               # (sgit batch_read: "a per-object non-404 status fails soft")
-                        detail  = type(error).__name__)
-        if payload is None:
+        payload      = self.storage_fs.file__bytes(payload_path)                 # None when absent — single read, no pre-exists check
+        if payload is None:                                                      # a backend error (S3 SlowDown, timeout) raises and fails the WHOLE
+                                                                                 # request, as before the parallel read: deployed and rollback UIs only
+                                                                                 # understand 'ok' / 'not_found', and retry a failed request by splitting it
             return dict(file_id = file_id, status = 'not_found')
         return dict(file_id = file_id                                ,
                     status  = 'ok'                                   ,

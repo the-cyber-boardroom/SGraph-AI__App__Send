@@ -131,7 +131,9 @@ const hex  = (u8) => Array.from(new Uint8Array(u8)).map(b => b.toString(16).padS
     ok('B.merge(old) refuses with EREWOUND', await throwsCode(() => B.merge(old), 'EREWOUND') === true);
     ok('nothing changed on B', B._headCommitId === headAfterB);
     const res = await B.merge(old, { acceptRewind: true });
-    ok('merge with acceptRewind proceeds (their head is behind us: up to date)', !!res && res.upToDate === true);
+    // Accepting a rewind MOVES the device to the rewound head (sgit pull --accept-rewind), so the
+    // commits the owner removed cannot be pushed back (review of 2026-11-25, finding 4).
+    ok('merge with acceptRewind moves the device to the rewound head', !!res && res.rewindAccepted === true && B._headCommitId === old && B.lastAcceptedHead === old, JSON.stringify(res));
     await A._refManager.writeRef(A._refFileId, goodHead);          // restore
     ok('forward move is forward again', (await B.getBehindCount(), B.remoteHeadStatus) === 'forward');
 

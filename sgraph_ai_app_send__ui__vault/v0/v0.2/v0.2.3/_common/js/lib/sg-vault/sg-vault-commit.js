@@ -172,7 +172,7 @@ class SGVaultCommit {
                 blob_id:          entry.blob_id,
                 tree_id:          null,
                 name_enc:         await enc(entry.name),
-                size_enc:         await enc(String(entry.size | 0)),
+                size_enc:         await enc(String(Math.max(0, Math.floor(Number(entry.size) || 0)))),   // no `| 0`: sizes ≥ 2 GiB
                 content_hash_enc: await enc(entry.content_hash == null ? '' : entry.content_hash),
                 content_type_enc: await enc(contentType),
                 large:            !!entry.large
@@ -201,7 +201,7 @@ class SGVaultCommit {
 
         return {
             name:         await dec(entry.name_enc),
-            size:         await dec(entry.size_enc) | 0,
+            size:         Number(await dec(entry.size_enc)) || 0,
             content_hash: await dec(entry.content_hash_enc),
             content_type: await dec(entry.content_type_enc),
             large:        !!entry.large,

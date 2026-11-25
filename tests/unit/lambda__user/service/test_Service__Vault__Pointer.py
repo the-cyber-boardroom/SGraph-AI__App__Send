@@ -504,9 +504,12 @@ class test_Service__Vault__Pointer(TestCase):
         sequential = [self.service._batch_read(self.vault_id, op['file_id']) for op in ops]
         assert result['results'] == sequential                                   # identical to the one-by-one answer
 
-    def test__batch_read__backend_error_fails_only_that_object(self):
-        """A backend exception while reading one object (S3 SlowDown, a timeout) yields
-        status 'error' for that operation; the others in the batch still succeed."""
+    def test__batch_read__backend_error_fails_the_whole_request(self):
+        """A backend exception while reading one object (S3 SlowDown, a timeout) fails the
+        whole batch, exactly as the sequential read did: every deployed UI (and every rollback
+        release) understands only 'ok' / 'not_found' per op and retries a failed REQUEST by
+        splitting it. A per-op 'error' status would read as a silently missing object there."""
+        import pytest
         from memory_fs.storage_fs.providers.Storage_FS__Memory import Storage_FS__Memory
         class Flaky_FS(Storage_FS__Memory):
             def file__bytes(self, path):
@@ -516,13 +519,13 @@ class test_Service__Vault__Pointer(TestCase):
         service = Service__Vault__Pointer(storage_fs=Flaky_FS())
         service.write(self.vault_id, 'bare/data/obj-good', self.write_key, b'ok')
         service.write(self.vault_id, 'bare/data/obj-bad',  self.write_key, b'never read')
-        result = service.batch_read(self.vault_id, [dict(op='read', file_id='bare/data/obj-good'),
-                                                    dict(op='read', file_id='bare/data/obj-bad'),
-                                                    dict(op='read', file_id='bare/data/obj-absent')])
-        statuses = [r['status'] for r in result['results']]
-        assert statuses == ['ok', 'error', 'not_found']
-        assert result['results'][1]['detail'] == 'RuntimeError'
-        assert 'data' not in result['results'][1]
+        ops = [dict(op='read', file_id='bare/data/obj-good'),
+               dict(op='read', file_id='bare/data/obj-bad' ),
+               dict(op='read', file_id='bare/data/obj-absent')]
+        with pytest.raises(RuntimeError, match='SlowDown'):
+            service.batch_read(self.vault_id, ops)                               # parallel path
+        with pytest.raises(RuntimeError, match='SlowDown'):
+            service.batch_read(self.vault_id, ops[1:2])                          # single-op path
 
     def test__batch_read__first_read_on_calling_thread(self):
         """The first operation is read on the request thread before the pool starts, so a

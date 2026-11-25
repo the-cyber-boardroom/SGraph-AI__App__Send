@@ -118,16 +118,15 @@
     function pyGuessType(filename) {
         let base = String(filename || '');
         let [stem, ext] = pySplitExt(base);
-        while (Object.prototype.hasOwnProperty.call(PY_SUFFIX_MAP, ext)) {
-            base = stem + PY_SUFFIX_MAP[ext];
+        while (Object.prototype.hasOwnProperty.call(PY_SUFFIX_MAP, ext.toLowerCase())) {   // CPython: suffix_map by ext.lower()
+            base = stem + PY_SUFFIX_MAP[ext.toLowerCase()];
             [stem, ext] = pySplitExt(base);
         }
         if (Object.prototype.hasOwnProperty.call(PY_ENCODINGS_MAP, ext)) {
             base = stem;
             [stem, ext] = pySplitExt(base);
         }
-        if (Object.prototype.hasOwnProperty.call(PY_TYPES_MAP, ext)) return PY_TYPES_MAP[ext];
-        const lower = ext.toLowerCase();
+        const lower = ext.toLowerCase();                                                      // CPython: types_map by ext.lower()
         if (Object.prototype.hasOwnProperty.call(PY_TYPES_MAP, lower)) return PY_TYPES_MAP[lower];
         return null;
     }

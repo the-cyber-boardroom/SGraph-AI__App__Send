@@ -148,6 +148,7 @@ class SGVault {
             ['decrypt']
         )
         vault._refFileId = refFileId
+        vault._refPinned = true                 // the token names its ref: an index refresh must not swap in 'current'
         vault._initManagers()
 
         // The format gate lives in the branch index, whose id is HMAC(read_key, …): derivable
@@ -234,9 +235,14 @@ class SGVault {
             try {
                 const legacyRef  = await SGVaultCrypto.deriveBranchRefFileId(keys.hmacKey, vaultId, 'web-ui')
                 const legacyHead = await vault._refManager.readRef(legacyRef)
-                if (legacyHead && legacyHead !== namedCommitId && !(await vault._isAncestor(legacyHead, namedCommitId))) {
-                    cloneCommitId = legacyHead
-                    vault._adoptedLegacyClone = legacyRef
+                if (legacyHead && legacyHead !== namedCommitId) {
+                    // Adopt only when the walk PROVES it unpublished (complete walk, never reached).
+                    // An inconclusive walk (a long history) must not open a months-old tree.
+                    const w = await vault._walkReaches(namedCommitId, legacyHead, 5000)
+                    if (!w.reached && w.complete) {
+                        cloneCommitId = legacyHead
+                        vault._adoptedLegacyClone = legacyRef
+                    }
                 }
             } catch (_) {}
         }
@@ -381,6 +387,20 @@ class SGVault {
         this._objectStore.setFormat(this._format)
     }
 
+    // Load every lazy folder on the way to (and including) folderPath, so a write never lands
+    // in a node whose other children were never read. Throws when a folder cannot be loaded.
+    async _ensureFolderLoaded(folderPath) {
+        const parts = String(folderPath || '/').split('/').filter(Boolean)
+        let path = ''
+        for (const part of parts) {
+            path += '/' + part
+            if (this.needsLoading && this.needsLoading(path)) {
+                const ok = await this.loadSubTreeOnDemand(path)
+                if (!ok && this.needsLoading(path)) { const e = new Error(`folder ${path} could not be loaded; nothing was written`); e.code = 'EUNLOADED'; throw e }
+            }
+        }
+    }
+
     // --- Branch index / format gate ----------------------------------------------------
     // Re-read the server's copy (one small read), apply the gate (id width, features) and keep
     // the parsed index for branches / tags. Called on open and before every sync, as the CLI's
@@ -487,7 +507,7 @@ class SGVault {
             const pem = await this._refManager.readPublicKeyPem(kid)
             if (pem) key = await SGVaultSigning.importPublicKeyPem(pem)
         } catch (_) { key = null }
-        this._publicKeyCache.set(kid, key)
+        if (key) this._publicKeyCache.set(kid, key)       // only successes: a key registered later must be found
         return key
     }
     async verifyCommit(commitId, commit = null) {
@@ -685,7 +705,12 @@ class SGVault {
         for (const [name, entry] of Object.entries(node.children || {})) {
             if (entry.type === 'folder') {
                 if (entry._loaded === false && entry._tree_id) {
-                    // Lazy sub-tree: never opened by the user, nothing could have changed
+                    // Lazy sub-tree: never opened, so nothing in it can have changed. Content written
+                    // into it without loading it first would be dropped silently — refuse instead
+                    // (every write path loads its folder first: _ensureFolderLoaded).
+                    if (entry._dirty || Object.keys(entry.children || {}).length) {
+                        const e = new Error(`commit refused: folder "${name}" was changed without being loaded; nothing was written`); e.code = 'EUNLOADED'; throw e
+                    }
                     entries.push({ name, size: 0, content_hash: null, blob_id: null, tree_id: entry._tree_id })
                 } else if (!entry._dirty && entry._cleanTreeId) {
                     // Loaded but unmodified: reuse the tree object saved when it was loaded
@@ -812,7 +837,7 @@ class SGVault {
         }
         node.children[fileName] = {
             type: 'file', blob_id: entry.blob_id,
-            size: entry.size | 0, content_hash: entry.content_hash || null,
+            size: Number(entry.size) || 0, content_hash: entry.content_hash || null,
             content_type: entry.content_type || null, large: !!entry.large
         }
     }

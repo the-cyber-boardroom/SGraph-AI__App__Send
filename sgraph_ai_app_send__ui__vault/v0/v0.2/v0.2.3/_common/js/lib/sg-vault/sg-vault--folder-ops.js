@@ -15,6 +15,7 @@
             const parts      = folderPath.split('/').filter(Boolean)
             const name       = parts.pop()
             const parentPath = '/' + parts.join('/')
+            await this._ensureFolderLoaded(parentPath)
             const parent     = this._findNode(parentPath)
             if (!parent || parent.type !== 'folder') {
                 throw new Error(`Parent folder not found: ${parentPath}`)
@@ -43,6 +44,7 @@
             const parts      = folderPath.split('/').filter(Boolean)
             const name       = parts.pop()
             const parentPath = '/' + parts.join('/')
+            await this._ensureFolderLoaded(parentPath)
             const parent     = this._findNode(parentPath)
             if (!parent || parent.type !== 'folder') throw new Error(`Parent folder not found`)
             if (!parent.children[name]) throw new Error(`Folder not found: ${name}`)
@@ -55,6 +57,7 @@
             const parts      = folderPath.split('/').filter(Boolean)
             const oldName    = parts.pop()
             const parentPath = '/' + parts.join('/')
+            await this._ensureFolderLoaded(parentPath)
             const parent     = this._findNode(parentPath)
             if (!parent || parent.type !== 'folder') throw new Error(`Parent folder not found`)
             if (!parent.children[oldName]) throw new Error(`Folder not found: ${oldName}`)
@@ -70,6 +73,7 @@
             const folderName    = srcParts.pop()
             const srcParentPath = '/' + srcParts.join('/')
             if (srcParentPath === destParentPath) return
+            await this._ensureFolderLoaded(srcParentPath); await this._ensureFolderLoaded(destParentPath)
 
             const srcParent  = this._findNode(srcParentPath)
             if (!srcParent || srcParent.type !== 'folder') throw new Error(`Source parent not found`)
@@ -142,9 +146,12 @@
         // Concurrent calls share one walk (the shells and the app page both call this on open).
 
         async loadAllSubTrees(opts) {
-            if (this._bulkLoad) return this._bulkLoad
-            this._bulkLoad = this._loadAllSubTreesNow(opts || {}).finally(() => { this._bulkLoad = null })
-            return this._bulkLoad
+            const root = this._tree && this._tree['/']
+            if (this._bulkLoad && this._bulkLoadRoot === root) return this._bulkLoad     // same tree: share the walk
+            const walk = this._loadAllSubTreesNow(opts || {})
+            this._bulkLoad = walk; this._bulkLoadRoot = root
+            walk.finally(() => { if (this._bulkLoad === walk) { this._bulkLoad = null; this._bulkLoadRoot = null } }).catch(() => {})
+            return walk
         },
 
         async _loadAllSubTreesNow(opts) {

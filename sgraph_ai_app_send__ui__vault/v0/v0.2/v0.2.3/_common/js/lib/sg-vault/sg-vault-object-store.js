@@ -305,6 +305,7 @@ class SGVaultObjectStore {
                 done += 1; report(); return
             }
             // results arrive in request order; match by file_id when the server echoes it, else by position
+            const retry  = []
             const byFile = new Map()
             for (let j = 0; j < (raw || []).length; j++) { const r = raw[j]; if (r && r.file_id) byFile.set(r.file_id, r) }
             for (let j = 0; j < chunk.length; j++) {
@@ -314,9 +315,18 @@ class SGVaultObjectStore {
                     const bytes = SGVaultObjectStore._b64ToAb(r.data)
                     result.set(objectId, bytes)
                     this._cachePut(objectId, filePath, bytes)                      // not awaited: see above
-                } else if (failures) {
-                    failures.set(objectId, (r && r.status) || 'no result')
+                } else if (r && r.status === 'not_found') {
+                    if (failures) failures.set(objectId, 'not_found')
+                } else {
+                    retry.push(chunk[j])                                            // 'error' / no result: one GET each
                 }
+            }
+            for (const { objectId, filePath } of retry) {
+                try {
+                    const data = await this._sgSend.vaultRead(this._vaultId, filePath)
+                    if (data) { result.set(objectId, data); this._cachePut(objectId, filePath, data) }
+                    else if (failures) failures.set(objectId, 'not_found')
+                } catch (e) { if (failures) failures.set(objectId, (e && e.message) || 'request failed') }
             }
             done += chunk.length; report()
         }
