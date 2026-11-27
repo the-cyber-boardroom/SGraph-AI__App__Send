@@ -50,6 +50,15 @@ ciphertext — it never decrypts. Reads are public; writes are double-gated (acc
 | POST | `/vault/presigned/complete/{vault_id}` | Complete S3 multipart (auth + write_key) | Yes |
 | POST | `/vault/presigned/cancel/{vault_id}` | Cancel S3 multipart (auth + write_key) | Yes |
 | GET | `/vault/presigned/read-url/{vault_id}/{file_id}` | Presigned S3 GET URL (no auth) | Yes |
+| POST | `/vault/batch/{vault_id}` | Up to 100 ops (`read`, `write`, `write-if-match`, `delete`), in order, best effort, stops at the first conflict or unknown op (earlier ops stay applied); all-`read` batch needs no auth and reads in parallel; any write needs token + write_key. `write-if-match` compares base64 `match` with the full current bytes in the Lambda (not a storage conditional write) | Yes |
+| GET | `/vault/list/{vault_id}?prefix=` | List file_ids (unpaginated; skips manifest, tombstone and append entries; no auth) | Yes |
+| GET | `/vault/health/{vault_id}` | Existence check + warm-up (`{status:"ok"}` or 404; no auth) | Yes |
+| GET | `/vault/public-info/{vault_id}` | `public-vault.json` of a public vault (no auth; 501 when public vaults are not configured) | Yes |
+
+**Corrected 2026-11-27 (cl-6.conductor, code-verified against the in-memory OpenAPI spec):** the four
+rows above were live but missing from this table. The full vault surface is 29 route paths: 13 pointer
+(including zip, destroy and three catch-alls for a missing `file_id`), 4 presigned, 12 append. Map and
+callers: `team/roles/conductor/reviews/11/27/v0.33.69__map-and-plan__sg-api-for-vaults.md`.
 
 **Storage model:** Blobs stored at `transfers/vault/{vault_id}/{file_id}/payload` in Storage_FS.
 Write-key hash stored in `transfers/vault/{vault_id}/vault_pointer.json`.

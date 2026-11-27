@@ -7,6 +7,10 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-11-27
+
+2026-11-27 | `send-api/index.md` | Vault Pointer table: added `batch`, `list`, `health`, `public-info` (live, code-verified against the in-memory OpenAPI spec; were missing). Vault surface = 29 route paths. Source: Conductor map `team/roles/conductor/reviews/11/27/`.
+
 ## 2026-11-25
 
 Append lanes reviewed for v2 (capacity, large payloads, signed lanes). `vault/index.md` Vault Append section: new code-verified "Limits and known defects" table (1,000 pending cap counted by full listing; real payload max ≈ 4.4 MB; `fetch` has no response ceiling; config cache never expires, so token revocation does not reach other warm instances; v2 features PROPOSED).
